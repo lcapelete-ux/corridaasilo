@@ -152,7 +152,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
     // Verificação de duplicidade
     const existingRunners = getRunners();
-    
+
     // 1. Verifica CPF duplicado
     const duplicateCpf = existingRunners.find(r => r.cpf === formData.cpf);
     if (duplicateCpf) {
@@ -171,7 +171,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     }
 
     const ageCalculated = calculateAge(formData.birthDate);
-    
+
     if (ageCalculated < 10) {
       alert("Idade mínima de 10 anos.");
       return;
@@ -194,7 +194,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     };
 
     onSave(newRunner);
-    
+
     setFormData({
       fullName: '',
       email: '',
@@ -210,30 +210,45 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setErrors({});
     setIsCustomCity(false);
     setIsCustomTeam(false);
-    
+
     if (!isPublicView) {
        alert("Cadastrado com sucesso!");
     }
   };
 
-  return (
-    <div className={`max-w-3xl mx-auto bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden ${isPublicView ? 'my-8' : ''}`}>
-      {isPublicView && (
-        <div className="bg-[#FFD700] py-12 px-4 flex flex-col items-center justify-center relative overflow-hidden">
-          {/* Logo Recreation - Cleaner and Smaller */}
-          <div className="relative flex flex-col items-center justify-center transform -skew-x-6 select-none">
-            
-            {/* Main Text Stack */}
-            <span className="text-5xl md:text-6xl font-black tracking-tighter drop-shadow-sm leading-none text-slate-900">LSC</span>
-            <span className="text-6xl md:text-7xl font-black tracking-tighter drop-shadow-sm leading-none text-slate-900 -mt-2">NIGHT</span>
-            <span className="text-[5rem] md:text-[6rem] font-black tracking-tighter drop-shadow-sm leading-[0.75] text-slate-900 -mt-3">RUN</span>
-            
-            {/* Subtitle */}
-            <div className="mt-3 border-t-4 border-slate-900 w-full pt-1">
-               <span className="block text-center text-lg md:text-xl font-black tracking-widest uppercase text-slate-900">Laranjal Paulista</span>
-            </div>
+  // Estilos: tema escuro com brilho amarelo na inscrição pública (igual à tela inicial);
+  // tema claro original no formulário interno da área restrita
+  const inputClass = isPublicView
+    ? "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
+    : "w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all";
 
-          </div>
+  const selectClass = isPublicView
+    ? "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
+    : "w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none bg-white transition-all";
+
+  const labelClass = isPublicView
+    ? "block text-sm font-bold text-slate-300 mb-1"
+    : "block text-sm font-bold text-slate-700 mb-1";
+
+  const optionClass = "text-slate-900";
+
+  return (
+    <div className={isPublicView
+      ? "max-w-3xl mx-auto bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-800 overflow-hidden my-8 relative z-10"
+      : "max-w-3xl mx-auto bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden"
+    }>
+      {isPublicView && (
+        <div className="relative py-10 px-6 flex flex-col items-center justify-center text-center border-b border-slate-800 overflow-hidden">
+          <div className="absolute top-[-60%] left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-yellow-500 rounded-full blur-[100px] opacity-20 pointer-events-none" aria-hidden="true"></div>
+          <span className="relative z-10 text-yellow-400 text-xs font-bold uppercase tracking-widest border border-yellow-400/40 px-3 py-1 rounded-full mb-3">
+            2ª Corrida Noturna LSC
+          </span>
+          <h2 className="relative z-10 text-3xl md:text-4xl font-black italic tracking-tighter text-white neon-text">
+            FICHA DE <span className="text-yellow-400">INSCRIÇÃO</span>
+          </h2>
+          <p className="relative z-10 mt-2 flex items-center gap-2 text-slate-400 text-sm font-bold uppercase tracking-wider">
+            <MapPin size={14} className="text-yellow-400" aria-hidden="true" /> Laranjal Paulista/SP
+          </p>
         </div>
       )}
 
@@ -251,24 +266,24 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
+
             {/* Nome Completo */}
             <div className="col-span-2">
-              <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
+              <label className={labelClass}>Nome Completo</label>
               <input
                 type="text"
                 name="fullName"
                 required
                 value={formData.fullName}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
+                className={inputClass}
                 placeholder="Ex: Maria Silva"
               />
             </div>
 
             {/* CPF */}
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <label className={`${labelClass} flex items-center gap-1`}>
                 <CreditCard size={14} /> CPF
               </label>
               <div className="relative">
@@ -281,24 +296,28 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   onChange={handleChange}
                   onBlur={handleBlur}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all ${
-                    errors.cpf 
-                      ? 'border-red-400 focus:ring-red-200 focus:border-red-400 bg-red-50' 
-                      : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400'
+                    errors.cpf
+                      ? (isPublicView
+                          ? 'border-red-400 bg-red-950/40 text-white focus:ring-red-400/30 focus:border-red-400'
+                          : 'border-red-400 focus:ring-red-200 focus:border-red-400 bg-red-50')
+                      : (isPublicView
+                          ? 'bg-slate-800/60 border-slate-700 text-white placeholder-slate-500 focus:ring-yellow-400 focus:border-yellow-400'
+                          : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400')
                   }`}
                   placeholder="000.000.000-00"
                 />
                 {errors.cpf && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 animate-fade-in">
+                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 animate-fade-in ${isPublicView ? 'text-red-400' : 'text-red-500'}`}>
                     <AlertCircle size={18} />
                   </div>
                 )}
               </div>
-              {errors.cpf && <p className="text-xs text-red-500 font-bold mt-1 ml-1">{errors.cpf}</p>}
+              {errors.cpf && <p className={`text-xs font-bold mt-1 ml-1 ${isPublicView ? 'text-red-400' : 'text-red-500'}`}>{errors.cpf}</p>}
             </div>
 
             {/* Data Nascimento */}
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <label className={`${labelClass} flex items-center gap-1`}>
                 <Calendar size={14} /> Data de Nascimento
               </label>
               <input
@@ -307,27 +326,27 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 required
                 value={formData.birthDate}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
+                className={`${inputClass} ${isPublicView ? '[color-scheme:dark]' : ''}`}
               />
             </div>
 
             {/* Cidade */}
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <label className={`${labelClass} flex items-center gap-1`}>
                 <MapPin size={14} /> Cidade onde reside
               </label>
               <div className="space-y-2">
-                <select 
+                <select
                   name="citySelect"
                   value={isCustomCity ? 'Outra' : formData.city}
                   onChange={handleCitySelectChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none bg-white transition-all"
+                  className={selectClass}
                 >
-                  <option value="" disabled>Selecione uma cidade...</option>
+                  <option value="" disabled className={optionClass}>Selecione uma cidade...</option>
                   {PREDEFINED_CITIES.map(city => (
-                    <option key={city} value={city}>{city}</option>
+                    <option key={city} value={city} className={optionClass}>{city}</option>
                   ))}
-                  <option value="Outra">Outra (Digitar nome)</option>
+                  <option value="Outra" className={optionClass}>Outra (Digitar nome)</option>
                 </select>
 
                 {isCustomCity && (
@@ -337,7 +356,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                     required
                     value={formData.city}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all animate-fade-in"
+                    className={`${inputClass} animate-fade-in`}
                     placeholder="Digite o nome da cidade"
                     autoFocus
                   />
@@ -347,67 +366,67 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
             {/* Gênero */}
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1">Sexo</label>
+              <label className={labelClass}>Sexo</label>
               <select
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none bg-white"
+                className={selectClass}
               >
                 {Object.values(Gender).map(g => (
-                  <option key={g} value={g}>{g}</option>
+                  <option key={g} value={g} className={optionClass}>{g}</option>
                 ))}
               </select>
             </div>
 
              {/* Tamanho Camiseta */}
              <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1">Tamanho da Camiseta</label>
+              <label className={labelClass}>Tamanho da Camiseta</label>
               <select
                 name="shirtSize"
                 value={formData.shirtSize}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none bg-white"
+                className={selectClass}
               >
                 {Object.values(ShirtSize).map(s => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s} className={optionClass}>{s}</option>
                 ))}
               </select>
             </div>
 
             {/* Email */}
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+              <label className={labelClass}>Email</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
+                className={inputClass}
                 placeholder="contato@email.com"
               />
             </div>
 
             {/* Equipe */}
             <div className="col-span-2">
-              <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <label className={`${labelClass} flex items-center gap-1`}>
                 <Flag size={14} /> Nome da Equipe
               </label>
               <div className="space-y-2">
-                <select 
+                <select
                   name="teamSelect"
                   value={isCustomTeam ? 'Outra' : formData.teamName}
                   onChange={handleTeamSelectChange}
                   disabled={userSession?.role === 'team_leader' && !!userSession.teamAccess}
-                  className={`w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none bg-white transition-all ${
-                    userSession?.role === 'team_leader' ? 'bg-slate-100 text-slate-500' : ''
+                  className={`${selectClass} ${
+                    userSession?.role === 'team_leader' ? (isPublicView ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-500') : ''
                   }`}
                 >
-                  <option value="Avulso">Avulso (Sem equipe)</option>
+                  <option value="Avulso" className={optionClass}>Avulso (Sem equipe)</option>
                   {PREDEFINED_TEAMS.map(team => (
-                    <option key={team} value={team}>{team}</option>
+                    <option key={team} value={team} className={optionClass}>{team}</option>
                   ))}
-                  <option value="Outra">Outra (Digitar nome da equipe)</option>
+                  <option value="Outra" className={optionClass}>Outra (Digitar nome da equipe)</option>
                 </select>
 
                 {isCustomTeam && (
@@ -417,7 +436,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                     required
                     value={formData.teamName}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all animate-fade-in"
+                    className={`${inputClass} animate-fade-in`}
                     placeholder="Digite o nome da equipe"
                     autoFocus
                   />
@@ -433,24 +452,24 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                  <DollarSign size={20} className="text-emerald-600" />
                  <h3 className="font-bold text-lg">Financeiro (Área Restrita)</h3>
                </div>
-               
+
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  {/* Upload Comprovante */}
                  <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Comprovante de Pagamento</label>
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       ref={fileInputRef}
                       accept="image/*,application/pdf"
                       onChange={handleFileChange}
                       className="hidden"
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className={`w-full py-3 px-4 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 transition-colors ${
-                        formData.paymentProof 
-                          ? 'border-emerald-400 bg-emerald-50 text-emerald-700' 
+                        formData.paymentProof
+                          ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
                           : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-400'
                       }`}
                     >
@@ -494,12 +513,24 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
             </div>
           )}
 
-          <div className="pt-6 border-t border-slate-100 flex justify-end">
+          <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
             <button
               type="submit"
-              className="w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase"
+              className={isPublicView
+                ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden"
+                : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase"
+              }
             >
-              Confirmar Inscrição
+              {isPublicView ? (
+                <>
+                  <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
+                  <span className="relative z-10 flex items-center gap-2">
+                    <Save size={20} aria-hidden="true" /> Confirmar Inscrição
+                  </span>
+                </>
+              ) : (
+                'Confirmar Inscrição'
+              )}
             </button>
           </div>
         </form>

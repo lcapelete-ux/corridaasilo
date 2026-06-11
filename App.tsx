@@ -221,30 +221,34 @@ const App: React.FC = () => {
   // RENDER: FORMULÁRIO PÚBLICO
   if (mode === 'public') {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
-        <header className="bg-yellow-400 border-b-4 border-black sticky top-0 z-10 shadow-md">
-          <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-             <div className="flex items-center gap-2 font-black text-slate-900 text-xl md:text-2xl italic tracking-tighter">
-               <Timer size={28} className="text-black fill-white"/> CORRIDA NOTURNA LSC
-             </div>
-             <button 
-               onClick={() => setMode('landing')}
-               className="text-sm font-bold text-slate-900 hover:text-slate-700 flex items-center gap-1"
-             >
-               <ArrowLeft size={16} /> Voltar
-             </button>
-          </div>
-        </header>
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col relative overflow-hidden font-sans">
+        {/* Brilhos de fundo (mesma identidade visual da tela inicial) */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none" aria-hidden="true">
+          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-500 rounded-full blur-[120px] opacity-20"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-indigo-900 rounded-full blur-[100px] opacity-20"></div>
+        </div>
 
-        <main className="flex-1 p-4 md:p-8 bg-slate-100">
-           <RegistrationForm 
-             onSave={handleSaveRunner} 
-             existingTeams={getExistingTeams()} 
-             isPublicView={true} 
+        <nav className="relative z-20 flex justify-between items-center p-6 max-w-5xl mx-auto w-full">
+          <div className="flex items-center gap-2 font-black italic tracking-tighter text-lg md:text-xl">
+            <Timer size={22} className="text-yellow-400" aria-hidden="true" /> 2ª CORRIDA NOTURNA LSC
+          </div>
+          <button
+            onClick={() => setMode('landing')}
+            className="text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 border border-slate-800 px-3 py-1.5 rounded-full hover:bg-slate-900 transition-all backdrop-blur-md"
+          >
+            <ArrowLeft size={14} aria-hidden="true" /> Voltar
+          </button>
+        </nav>
+
+        <main className="flex-1 p-4 md:p-8 relative z-10">
+           <RegistrationForm
+             onSave={handleSaveRunner}
+             existingTeams={getExistingTeams()}
+             isPublicView={true}
            />
-           
-           <div className="max-w-3xl mx-auto mt-12 text-center text-slate-500 text-sm">
-             <p className="font-bold text-slate-800">Laranjal Paulista</p>
+
+           <div className="max-w-3xl mx-auto mt-4 mb-8 text-center text-slate-500 text-sm">
+             <p className="font-bold text-slate-300">Laranjal Paulista</p>
              <p className="mt-2">&copy; 2026 Corrida Noturna LSC. Todos os direitos reservados.</p>
            </div>
         </main>
