@@ -1,0 +1,402 @@
+
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, ViewState, UserSession } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, saveOrganizer, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue } from './services/storageService';
+import { RegistrationForm } from './components/RegistrationForm';
+import { RegistrationSuccess } from './components/RegistrationSuccess';
+import { RunnerList } from './components/RunnerList';
+import { TeamView } from './components/TeamView';
+import { SponsorsManager } from './components/SponsorsManager';
+import { ExpensesManager } from './components/ExpensesManager';
+import { ExtraRevenueManager } from './components/ExtraRevenueManager';
+import { OrganizersManager } from './components/OrganizersManager';
+import { LoginScreen } from './components/LoginScreen';
+import { LandingPage } from './components/LandingPage';
+import { ProofUploadScreen } from './components/ProofUploadScreen';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft } from 'lucide-react';
+
+// Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
+// por quem entra na área restrita, deixando a página pública mais leve
+const Dashboard = lazy(() =>
+  import('./components/Dashboard').then(m => ({ default: m.Dashboard }))
+);
+
+type AppMode = 'landing' | 'public' | 'registration_success' | 'auth_screen' | 'restricted_area' | 'proof_upload';
+
+const App: React.FC = () => {
+  const [runners, setRunners] = useState<Runner[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [organizers, setOrganizers] = useState<Organizer[]>([]);
+  const [extraRevenues, setExtraRevenues] = useState<ExtraRevenue[]>([]);
+  
+  // Alterado: O modo inicial agora é 'landing'
+  const [mode, setMode] = useState<AppMode>('landing');
+  const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [lastRegisteredAge, setLastRegisteredAge] = useState<number>(0);
+  
+  // Auth State
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+
+  useEffect(() => {
+    setRunners(getRunners());
+    setSponsors(getSponsors());
+    setExpenses(getExpenses());
+    setOrganizers(getOrganizers());
+    setExtraRevenues(getExtraRevenues());
+  }, []);
+
+  // --- Runner Actions ---
+  const handleSaveRunner = (runner: Runner) => {
+    saveRunner(runner);
+    setRunners(getRunners());
+    setLastRegisteredAge(runner.age);
+    
+    // Check if we are in public mode to redirect to success screen
+    if (mode === 'public') {
+      setMode('registration_success');
+    } else if (mode === 'restricted_area') {
+      // Se for admin ou team leader cadastrando, volta pra lista
+      setCurrentView('runners');
+    }
+  };
+
+  const handleUpdateRunner = (runner: Runner) => {
+    updateRunner(runner);
+    setRunners(getRunners());
+  };
+
+  const handleDeleteRunner = (id: string) => {
+    if (confirm('Tem certeza que deseja remover este atleta?')) {
+      deleteRunner(id);
+      setRunners(getRunners());
+    }
+  };
+
+  // --- Sponsor Actions ---
+  const handleSaveSponsor = (sponsor: Sponsor) => {
+    saveSponsor(sponsor);
+    setSponsors(getSponsors());
+  };
+
+  const handleUpdateSponsor = (sponsor: Sponsor) => {
+    updateSponsor(sponsor);
+    setSponsors(getSponsors());
+  };
+
+  const handleDeleteSponsor = (id: string) => {
+    if (confirm('Remover este patrocinador?')) {
+      deleteSponsor(id);
+      setSponsors(getSponsors());
+    }
+  };
+
+  // --- Expense Actions ---
+  const handleSaveExpense = (expense: Expense) => {
+    saveExpense(expense);
+    setExpenses(getExpenses());
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    if (confirm('Remover esta despesa?')) {
+      deleteExpense(id);
+      setExpenses(getExpenses());
+    }
+  };
+
+  // --- Extra Revenue Actions ---
+  const handleSaveExtraRevenue = (revenue: ExtraRevenue) => {
+    saveExtraRevenue(revenue);
+    setExtraRevenues(getExtraRevenues());
+  };
+
+  const handleDeleteExtraRevenue = (id: string) => {
+    if (confirm('Remover esta receita?')) {
+      deleteExtraRevenue(id);
+      setExtraRevenues(getExtraRevenues());
+    }
+  };
+
+  // --- Organizer Actions ---
+  const handleSaveOrganizer = (organizer: Organizer) => {
+    saveOrganizer(organizer);
+    setOrganizers(getOrganizers());
+  };
+
+  const handleUpdateOrganizer = (organizer: Organizer) => {
+    updateOrganizer(organizer);
+    setOrganizers(getOrganizers());
+  };
+
+  const handleDeleteOrganizer = (id: string) => {
+    if (confirm('Remover este organizador? Ele perderá o acesso ao sistema.')) {
+      deleteOrganizer(id);
+      setOrganizers(getOrganizers());
+    }
+  };
+
+  // --- Auth & Permissions ---
+  const handleLogin = (session: UserSession) => {
+    setUserSession(session);
+    setMode('restricted_area');
+    
+    // Redirecionamento inicial baseado no cargo
+    if (session.role === 'team_leader') {
+      setCurrentView('runners'); // Líder vê direto a lista
+    } else {
+      setCurrentView('dashboard'); // Admin vê dashboard
+    }
+  };
+
+  const handleLogout = () => {
+    setUserSession(null);
+    setMode('landing'); // Logout volta para a Landing Page
+  };
+
+  // Filtra corredores baseado no usuário logado
+  const getVisibleRunners = () => {
+    if (userSession?.role === 'team_leader' && userSession.teamAccess) {
+      return runners.filter(r => r.teamName.toLowerCase() === userSession.teamAccess?.toLowerCase());
+    }
+    return runners;
+  };
+
+  const getExistingTeams = () => {
+    const teams = new Set(runners.map(r => r.teamName).filter(t => t && t !== 'Avulso'));
+    return Array.from(teams);
+  };
+
+  // Totals Calculation
+  const totalSponsorRevenue = sponsors.reduce((acc, curr) => acc + (curr.isPaid ? curr.amount : 0), 0);
+  const totalExtraRevenue = extraRevenues.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpensesValue = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+
+  // Grand Total Revenue (Sponsors + Extra)
+  const grandTotalRevenue = totalSponsorRevenue + totalExtraRevenue;
+
+  const NavItem = ({ target, icon: Icon, label }: { target: ViewState; icon: any; label: string }) => (
+    <button
+      onClick={() => {
+        setCurrentView(target);
+        setIsSidebarOpen(false);
+      }}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+        currentView === target
+          ? 'bg-yellow-400 text-slate-900 shadow-lg shadow-yellow-400/30 font-bold'
+          : 'text-slate-400 hover:bg-slate-800 hover:text-yellow-400'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="font-medium">{label}</span>
+    </button>
+  );
+
+  // RENDER: LANDING PAGE (NOVA TELA INICIAL)
+  if (mode === 'landing') {
+    return (
+      <LandingPage 
+        onStartRegistration={() => setMode('public')} 
+        onAdminLogin={() => setMode('auth_screen')} 
+        onOpenProofUpload={() => setMode('proof_upload')}
+      />
+    );
+  }
+
+  // RENDER: TELA DE UPLOAD DE COMPROVANTE
+  if (mode === 'proof_upload') {
+    return <ProofUploadScreen onBack={() => setMode('landing')} />;
+  }
+
+  // RENDER: TELA DE LOGIN
+  if (mode === 'auth_screen') {
+    return <LoginScreen onLogin={handleLogin} onBack={() => setMode('landing')} />;
+  }
+
+  // RENDER: TELA DE SUCESSO DO PIX
+  if (mode === 'registration_success') {
+    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} />;
+  }
+
+  // RENDER: FORMULÁRIO PÚBLICO
+  if (mode === 'public') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <header className="bg-yellow-400 border-b-4 border-black sticky top-0 z-10 shadow-md">
+          <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+             <div className="flex items-center gap-2 font-black text-slate-900 text-xl md:text-2xl italic tracking-tighter">
+               <Timer size={28} className="text-black fill-white"/> CORRIDA NOTURNA LSC
+             </div>
+             <button 
+               onClick={() => setMode('landing')}
+               className="text-sm font-bold text-slate-900 hover:text-slate-700 flex items-center gap-1"
+             >
+               <ArrowLeft size={16} /> Voltar
+             </button>
+          </div>
+        </header>
+
+        <main className="flex-1 p-4 md:p-8 bg-slate-100">
+           <RegistrationForm 
+             onSave={handleSaveRunner} 
+             existingTeams={getExistingTeams()} 
+             isPublicView={true} 
+           />
+           
+           <div className="max-w-3xl mx-auto mt-12 text-center text-slate-500 text-sm">
+             <p className="font-bold text-slate-800">Laranjal Paulista</p>
+             <p className="mt-2">&copy; 2026 Corrida Noturna LSC. Todos os direitos reservados.</p>
+           </div>
+        </main>
+      </div>
+    );
+  }
+
+  // RENDER: ÁREA RESTRITA (ADMIN / TEAM LEADER)
+  return (
+    <div className="flex h-screen bg-slate-100 overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed md:relative z-30 w-72 h-full bg-slate-900 border-r border-slate-800 flex flex-col
+        transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="p-8 flex items-center gap-3 border-b border-slate-800">
+          <div className="bg-yellow-400 p-2 rounded-lg text-slate-900">
+            <Timer size={24} />
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-white italic tracking-tighter leading-tight">2ª CORRIDA<br />NOTURNA LSC</h1>
+            <p className="text-xs text-yellow-400">
+              {userSession?.role === 'admin' ? 'Painel Admin' : `Líder: ${userSession?.username}`}
+            </p>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-6 space-y-2">
+          {userSession?.role === 'admin' && (
+            <NavItem target="dashboard" icon={LayoutDashboard} label="Dashboard" />
+          )}
+          
+          <NavItem target="runners" icon={Users} label="Corredores" />
+          
+          <NavItem target="registration" icon={UserPlus} label="Novo Cadastro" />
+          
+          {userSession?.role === 'admin' && (
+            <>
+              <NavItem target="teams" icon={Flag} label="Equipes" />
+              <div className="pt-4 pb-2">
+                <div className="h-px bg-slate-800 w-full" />
+              </div>
+              <NavItem target="sponsors" icon={Briefcase} label="Patrocinadores" />
+              <NavItem target="extra_revenue" icon={CircleDollarSign} label="Receita Extra" />
+              <NavItem target="expenses" icon={TrendingDown} label="Despesas" />
+              <NavItem target="organizers" icon={Shield} label="Organizadores" />
+            </>
+          )}
+        </nav>
+
+        <div className="p-6 border-t border-slate-800 space-y-4">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all text-sm py-2 font-bold"
+          >
+            <LogOut size={16} /> Encerrar Sessão
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Mobile Header */}
+        <header className="md:hidden bg-yellow-400 border-b border-black p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-black text-slate-900 italic">
+             <Timer size={20} className="text-black"/> CORRIDA NOTURNA LSC
+          </div>
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-900">
+            <Menu size={24} />
+          </button>
+        </header>
+
+        {/* Scrollable Area */}
+        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50">
+          <div className="max-w-7xl mx-auto">
+            {currentView === 'dashboard' && (
+              <Suspense fallback={<div className="text-slate-400 font-medium p-8 text-center animate-pulse">Carregando dashboard...</div>}>
+                <Dashboard
+                  runners={runners}
+                  totalRevenue={grandTotalRevenue}
+                  totalExpenses={totalExpensesValue}
+                />
+              </Suspense>
+            )}
+            
+            {currentView === 'registration' && (
+              <RegistrationForm 
+                onSave={handleSaveRunner} 
+                existingTeams={getExistingTeams()} 
+                isPublicView={false}
+                userSession={userSession}
+              />
+            )}
+            
+            {currentView === 'runners' && (
+              <RunnerList 
+                runners={getVisibleRunners()} 
+                onDelete={handleDeleteRunner} 
+                onUpdate={handleUpdateRunner}
+                userSession={userSession}
+              />
+            )}
+            
+            {currentView === 'teams' && <TeamView runners={runners} />}
+            
+            {currentView === 'sponsors' && (
+              <SponsorsManager 
+                sponsors={sponsors} 
+                onSave={handleSaveSponsor} 
+                onUpdate={handleUpdateSponsor}
+                onDelete={handleDeleteSponsor}
+              />
+            )}
+
+            {currentView === 'extra_revenue' && (
+              <ExtraRevenueManager 
+                revenues={extraRevenues}
+                onSave={handleSaveExtraRevenue}
+                onDelete={handleDeleteExtraRevenue}
+              />
+            )}
+
+            {currentView === 'expenses' && (
+              <ExpensesManager 
+                expenses={expenses}
+                onSave={handleSaveExpense}
+                onDelete={handleDeleteExpense}
+              />
+            )}
+
+            {currentView === 'organizers' && (
+              <OrganizersManager 
+                organizers={organizers}
+                onSave={handleSaveOrganizer}
+                onUpdate={handleUpdateOrganizer}
+                onDelete={handleDeleteOrganizer}
+              />
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default App;

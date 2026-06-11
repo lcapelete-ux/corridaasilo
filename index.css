@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scrollbar com a identidade visual do evento (noite + amarelo neon) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #fbbf24;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* Utilitários de atraso de animação (delay-* do Tailwind só afeta transition) */
+@layer utilities {
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-500 { animation-delay: 500ms; }
+}
+
+/* Efeitos de luz da tela inicial (holofotes, flashes e neon) */
+@keyframes rotate-beam {
+  0% { transform: rotate(0deg); opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { transform: rotate(360deg); opacity: 0.3; }
+}
+@keyframes camera-flash {
+  0%, 90%, 100% { opacity: 0; transform: scale(0); }
+  92% { opacity: 1; transform: scale(1.5); box-shadow: 0 0 30px 10px white; }
+  94% { opacity: 0.8; transform: scale(1); }
+}
+@keyframes neon-pulse {
+  0%, 100% { text-shadow: 0 0 10px #facc15, 0 0 20px #facc15; }
+  50% { text-shadow: 0 0 20px #facc15, 0 0 40px #eab308, 0 0 60px #ca8a04; }
+}
+.animate-beam-slow { animation: rotate-beam 15s linear infinite; }
+.animate-beam-fast { animation: rotate-beam 10s linear infinite reverse; }
+.animate-flash { animation: camera-flash 4s infinite; }
+.neon-text { animation: neon-pulse 2s infinite alternate; }
+
+/* Desliga animações decorativas para quem prefere menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
