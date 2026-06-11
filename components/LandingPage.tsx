@@ -161,12 +161,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       <footer className="relative z-10 py-6 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center px-6 gap-4">
            <div className="text-slate-600 text-xs font-bold uppercase tracking-widest">
-             Realização: Equipe Luso
+             Realização: Lar São Cristóvão
            </div>
-           <div className="flex gap-6 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-              {/* Placeholders for Sponsor Logos */}
-              <div className="h-8 w-24 bg-slate-800 rounded flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-700">SICREDI</div>
-              <div className="h-8 w-24 bg-slate-800 rounded flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-700">RUNNER BRASIL</div>
+           <div className="flex items-center gap-6 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+              <SicrediLogo className="h-7 w-auto" />
            </div>
         </div>
       </footer>
