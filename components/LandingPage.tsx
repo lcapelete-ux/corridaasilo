@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload } from 'lucide-react';
+import { SicrediLogo } from './SicrediLogo';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -71,7 +72,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         {/* Sponsor Header */}
         <div className="mb-6 animate-fade-in-up">
            <div className="flex items-center justify-center gap-2 text-white font-bold text-lg md:text-xl tracking-tighter">
-             <span className="opacity-80">Sicredi</span>
+             <SicrediLogo className="h-6 md:h-7 w-auto" />
              <span className="text-yellow-400 text-xs uppercase tracking-widest border border-yellow-400 px-1 rounded shadow-[0_0_10px_rgba(250,204,21,0.3)]">Apresenta</span>
            </div>
         </div>
@@ -92,7 +93,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         {/* Date & Time Badge */}
         <div className="flex flex-col md:flex-row items-center gap-4 mb-8 animate-fade-in-up animation-delay-100">
            <div className="bg-yellow-400 text-slate-900 px-6 py-2 rounded-tl-2xl rounded-br-2xl font-black text-2xl md:text-3xl italic transform skew-x-[-10deg] shadow-[0_0_20px_rgba(250,204,21,0.4)] hover:shadow-[0_0_30px_rgba(250,204,21,0.6)] transition-shadow duration-500">
-             26 / SET / 2026
+             19 / SET / 2026
            </div>
            <div className="flex items-center gap-2 text-xl font-bold italic drop-shadow-md">
              <Timer className="text-yellow-400" aria-hidden="true" /> 19H LARGADA

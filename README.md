@@ -5,7 +5,7 @@ inscrições públicas, envio de comprovante de pagamento (PIX), dashboard
 financeiro, gestão de corredores, equipes, patrocinadores, despesas, receitas
 extras e organizadores.
 
-> Evento: **26/09/2026 · 19h · Praça Armando Sales de Oliveira – Laranjal Paulista/SP**
+> Evento: **19/09/2026 · 19h · Praça Armando Sales de Oliveira – Laranjal Paulista/SP**
 > Categorias: 5K corrida e 3K caminhada
 
 ## Stack
