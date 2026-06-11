@@ -1,6 +1,6 @@
-# LSC Night Run – Sistema de Gestão
+# 2ª Corrida Noturna LSC – Sistema de Gestão
 
-Sistema completo de gestão da corrida **LSC Night Run** (Laranjal Paulista/SP):
+Sistema completo de gestão da **2ª Corrida Noturna LSC** (Laranjal Paulista/SP):
 inscrições públicas, envio de comprovante de pagamento (PIX), dashboard
 financeiro, gestão de corredores, equipes, patrocinadores, despesas, receitas
 extras e organizadores.
@@ -54,7 +54,7 @@ pasta `dist/`, com redirect de SPA. Basta conectar o repositório no Netlify.
 ```
 ├── App.tsx                  # Roteamento entre as telas (landing, inscrição, admin…)
 ├── components/
-│   ├── LandingPage.tsx      # Tela inicial pública (countdown, infos, CTA)
+│   ├── LandingPage.tsx      # Tela inicial pública (hero do evento + CTA)
 │   ├── RegistrationForm.tsx # Formulário de inscrição
 │   ├── ProofUploadScreen.tsx# Envio de comprovante por CPF
 │   ├── Dashboard.tsx        # Painel financeiro (admin)

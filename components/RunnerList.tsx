@@ -110,7 +110,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `inscritos_lsc_night_run_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute('download', `inscritos_corrida_noturna_lsc_${new Date().toISOString().slice(0,10)}.csv`);
     document.body.appendChild(link);
     link.click();
     
@@ -590,7 +590,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
             {/* Modal Footer */}
             <div className="bg-slate-50 p-6 flex justify-between items-center print:hidden">
-              <span className="text-xs text-slate-400 font-mono">LSC NIGHT RUN SYSTEM</span>
+              <span className="text-xs text-slate-400 font-mono">CORRIDA NOTURNA LSC</span>
               <div className="flex gap-3">
                 <button 
                   onClick={handlePrint}

@@ -52,7 +52,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
           <div className="bg-yellow-400 p-4 rounded-xl text-slate-900 mb-4 shadow-lg shadow-yellow-400/20">
             <Timer size={40} className="fill-white text-black" />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 italic tracking-tighter uppercase">LSC Night Run</h1>
+          <h1 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">2ª Corrida Noturna LSC</h1>
           <p className="text-slate-500 font-medium">Área Restrita</p>
         </div>
 

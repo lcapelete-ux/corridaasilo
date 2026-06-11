@@ -224,8 +224,8 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <header className="bg-yellow-400 border-b-4 border-black sticky top-0 z-10 shadow-md">
           <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-             <div className="flex items-center gap-2 font-black text-slate-900 text-2xl italic tracking-tighter">
-               <Timer size={28} className="text-black fill-white"/> LSC NIGHT RUN
+             <div className="flex items-center gap-2 font-black text-slate-900 text-xl md:text-2xl italic tracking-tighter">
+               <Timer size={28} className="text-black fill-white"/> CORRIDA NOTURNA LSC
              </div>
              <button 
                onClick={() => setMode('landing')}
@@ -245,7 +245,7 @@ const App: React.FC = () => {
            
            <div className="max-w-3xl mx-auto mt-12 text-center text-slate-500 text-sm">
              <p className="font-bold text-slate-800">Laranjal Paulista</p>
-             <p className="mt-2">&copy; 2026 LSC Night Run. Todos os direitos reservados.</p>
+             <p className="mt-2">&copy; 2026 Corrida Noturna LSC. Todos os direitos reservados.</p>
            </div>
         </main>
       </div>
@@ -274,7 +274,7 @@ const App: React.FC = () => {
             <Timer size={24} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-white italic tracking-tighter">LSC NIGHT RUN</h1>
+            <h1 className="text-lg font-black text-white italic tracking-tighter leading-tight">2ª CORRIDA<br />NOTURNA LSC</h1>
             <p className="text-xs text-yellow-400">
               {userSession?.role === 'admin' ? 'Painel Admin' : `Líder: ${userSession?.username}`}
             </p>
@@ -319,7 +319,7 @@ const App: React.FC = () => {
         {/* Mobile Header */}
         <header className="md:hidden bg-yellow-400 border-b border-black p-4 flex items-center justify-between">
           <div className="flex items-center gap-2 font-black text-slate-900 italic">
-             <Timer size={20} className="text-black"/> LSC NIGHT RUN
+             <Timer size={20} className="text-black"/> CORRIDA NOTURNA LSC
           </div>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-900">
             <Menu size={24} />

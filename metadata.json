@@ -1,6 +1,6 @@
 {
-  "name": "LSC Night Run Manager",
-  "description": "Sistema de gestão para a LSC Night Run em Laranjal Paulista.",
+  "name": "Corrida Noturna LSC Manager",
+  "description": "Sistema de gestão para a 2ª Corrida Noturna LSC em Laranjal Paulista.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
