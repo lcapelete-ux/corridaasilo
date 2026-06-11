@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    base: '/', // Base na raiz para garantir compatibilidade com Netlify
+    base: './', // Caminhos relativos: funciona no GitHub Pages (/corridaasilo/) e em qualquer host
     define: {
       // Aceita API_KEY ou GEMINI_API_KEY (nome usado no painel do AI Studio/Netlify);
       // sem chave vira string vazia e as funções de IA usam o fallback offline
