@@ -10,8 +10,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     base: '/', // Base na raiz para garantir compatibilidade com Netlify
     define: {
-      // Define a variável de ambiente explicitamente para ser substituída no build
-      'process.env.API_KEY': JSON.stringify(env.API_KEY)
+      // Aceita API_KEY ou GEMINI_API_KEY (nome usado no painel do AI Studio/Netlify);
+      // sem chave vira string vazia e as funções de IA usam o fallback offline
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || env.GEMINI_API_KEY || '')
     }
   }
 })

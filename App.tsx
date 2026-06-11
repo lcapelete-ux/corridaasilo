@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, ViewState, UserSession } from './types';
 import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, saveOrganizer, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue } from './services/storageService';
-import { Dashboard } from './components/Dashboard';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -15,6 +14,12 @@ import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
 import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft } from 'lucide-react';
+
+// Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
+// por quem entra na área restrita, deixando a página pública mais leve
+const Dashboard = lazy(() =>
+  import('./components/Dashboard').then(m => ({ default: m.Dashboard }))
+);
 
 type AppMode = 'landing' | 'public' | 'registration_success' | 'auth_screen' | 'restricted_area' | 'proof_upload';
 
@@ -240,7 +245,7 @@ const App: React.FC = () => {
            
            <div className="max-w-3xl mx-auto mt-12 text-center text-slate-500 text-sm">
              <p className="font-bold text-slate-800">Laranjal Paulista</p>
-             <p className="mt-2">&copy; 2025 LSC Night Run. Todos os direitos reservados.</p>
+             <p className="mt-2">&copy; 2026 LSC Night Run. Todos os direitos reservados.</p>
            </div>
         </main>
       </div>
@@ -325,11 +330,13 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50">
           <div className="max-w-7xl mx-auto">
             {currentView === 'dashboard' && (
-              <Dashboard 
-                runners={runners} 
-                totalRevenue={grandTotalRevenue} 
-                totalExpenses={totalExpensesValue} 
-              />
+              <Suspense fallback={<div className="text-slate-400 font-medium p-8 text-center animate-pulse">Carregando dashboard...</div>}>
+                <Dashboard
+                  runners={runners}
+                  totalRevenue={grandTotalRevenue}
+                  totalExpenses={totalExpensesValue}
+                />
+              </Suspense>
             )}
             
             {currentView === 'registration' && (
