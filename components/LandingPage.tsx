@@ -162,13 +162,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Logos/Footer */}
       <footer className="relative z-10 py-6 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center px-6 gap-4">
-           <div className="text-slate-600 text-xs font-bold uppercase tracking-widest">
-             Realização: Lar São Cristóvão
-           </div>
            <div className="flex items-center gap-6">
               <div className="bg-white rounded px-3 py-1.5 flex items-center">
                 <img src={sicrediLogo} alt="Sicredi" className="h-8 md:h-10 w-auto object-contain" />
               </div>
+           </div>
+           <div className="text-slate-600 text-xs font-bold uppercase tracking-widest">
+             Realização: Lar São Cristóvão
            </div>
         </div>
       </footer>
