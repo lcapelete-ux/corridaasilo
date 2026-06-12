@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload } from 'lucide-react';
-import { SicrediLogo } from './SicrediLogo';
+import sicrediLogo from '../assets/sicredi-logo.jpg';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -72,7 +72,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         {/* Sponsor Header */}
         <div className="mb-6 animate-fade-in-up">
            <div className="flex items-center justify-center gap-2 text-white font-bold text-lg md:text-xl tracking-tighter">
-             <SicrediLogo className="h-6 md:h-7 w-auto" />
+             <div className="bg-white rounded px-2 py-1 flex items-center">
+               <img src={sicrediLogo} alt="Sicredi" className="h-5 md:h-6 w-auto object-contain" />
+             </div>
              <span className="text-yellow-400 text-xs uppercase tracking-widest border border-yellow-400 px-1 rounded shadow-[0_0_10px_rgba(250,204,21,0.3)]">Apresenta</span>
            </div>
         </div>
@@ -163,8 +165,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
            <div className="text-slate-600 text-xs font-bold uppercase tracking-widest">
              Realização: Lar São Cristóvão
            </div>
-           <div className="flex items-center gap-6 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-              <SicrediLogo className="h-7 w-auto" />
+           <div className="flex items-center gap-6">
+              <div className="bg-white rounded px-3 py-1.5 flex items-center">
+                <img src={sicrediLogo} alt="Sicredi" className="h-8 md:h-10 w-auto object-contain" />
+              </div>
            </div>
         </div>
       </footer>
