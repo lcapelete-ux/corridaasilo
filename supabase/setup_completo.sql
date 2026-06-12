@@ -22,9 +22,10 @@
 -- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  PASSO 0 — EDITE AQUI (única parte que você precisa mexer)            ║
 -- ║                                                                        ║
--- ║  Troque TROQUE-ESTA-SENHA por uma senha forte (mínimo 8 caracteres)   ║
--- ║  para cada administrador. Se quiser, troque também os e-mails — usar   ║
--- ║  um e-mail real é recomendado, pois permite recuperar a senha depois.  ║
+-- ║  Troque TROQUE-ESTA-SENHA pela senha desejada de cada administrador   ║
+-- ║  (mínimo 4 caracteres; uma senha forte é recomendado). Se quiser,      ║
+-- ║  troque também os e-mails — usar um e-mail real é recomendado, pois    ║
+-- ║  permite recuperar a senha depois.                                     ║
 -- ╚══════════════════════════════════════════════════════════════════════╝
 
 drop table if exists pg_temp.setup_config;
@@ -453,7 +454,7 @@ on conflict (name) do nothing;
 --
 --   select public.admin_create_login(
 --     'ana@exemplo.com',      -- e-mail de login
---     'SenhaForteDaAna1',     -- senha (mínimo 8 caracteres)
+--     'SenhaForteDaAna1',     -- senha (mínimo 4 caracteres)
 --     'Ana Silva',            -- nome
 --     'ana',                  -- usuário
 --     'Tribo',                -- equipe que ela lidera
@@ -484,8 +485,8 @@ begin
 
   if p_password is null
      or btrim(p_password) = 'TROQUE-ESTA-SENHA'
-     or length(btrim(p_password)) < 8 then
-    raise exception 'SENHA NÃO DEFINIDA para %. Volte ao "PASSO 0 — EDITE AQUI" no topo do arquivo, defina uma senha forte (mínimo 8 caracteres) e rode o arquivo inteiro de novo.', p_email;
+     or length(btrim(p_password)) < 4 then
+    raise exception 'SENHA NÃO DEFINIDA para %. Volte ao "PASSO 0 — EDITE AQUI" no topo do arquivo, escreva a senha desejada (mínimo 4 caracteres) e rode o arquivo inteiro de novo.', p_email;
   end if;
 
   if p_role not in ('admin', 'team_leader') then
