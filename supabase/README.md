@@ -1,94 +1,113 @@
 # Banco de dados — 2ª Corrida Noturna LSC (Supabase)
 
-Este diretório contém o schema completo para rodar o sistema de inscrições
-em um projeto [Supabase](https://supabase.com) (PostgreSQL + Auth + RLS),
-substituindo o armazenamento atual em `localStorage` (`services/storageService.ts`).
+Este diretório contém **um único arquivo de instalação**, o
+[`setup_completo.sql`](./setup_completo.sql), que monta todo o banco do
+sistema de inscrições em um projeto [Supabase](https://supabase.com)
+(PostgreSQL + Auth + RLS), substituindo o armazenamento atual em
+`localStorage` (`services/storageService.ts`).
 
-## 1. Criar o projeto
+## Instalação (3 passos)
 
-1. Crie um projeto em https://supabase.com (ou use um já existente).
-2. Abra **SQL Editor** no painel do projeto.
+1. **Edite as senhas**: abra o `setup_completo.sql` e, no **PASSO 0** (topo
+   do arquivo), troque `TROQUE-ESTA-SENHA` por uma senha forte para o
+   `marcelo` e outra para o `wilson`. Se quiser, troque também os e-mails —
+   um e-mail real é recomendado, pois permite recuperar a senha depois.
+2. No painel do projeto Supabase, abra o **SQL Editor**.
+3. Cole o arquivo **inteiro** e clique em **Run**. O resultado mostra um
+   resumo do que foi criado.
 
-## 2. Rodar o schema
+Pronto. O script faz tudo: estrutura, regras de segurança, listas de
+equipes/cidades dos formulários **e os dois logins de administrador** no
+Supabase Auth (e-mail já confirmado, senha criptografada com bcrypt).
 
-1. Cole o conteúdo de `schema.sql` e clique em **Run**.
-   - Cria os tipos enumerados, as tabelas, as funções auxiliares, o gatilho
-     de provisionamento de organizadores e todas as políticas de RLS.
-2. Cole o conteúdo de `seed.sql` e clique em **Run**.
-   - Preenche `teams` e `cities` com os valores já usados nos formulários
-     (`PREDEFINED_TEAMS` / `PREDEFINED_CITIES`).
+Observações:
 
-## 3. Criar os usuários administradores e líderes de equipe
+- **Pode rodar mais de uma vez** sem medo: o script é idempotente — não
+  duplica nada e não apaga dados existentes.
+- Se aparecer o erro **"SENHA NÃO DEFINIDA"**, é porque o PASSO 0 não foi
+  editado. Defina as senhas e rode o arquivo inteiro de novo.
+- O script **não troca a senha** de um login que já existe. Para trocar uma
+  senha depois, use **Authentication → Users → (usuário) → Reset password**
+  no painel.
 
-O sistema atual tem dois logins "mestre" fixos no código (`marcelo` / `wilson`,
-senha `1234`) e organizadores com senha em **texto puro** guardados no
-`localStorage` (`Organizer.password`). **Isso não foi replicado neste schema**
-— é uma falha de segurança grave e o Supabase já resolve isso pelo módulo
-**Auth** (hash de senha, recuperação de senha, etc).
+## Criando mais logins depois (ex.: líderes de equipe)
 
-Para cada organizador (incluindo `marcelo` e `wilson`):
+No SQL Editor, rode:
 
-1. Vá em **Authentication > Users > Add user** no painel do Supabase.
-2. Informe um e-mail (real ou "técnico", ex.: `marcelo@corridalsc.com.br`) e
-   defina uma senha forte.
-3. No campo **User Metadata**, adicione um JSON parecido com:
+```sql
+select public.admin_create_login(
+  'ana@exemplo.com',      -- e-mail de login
+  'SenhaForteDaAna1',     -- senha (mínimo 8 caracteres)
+  'Ana Silva',            -- nome
+  'ana',                  -- usuário
+  'Tribo',                -- equipe que ela lidera
+  'team_leader',          -- papel: 'admin' ou 'team_leader'
+  '(15) 99999-0000'       -- telefone (opcional)
+);
+```
 
-   ```json
-   {
-     "name": "Marcelo",
-     "username": "marcelo",
-     "team_name": "Avulso",
-     "role": "admin",
-     "phone": "(15) 99999-0000"
-   }
-   ```
+- `role = 'admin'`: acesso total (equivalente aos logins mestre atuais).
+- `role = 'team_leader'`: acesso restrito aos corredores da equipe indicada
+  (equivalente aos organizadores cadastrados em "Organizadores" no app).
 
-   - `role`: `"admin"` (acesso total, equivalente aos logins mestre atuais)
-     ou `"team_leader"` (acesso restrito à equipe indicada em `team_name`,
-     equivalente aos organizadores cadastrados em "Organizadores").
+Alternativa pelo painel: **Authentication → Users → Add user**, preenchendo
+o campo **User Metadata** com
+`{ "name": "...", "username": "...", "team_name": "...", "role": "team_leader", "phone": "..." }`
+— o gatilho `on_auth_user_created` cria o perfil em `public.organizers`
+automaticamente nos dois caminhos.
 
-4. Ao salvar, o gatilho `on_auth_user_created` cria automaticamente o
-   registro correspondente em `public.organizers`.
+> Segurança: `admin_create_login` só funciona no SQL Editor ou com a
+> `service_role` key. Os papéis usados pelo site (`anon`/`authenticated`)
+> são explicitamente bloqueados de executá-la.
 
-No app, a tela de login (`LoginScreen.tsx`) deve passar a chamar
-`supabase.auth.signInWithPassword({ email, password })` em vez da comparação
-de usuário/senha em texto puro feita hoje.
+## Por que as senhas antigas não foram migradas
 
-## 4. Estrutura das tabelas
+O sistema atual tem dois logins "mestre" fixos no código (`marcelo` /
+`wilson`, senha `1234`) e organizadores com senha em **texto puro** no
+`localStorage` (`Organizer.password`). Isso é uma falha de segurança grave
+e **não foi replicado**: a autenticação passa a ser feita pelo módulo
+**Auth** do Supabase (hash bcrypt, recuperação de senha etc.). No app, a
+tela de login (`LoginScreen.tsx`) deve passar a chamar
+`supabase.auth.signInWithPassword({ email, password })` em vez da
+comparação de usuário/senha em texto puro feita hoje.
 
-| Tabela           | Equivalente no localStorage    | Descrição                                            |
-|------------------|---------------------------------|-------------------------------------------------------|
-| `organizers`     | `runtrack_5k_organizers`         | Perfis dos organizadores/líderes (1:1 com `auth.users`) |
-| `runners`        | `runtrack_5k_data`                | Inscrições dos corredores                              |
-| `sponsors`       | `runtrack_5k_sponsors`            | Patrocinadores/apoiadores                              |
-| `expenses`       | `runtrack_5k_expenses`            | Despesas do evento                                     |
-| `extra_revenues` | `runtrack_5k_extra_revenue`       | Receitas extras                                        |
-| `teams`          | `PREDEFINED_TEAMS` (hardcoded)    | Lista de equipes para o formulário                     |
-| `cities`         | `PREDEFINED_CITIES` (hardcoded)   | Lista de cidades para o formulário                     |
+## Estrutura das tabelas
+
+| Tabela           | Equivalente no localStorage       | Descrição                                               |
+|------------------|-----------------------------------|---------------------------------------------------------|
+| `organizers`     | `runtrack_5k_organizers`          | Perfis dos organizadores/líderes (1:1 com `auth.users`) |
+| `runners`        | `runtrack_5k_data`                | Inscrições dos corredores                               |
+| `sponsors`       | `runtrack_5k_sponsors`            | Patrocinadores/apoiadores                               |
+| `expenses`       | `runtrack_5k_expenses`            | Despesas do evento                                      |
+| `extra_revenues` | `runtrack_5k_extra_revenue`       | Receitas extras                                         |
+| `teams`          | `PREDEFINED_TEAMS` (hardcoded)    | Lista de equipes para o formulário                      |
+| `cities`         | `PREDEFINED_CITIES` (hardcoded)   | Lista de cidades para o formulário                      |
 
 Os nomes das colunas usam `snake_case` (padrão Postgres). Ao integrar com o
 frontend (que usa `camelCase`), faça a conversão na camada de serviço — por
 exemplo `full_name` ↔ `fullName`, `team_name` ↔ `teamName`, etc.
 
-## 5. Regras de acesso (RLS)
+O CPF é único **comparando apenas os dígitos**: `111.222.333-44` e
+`11122233344` contam como a mesma inscrição.
+
+## Regras de acesso (RLS)
 
 - **Cadastro de corredor**: qualquer pessoa pode se inscrever, mesmo sem
   login (igual ao formulário público hoje). Inscrições anônimas são forçadas
   a nascer com `is_paid = false` e sem `payment_proof`.
 - **Admin** (`role = 'admin'`): acesso total — corredores, patrocinadores,
-  despesas, receitas extras e organizadores.
+  despesas, receitas extras, organizadores e listas de equipes/cidades.
 - **Líder de equipe** (`role = 'team_leader'`): vê e edita apenas os
   corredores da própria equipe (`team_name`), incluindo o status de
   pagamento — igual a `canEditFinancials` em `RunnerList.tsx`. Não pode
-  excluir corredores (exclusão é restrita a admin) nem mover um corredor
-  para outra equipe.
+  excluir corredores (exclusão é restrita a admin) nem mover/criar corredor
+  em outra equipe.
 - **Envio de comprovante** ("Já me inscrevi, enviar comprovante" /
   `ProofUploadScreen.tsx`): em vez de consultar a tabela `runners`
   diretamente (o que exigiria expor CPFs/e-mails de todos os corredores ao
-  público), use as funções:
-  - `find_runner_by_cpf(p_cpf text)` — localiza a inscrição pelo CPF exato.
-  - `attach_payment_proof(p_cpf text, p_proof text)` — anexa o comprovante
-    à inscrição correspondente.
+  público), use as funções — a busca ignora a máscara do CPF:
+  - `find_runner_by_cpf(p_cpf text)` — localiza a inscrição pelo CPF.
+  - `attach_payment_proof(p_cpf text, p_proof text)` — anexa o comprovante.
 
   Exemplo via `supabase-js`:
 
@@ -97,7 +116,7 @@ exemplo `full_name` ↔ `fullName`, `team_name` ↔ `teamName`, etc.
   await supabase.rpc('attach_payment_proof', { p_cpf: cpf, p_proof: base64Image });
   ```
 
-## 6. Comprovantes e recibos (imagens)
+## Comprovantes e recibos (imagens)
 
 Por simplicidade, `runners.payment_proof` e `sponsors.receipt_image`
 continuam como texto (base64/data URL) — o mesmo formato salvo hoje no
@@ -109,7 +128,7 @@ Se o volume/tamanho das imagens crescer muito, considere migrar para o
 `payment-proofs` e `sponsor-receipts`) e trocar essas colunas por um caminho
 de arquivo (ex.: `payment_proof_path`).
 
-## 7. Operações administrativas/back-office
+## Operações administrativas/back-office
 
 Scripts de back-office (relatórios, importações em massa, etc.) podem usar a
 **service_role key** do Supabase, que ignora todas as políticas de RLS acima.
