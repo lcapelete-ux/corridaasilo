@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload } from 'lucide-react';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
+import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -11,6 +12,9 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
+  // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
+  const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
+  const [contentVisible, setContentVisible] = useState(introDone);
 
   useEffect(() => {
     // Gerar posições aleatórias para os "flashes" de câmera/luz
@@ -52,6 +56,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
           />
         ))}
       </div>
+
+      {/* Vinheta de Largada (contagem 3-2-1 + corredor) */}
+      {!introDone && (
+        <RaceIntro
+          onReveal={() => setContentVisible(true)}
+          onFinish={() => setIntroDone(true)}
+        />
+      )}
+
+      {contentVisible && (<>
 
       {/* Navbar Minimalista */}
       <nav className="relative z-20 flex justify-between items-center p-6 max-w-6xl mx-auto w-full">
@@ -171,6 +185,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
            </div>
         </div>
       </footer>
+
+      </>)}
 
     </div>
   );
