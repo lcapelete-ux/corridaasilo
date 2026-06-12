@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload } from 'lucide-react';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
+import { SicrediMark } from './SicrediMark';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -72,9 +73,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         {/* Sponsor Header */}
         <div className="mb-6 animate-fade-in-up">
            <div className="flex items-center justify-center gap-2 text-white font-bold text-lg md:text-xl tracking-tighter">
-             <div className="bg-white rounded px-2 py-1 flex items-center">
-               <img src={sicrediLogo} alt="Sicredi" className="h-5 md:h-6 w-auto object-contain" />
-             </div>
+             <SicrediMark />
              <span className="text-yellow-400 text-xs uppercase tracking-widest border border-yellow-400 px-1 rounded shadow-[0_0_10px_rgba(250,204,21,0.3)]">Apresenta</span>
            </div>
         </div>

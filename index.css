@@ -41,10 +41,15 @@
   0%, 100% { text-shadow: 0 0 10px #facc15, 0 0 20px #facc15; }
   50% { text-shadow: 0 0 20px #facc15, 0 0 40px #eab308, 0 0 60px #ca8a04; }
 }
+@keyframes neon-pulse-green {
+  0%, 100% { text-shadow: 0 0 8px #84cc16, 0 0 16px #65a30d; }
+  50% { text-shadow: 0 0 14px #a3e635, 0 0 28px #84cc16, 0 0 40px #65a30d; }
+}
 .animate-beam-slow { animation: rotate-beam 15s linear infinite; }
 .animate-beam-fast { animation: rotate-beam 10s linear infinite reverse; }
 .animate-flash { animation: camera-flash 4s infinite; }
 .neon-text { animation: neon-pulse 2s infinite alternate; }
+.neon-text-green { animation: neon-pulse-green 2s infinite alternate; }
 
 /* Desliga animações decorativas para quem prefere menos movimento */
 @media (prefers-reduced-motion: reduce) {
