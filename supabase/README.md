@@ -9,9 +9,10 @@ sistema de inscrições em um projeto [Supabase](https://supabase.com)
 ## Instalação (3 passos)
 
 1. **Edite as senhas**: abra o `setup_completo.sql` e, no **PASSO 0** (topo
-   do arquivo), troque `TROQUE-ESTA-SENHA` por uma senha forte para o
-   `marcelo` e outra para o `wilson`. Se quiser, troque também os e-mails —
-   um e-mail real é recomendado, pois permite recuperar a senha depois.
+   do arquivo), troque `TROQUE-ESTA-SENHA` pela senha desejada para o
+   `marcelo` e para o `wilson` (mínimo 4 caracteres; uma senha forte é
+   recomendado). Se quiser, troque também os e-mails — um e-mail real é
+   recomendado, pois permite recuperar a senha depois.
 2. No painel do projeto Supabase, abra o **SQL Editor**.
 3. Cole o arquivo **inteiro** e clique em **Run**. O resultado mostra um
    resumo do que foi criado.
@@ -37,7 +38,7 @@ No SQL Editor, rode:
 ```sql
 select public.admin_create_login(
   'ana@exemplo.com',      -- e-mail de login
-  'SenhaForteDaAna1',     -- senha (mínimo 8 caracteres)
+  'SenhaForteDaAna1',     -- senha (mínimo 4 caracteres)
   'Ana Silva',            -- nome
   'ana',                  -- usuário
   'Tribo',                -- equipe que ela lidera
