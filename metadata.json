@@ -1,6 +1,5 @@
 {
-  "name": "Corrida Noturna LSC Manager",
-  "description": "Sistema de gestão para a 2ª Corrida Noturna LSC em Laranjal Paulista.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "name": "Eucalipto Tratado Premium",
+  "description": "Landing page para venda de eucalipto tratado da espécie Citriodora, seguindo normas ABNT e NBR 9480.",
+  "requestFramePermissions": []
 }

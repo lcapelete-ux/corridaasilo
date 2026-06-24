@@ -1,15 +1,8 @@
-# Dependências
 node_modules/
-
-# Build
+build/
 dist/
-
-# Variáveis de ambiente (chaves de API)
-.env
-.env.local
-.env.*.local
-
-# Logs e arquivos de sistema
-npm-debug.log*
-*.log
+coverage/
 .DS_Store
+*.log
+.env*
+!.env.example

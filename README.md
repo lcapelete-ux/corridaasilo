@@ -1,72 +1,20 @@
-# 2ª Corrida Noturna LSC – Sistema de Gestão
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-Sistema completo de gestão da **2ª Corrida Noturna LSC** (Laranjal Paulista/SP):
-inscrições públicas, envio de comprovante de pagamento (PIX), dashboard
-financeiro, gestão de corredores, equipes, patrocinadores, despesas, receitas
-extras e organizadores.
+# Run and deploy your AI Studio app
 
-> Evento: **19/09/2026 · 19h · Praça Armando Sales de Oliveira – Laranjal Paulista/SP**
-> Categorias: 5K corrida e 3K caminhada
+This contains everything you need to run your app locally.
 
-## Stack
+View your app in AI Studio: https://ai.studio/apps/46dc1527-ea1d-42db-81b1-e05dcb1bdfee
 
-- [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- [Vite](https://vitejs.dev/) (build)
-- [Tailwind CSS](https://tailwindcss.com/) (estilos, via PostCSS)
-- [Recharts](https://recharts.org/) (gráficos do dashboard)
-- [Gemini API](https://ai.google.dev/) (sugestões de nomes de equipe — opcional)
-- Persistência local via `localStorage` (sem backend)
+## Run Locally
 
-## Rodando localmente
+**Prerequisites:**  Node.js
 
-**Pré-requisito:** Node.js 18+
 
-```bash
-npm install
-npm run dev
-```
-
-Para o build de produção:
-
-```bash
-npm run build    # gera a pasta dist/
-npm run preview  # serve o build localmente
-```
-
-### Chave da API Gemini (opcional)
-
-As funções de IA (gerar nomes de equipe) são opcionais. Para ativá-las, crie um
-arquivo `.env.local` na raiz:
-
-```
-GEMINI_API_KEY=sua_chave_aqui
-```
-
-Sem a chave, o app funciona normalmente com sugestões pré-definidas.
-
-## Deploy (Netlify)
-
-O `netlify.toml` já está configurado: build com `npm run build` e publicação da
-pasta `dist/`, com redirect de SPA. Basta conectar o repositório no Netlify.
-
-## Estrutura
-
-```
-├── App.tsx                  # Roteamento entre as telas (landing, inscrição, admin…)
-├── components/
-│   ├── LandingPage.tsx      # Tela inicial pública (hero do evento + CTA)
-│   ├── RegistrationForm.tsx # Formulário de inscrição
-│   ├── ProofUploadScreen.tsx# Envio de comprovante por CPF
-│   ├── Dashboard.tsx        # Painel financeiro (admin)
-│   └── …                    # Demais telas de gestão
-├── services/
-│   ├── storageService.ts    # Persistência em localStorage
-│   └── geminiService.ts     # Integração com a Gemini API
-└── types.ts                 # Tipos do domínio
-```
-
-## Acessos
-
-- **Inscrição pública:** tela inicial → "Fazer Inscrição Agora"
-- **Envio de comprovante:** tela inicial → "Já me inscrevi, enviar comprovante"
-- **Área restrita (admin/líderes de equipe):** botão "Área Restrita" no topo
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
