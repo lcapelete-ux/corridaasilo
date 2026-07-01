@@ -216,26 +216,18 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     }
   };
 
-  // Estilos: tema escuro com brilho amarelo na inscrição pública (igual à tela inicial);
-  // tema claro original no formulário interno da área restrita
-  const inputClass = isPublicView
-    ? "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
-    : "w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all";
+  const inputClass = "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all";
 
-  const selectClass = isPublicView
-    ? "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
-    : "w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none bg-white transition-all";
+  const selectClass = "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all [color-scheme:dark]";
 
-  const labelClass = isPublicView
-    ? "block text-sm font-bold text-slate-300 mb-1"
-    : "block text-sm font-bold text-slate-700 mb-1";
+  const labelClass = "block text-sm font-bold text-slate-300 mb-1";
 
-  const optionClass = "text-slate-900";
+  const optionClass = "text-white bg-slate-800";
 
   return (
     <div className={isPublicView
       ? "max-w-3xl mx-auto bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-800 overflow-hidden my-8 relative z-10"
-      : "max-w-3xl mx-auto bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden"
+      : "max-w-3xl mx-auto bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden"
     }>
       {isPublicView && (
         <div className="relative py-10 px-6 flex flex-col items-center justify-center text-center border-b border-slate-800 overflow-hidden">
@@ -254,12 +246,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
       <div className="p-8">
         {!isPublicView && (
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800/60">
             <div className="bg-yellow-400 p-2 rounded-lg text-slate-900">
               <Save size={24} />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">
-              Nova Inscrição {userSession?.role === 'team_leader' ? '(Líder de Equipe)' : '(Admin)'}
+            <h2 className="text-xl font-bold text-white">
+              Nova Inscrição <span className="text-slate-400 font-medium text-base">{userSession?.role === 'team_leader' ? '(Líder de Equipe)' : '(Admin)'}</span>
             </h2>
           </div>
         )}
@@ -295,24 +287,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   value={formData.cpf}
                   onChange={handleChange}
                   onBlur={handleBlur}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all ${
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all bg-slate-800/60 text-white placeholder-slate-500 ${
                     errors.cpf
-                      ? (isPublicView
-                          ? 'border-red-400 bg-red-950/40 text-white focus:ring-red-400/30 focus:border-red-400'
-                          : 'border-red-400 focus:ring-red-200 focus:border-red-400 bg-red-50')
-                      : (isPublicView
-                          ? 'bg-slate-800/60 border-slate-700 text-white placeholder-slate-500 focus:ring-yellow-400 focus:border-yellow-400'
-                          : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400')
+                      ? 'border-red-500 focus:ring-red-500/30 focus:border-red-500'
+                      : 'border-slate-700 focus:ring-yellow-400/40 focus:border-yellow-400'
                   }`}
                   placeholder="000.000.000-00"
                 />
                 {errors.cpf && (
-                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 animate-fade-in ${isPublicView ? 'text-red-400' : 'text-red-500'}`}>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 animate-fade-in text-red-400">
                     <AlertCircle size={18} />
                   </div>
                 )}
               </div>
-              {errors.cpf && <p className={`text-xs font-bold mt-1 ml-1 ${isPublicView ? 'text-red-400' : 'text-red-500'}`}>{errors.cpf}</p>}
+              {errors.cpf && <p className="text-xs font-bold mt-1 ml-1 text-red-400">{errors.cpf}</p>}
             </div>
 
             {/* Data Nascimento */}
@@ -326,7 +314,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 required
                 value={formData.birthDate}
                 onChange={handleChange}
-                className={`${inputClass} ${isPublicView ? '[color-scheme:dark]' : ''}`}
+                className={`${inputClass} [color-scheme:dark]`}
               />
             </div>
 
@@ -419,7 +407,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   onChange={handleTeamSelectChange}
                   disabled={userSession?.role === 'team_leader' && !!userSession.teamAccess}
                   className={`${selectClass} ${
-                    userSession?.role === 'team_leader' ? (isPublicView ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-500') : ''
+                    userSession?.role === 'team_leader' ? 'opacity-60 cursor-not-allowed' : ''
                   }`}
                 >
                   <option value="Avulso" className={optionClass}>Avulso (Sem equipe)</option>
@@ -447,73 +435,69 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
           {/* SESSÃO FINANCEIRA (APENAS ORGANIZADORES) */}
           {userSession && (
-            <div className="mt-8 bg-slate-50 p-6 rounded-xl border border-slate-200">
-               <div className="flex items-center gap-2 mb-4 text-slate-800 border-b border-slate-200 pb-2">
-                 <DollarSign size={20} className="text-emerald-600" />
-                 <h3 className="font-bold text-lg">Financeiro (Área Restrita)</h3>
-               </div>
+            <div className="mt-8 bg-slate-800/40 p-6 rounded-xl border border-slate-700/60">
+              <div className="flex items-center gap-2 mb-4 border-b border-slate-700/60 pb-3">
+                <DollarSign size={18} className="text-emerald-400" />
+                <h3 className="font-bold text-white">Financeiro <span className="text-slate-500 font-medium text-sm">(Área Restrita)</span></h3>
+              </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 {/* Upload Comprovante */}
-                 <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Comprovante de Pagamento</label>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/*,application/pdf"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`w-full py-3 px-4 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 transition-colors ${
-                        formData.paymentProof
-                          ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                          : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50 hover:border-slate-400'
-                      }`}
-                    >
-                      {formData.paymentProof ? (
-                        <>
-                          <CheckCircle size={18} /> Comprovante Anexado
-                        </>
-                      ) : (
-                        <>
-                          <Upload size={18} /> Fazer Upload do Comprovante
-                        </>
-                      )}
-                    </button>
-                    {formData.paymentProof && (
-                      <p className="text-xs text-center mt-1 text-emerald-600 font-medium cursor-pointer hover:underline" onClick={() => setFormData(prev => ({...prev, paymentProof: ''}))}>
-                        Remover/Trocar
-                      </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Upload Comprovante */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Comprovante de Pagamento</label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-full py-3 px-4 rounded-lg border-2 border-dashed flex items-center justify-center gap-2 transition-colors ${
+                      formData.paymentProof
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                        : 'border-slate-600 text-slate-500 hover:border-slate-500 hover:text-slate-400'
+                    }`}
+                  >
+                    {formData.paymentProof ? (
+                      <><CheckCircle size={18} /> Comprovante Anexado</>
+                    ) : (
+                      <><Upload size={18} /> Fazer Upload do Comprovante</>
                     )}
-                 </div>
+                  </button>
+                  {formData.paymentProof && (
+                    <p className="text-xs text-center mt-1 text-emerald-500 font-medium cursor-pointer hover:underline" onClick={() => setFormData(prev => ({...prev, paymentProof: ''}))}>
+                      Remover/Trocar
+                    </p>
+                  )}
+                </div>
 
-                 {/* Status Toggle */}
-                 <div className="flex flex-col justify-center">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Status do Pagamento</label>
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, isPaid: !prev.isPaid }))}
-                      className={`w-full py-3 px-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
-                        formData.isPaid
-                          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                          : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'
-                      }`}
-                    >
-                      {formData.isPaid ? (
-                        <><CheckCircle size={20} /> PAGO</>
-                      ) : (
-                        <><XCircle size={20} /> PENDENTE</>
-                      )}
-                    </button>
-                 </div>
-               </div>
+                {/* Status Toggle */}
+                <div className="flex flex-col justify-center">
+                  <label className="block text-sm font-bold text-slate-300 mb-2">Status do Pagamento</label>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, isPaid: !prev.isPaid }))}
+                    className={`w-full py-3 px-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
+                      formData.isPaid
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                        : 'bg-slate-800 border border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400'
+                    }`}
+                  >
+                    {formData.isPaid ? (
+                      <><CheckCircle size={20} /> PAGO</>
+                    ) : (
+                      <><XCircle size={20} /> PENDENTE</>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
+          <div className="pt-6 flex justify-end border-t border-slate-800/60">
             <button
               type="submit"
               className={isPublicView
