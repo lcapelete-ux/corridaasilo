@@ -183,8 +183,8 @@ const App: React.FC = () => {
       }}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
         currentView === target
-          ? 'bg-yellow-400 text-slate-900 shadow-lg shadow-yellow-400/30 font-bold'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-yellow-400'
+          ? 'bg-yellow-400 text-slate-900 shadow-lg shadow-yellow-400/25 font-bold'
+          : 'text-slate-500 hover:bg-slate-800/60 hover:text-yellow-400'
       }`}
     >
       <Icon size={20} />
@@ -258,60 +258,65 @@ const App: React.FC = () => {
 
   // RENDER: ÁREA RESTRITA (ADMIN / TEAM LEADER)
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-slate-950 overflow-hidden">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm"
+        <div
+          className="fixed inset-0 bg-black/70 z-20 md:hidden backdrop-blur-sm"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={`
-        fixed md:relative z-30 w-72 h-full bg-slate-900 border-r border-slate-800 flex flex-col
+        fixed md:relative z-30 w-72 h-full bg-slate-900 border-r border-slate-800/50 flex flex-col
         transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="p-8 flex items-center gap-3 border-b border-slate-800">
-          <div className="bg-yellow-400 p-2 rounded-lg text-slate-900">
-            <Timer size={24} />
+        <div className="p-7 flex items-center gap-3 border-b border-slate-800/50">
+          <div className="bg-yellow-400 p-2 rounded-lg text-slate-900 shadow-lg shadow-yellow-400/20">
+            <Timer size={22} />
           </div>
           <div>
-            <h1 className="text-lg font-black text-white italic tracking-tighter leading-tight">2ª CORRIDA<br />NOTURNA LSC</h1>
-            <p className="text-xs text-yellow-400">
+            <h1 className="text-base font-black text-white italic tracking-tighter leading-tight">2ª CORRIDA<br />NOTURNA LSC</h1>
+            <p className="text-xs text-yellow-400/80 mt-0.5">
               {userSession?.role === 'admin' ? 'Painel Admin' : `Líder: ${userSession?.username}`}
             </p>
           </div>
         </div>
 
-        <nav className="flex-1 p-6 space-y-2">
+        <nav className="flex-1 p-5 space-y-1 overflow-y-auto">
           {userSession?.role === 'admin' && (
             <NavItem target="dashboard" icon={LayoutDashboard} label="Dashboard" />
           )}
-          
+
           <NavItem target="runners" icon={Users} label="Corredores" />
-          
+
           <NavItem target="registration" icon={UserPlus} label="Novo Cadastro" />
-          
+
           {userSession?.role === 'admin' && (
             <>
               <NavItem target="teams" icon={Flag} label="Equipes" />
-              <div className="pt-4 pb-2">
-                <div className="h-px bg-slate-800 w-full" />
+              <div className="py-3">
+                <div className="h-px bg-slate-800/80 w-full" />
+                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-3 px-4">Financeiro</p>
               </div>
               <NavItem target="sponsors" icon={Briefcase} label="Patrocinadores" />
               <NavItem target="extra_revenue" icon={CircleDollarSign} label="Receita Extra" />
               <NavItem target="expenses" icon={TrendingDown} label="Despesas" />
+              <div className="py-3">
+                <div className="h-px bg-slate-800/80 w-full" />
+                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-3 px-4">Gestão</p>
+              </div>
               <NavItem target="organizers" icon={Shield} label="Organizadores" />
             </>
           )}
         </nav>
 
-        <div className="p-6 border-t border-slate-800 space-y-4">
-          <button 
+        <div className="p-5 border-t border-slate-800/50">
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all text-sm py-2 font-bold"
+            className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-red-400 hover:bg-slate-800/60 rounded-xl transition-all text-sm py-2.5 font-bold"
           >
             <LogOut size={16} /> Encerrar Sessão
           </button>
@@ -321,17 +326,17 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Header */}
-        <header className="md:hidden bg-yellow-400 border-b border-black p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-black text-slate-900 italic">
-             <Timer size={20} className="text-black"/> CORRIDA NOTURNA LSC
+        <header className="md:hidden bg-slate-900 border-b border-slate-800/50 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-black text-white italic">
+            <Timer size={20} className="text-yellow-400"/> CORRIDA NOTURNA LSC
           </div>
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-900">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-400 hover:text-white transition-colors">
             <Menu size={24} />
           </button>
         </header>
 
         {/* Scrollable Area */}
-        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50">
+        <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-950">
           <div className="max-w-7xl mx-auto">
             {currentView === 'dashboard' && (
               <Suspense fallback={<div className="text-slate-400 font-medium p-8 text-center animate-pulse">Carregando dashboard...</div>}>

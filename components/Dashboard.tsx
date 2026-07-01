@@ -114,30 +114,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Resumo de Camisetas */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
             👕 Resumo de Camisetas
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-                <tr>
+              <thead className="text-xs text-slate-500 uppercase">
+                <tr className="bg-slate-800/50">
                   <th className="px-4 py-3 rounded-l-lg">Tamanho</th>
                   <th className="px-4 py-3 text-right rounded-r-lg">Quantidade</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(stats.sizeCounts).map(([size, count]) => (
-                  <tr key={size} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-700">{size}</td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-900">{count}</td>
+                  <tr key={size} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-300">{size}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{count}</td>
                   </tr>
                 ))}
-                <tr className="bg-yellow-50 font-bold">
-                  <td className="px-4 py-3 text-slate-800">TOTAL</td>
-                  <td className="px-4 py-3 text-right text-slate-900">{stats.totalRunners}</td>
+                <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                  <td className="px-4 py-3 text-yellow-400">TOTAL</td>
+                  <td className="px-4 py-3 text-right text-yellow-400">{stats.totalRunners}</td>
                 </tr>
               </tbody>
             </table>
@@ -145,30 +145,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         </div>
 
         {/* Resumo de Equipes */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-           <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
             🏆 Top Equipes (Inscritos)
           </h3>
-           <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-                <tr>
+              <thead className="text-xs text-slate-500 uppercase">
+                <tr className="bg-slate-800/50">
                   <th className="px-4 py-3 rounded-l-lg">Equipe</th>
                   <th className="px-4 py-3 text-right rounded-r-lg">Atletas</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.sortedTeams.map((team, idx) => (
-                  <tr key={team.name} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-700 flex items-center gap-2">
+                  <tr key={team.name} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-300 flex items-center gap-2">
                       {idx < 3 && <span className="text-xs">🥇🥈🥉'[idx]</span>}
                       {team.name}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-900">{team.count}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{team.count}</td>
                   </tr>
                 ))}
-                 {stats.sortedTeams.length === 0 && (
-                  <tr><td colSpan={2} className="px-4 py-3 text-center text-slate-400">Nenhuma equipe registrada</td></tr>
+                {stats.sortedTeams.length === 0 && (
+                  <tr><td colSpan={2} className="px-4 py-8 text-center text-slate-600">Nenhuma equipe registrada</td></tr>
                 )}
               </tbody>
             </table>
@@ -176,8 +176,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         </div>
 
         {/* Gender Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Distribuição por Gênero</h3>
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4">Distribuição por Gênero</h3>
           <div className="h-64">
             {stats.totalRunners > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -196,31 +196,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400">Sem dados ainda</div>
+              <div className="h-full flex items-center justify-center text-slate-600">Sem dados ainda</div>
             )}
           </div>
         </div>
 
         {/* Age Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Faixa Etária</h3>
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4">Faixa Etária</h3>
           <div className="h-64">
             {stats.totalRunners > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.ageData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip cursor={{fill: '#f1f5f9'}} />
-                  <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                  <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' }} />
+                  <Bar dataKey="value" fill="#facc15" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400">Sem dados ainda</div>
+              <div className="h-full flex items-center justify-center text-slate-600">Sem dados ainda</div>
             )}
           </div>
         </div>
