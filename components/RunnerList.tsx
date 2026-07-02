@@ -132,20 +132,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        // Encontra o corredor atual
         const runner = runners.find(r => r.id === uploadingId);
         if (runner) {
-          // Atualiza o corredor com o comprovante
-          onUpdate({
-            ...runner,
-            paymentProof: base64String,
-            // Não marca como pago automaticamente, deixa o organizador conferir e marcar
-            isPaid: runner.isPaid 
-          });
+          const updatedRunner = { ...runner, paymentProof: base64String, isPaid: runner.isPaid };
+          onUpdate(updatedRunner);
+          if (selectedRunner?.id === uploadingId) {
+            setSelectedRunner(updatedRunner);
+          }
           alert("Comprovante enviado com sucesso!");
         }
         setUploadingId(null);
-        // Limpa o input para permitir selecionar o mesmo arquivo novamente se necessário
         if (fileInputRef.current) fileInputRef.current.value = '';
       };
       reader.readAsDataURL(file);
@@ -215,39 +211,39 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       />
 
       {/* Header & Search */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800/60">
         <div className="flex items-center gap-4 w-full md:w-auto">
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Users className="text-indigo-500" />
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Users className="text-indigo-400" />
             Participantes ({filteredRunners.length})
           </h2>
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-200 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-colors"
             title="Baixar Excel/CSV"
           >
             <Download size={14} /> Exportar
           </button>
         </div>
-        
+
         <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
           <input
             type="text"
             placeholder="Buscar por nome, equipe, cidade ou CPF..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <tr className="bg-slate-800/50 border-b border-slate-800">
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Atleta</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Local/CPF</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Idade/Gênero</th>
@@ -256,59 +252,57 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-800/60">
               {filteredRunners.length > 0 ? (
                 filteredRunners.map((runner) => (
-                  <tr key={runner.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={runner.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="p-4">
-                      <div className="font-medium text-slate-800">{runner.fullName}</div>
-                      <div className="text-xs text-slate-400">{runner.email}</div>
+                      <div className="font-medium text-white">{runner.fullName}</div>
+                      <div className="text-xs text-slate-500">{runner.email}</div>
                     </td>
                     <td className="p-4">
-                       <div className="flex items-center gap-1 text-sm text-slate-700">
-                         <MapPin size={12} className="text-slate-400"/> {runner.city}
-                       </div>
-                       <div className="text-xs text-slate-400 font-mono mt-0.5">{runner.cpf}</div>
+                      <div className="flex items-center gap-1 text-sm text-slate-300">
+                        <MapPin size={12} className="text-slate-500"/> {runner.city}
+                      </div>
+                      <div className="text-xs text-slate-500 font-mono mt-0.5">{runner.cpf}</div>
                     </td>
-                    <td className="p-4 text-slate-600">
+                    <td className="p-4 text-slate-300">
                       {runner.age} anos <br/>
-                      <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{runner.gender}</span>
+                      <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">{runner.gender}</span>
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        runner.teamName === 'Avulso' ? 'bg-slate-100 text-slate-800' : 'bg-indigo-100 text-indigo-800'
+                        runner.teamName === 'Avulso' ? 'bg-slate-800 text-slate-300' : 'bg-indigo-500/10 text-indigo-400'
                       }`}>
                         {runner.teamName}
                       </span>
                       <div className="mt-1 text-xs text-slate-500">
-                         👕 {runner.shirtSize}
+                        👕 {runner.shirtSize}
                       </div>
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col gap-2">
-                        {/* Status Label */}
                         {runner.isPaid ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-bold">
+                          <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-bold">
                             <CheckCircle size={14} /> Pago
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-500 text-xs font-bold">
+                          <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-bold">
                             <Clock size={14} /> Pendente
                           </span>
                         )}
 
-                        {/* Comprovante Upload/View */}
                         {runner.paymentProof ? (
-                          <button 
+                          <button
                             onClick={() => setSelectedRunner(runner)}
-                            className="text-xs text-indigo-600 hover:underline text-left flex items-center gap-1"
+                            className="text-xs text-indigo-400 hover:underline text-left flex items-center gap-1"
                           >
-                             <Eye size={12} /> Ver Comprovante
+                            <Eye size={12} /> Ver Comprovante
                           </button>
                         ) : (
-                          <button 
+                          <button
                             onClick={() => triggerUpload(runner.id)}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-medium flex items-center gap-1 w-fit transition-colors"
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-1 rounded text-xs font-medium flex items-center gap-1 w-fit transition-colors border border-slate-700"
                             title="Fazer upload do comprovante"
                           >
                             <Upload size={12} /> Enviar Comp.
@@ -318,41 +312,38 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Botão Transferir Inscrição (Apenas Admin) */}
                         {userSession?.role === 'admin' && (
-                           <button
-                             onClick={() => openTransferModal(runner)}
-                             className="p-2 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors"
-                             title="Transferir Inscrição (Editar Titular)"
-                           >
-                             <ArrowRightLeft size={18} />
-                           </button>
+                          <button
+                            onClick={() => openTransferModal(runner)}
+                            className="p-2 rounded-lg text-slate-500 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+                            title="Transferir Inscrição (Editar Titular)"
+                          >
+                            <ArrowRightLeft size={18} />
+                          </button>
                         )}
 
-                        {/* Toggle de Pagamento (Admin e Team Leader) */}
                         {canEditFinancials && (
-                           <button
-                             onClick={() => togglePaidStatus(runner)}
-                             className={`p-2 rounded-lg transition-colors ${runner.isPaid ? 'text-emerald-500 bg-emerald-50' : 'text-slate-300 hover:text-emerald-500'}`}
-                             title={runner.isPaid ? "Marcar como não pago" : "Confirmar pagamento"}
-                           >
-                             <CheckCircle size={18} />
-                           </button>
+                          <button
+                            onClick={() => togglePaidStatus(runner)}
+                            className={`p-2 rounded-lg transition-colors ${runner.isPaid ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-600 hover:text-emerald-400'}`}
+                            title={runner.isPaid ? "Marcar como não pago" : "Confirmar pagamento"}
+                          >
+                            <CheckCircle size={18} />
+                          </button>
                         )}
 
                         <button
                           onClick={() => setSelectedRunner(runner)}
-                          className="text-slate-400 hover:text-indigo-500 transition-colors p-2 hover:bg-indigo-50 rounded-lg"
+                          className="text-slate-500 hover:text-indigo-400 transition-colors p-2 hover:bg-indigo-500/10 rounded-lg"
                           title="Ver Ficha Completa"
                         >
                           <Eye size={18} />
                         </button>
-                        
-                        {/* Apenas admin pode deletar */}
+
                         {userSession?.role === 'admin' && (
                           <button
                             onClick={() => onDelete(runner.id)}
-                            className="text-slate-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50 rounded-lg"
+                            className="text-slate-600 hover:text-red-400 transition-colors p-2 hover:bg-red-500/10 rounded-lg"
                             title="Remover inscrito"
                           >
                             <Trash2 size={18} />
@@ -364,7 +355,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
+                  <td colSpan={6} className="p-8 text-center text-slate-600">
                     Nenhum corredor encontrado.
                   </td>
                 </tr>
