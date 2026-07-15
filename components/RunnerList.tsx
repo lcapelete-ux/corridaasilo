@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize } from '../types';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, Mail, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List } from 'lucide-react';
 
 interface RunnerListProps {
   runners: Runner[];
@@ -12,7 +12,8 @@ interface RunnerListProps {
 export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, userSession }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
-  
+  const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes'>('lista');
+
   // Estados para Transferência
   const [transferRunner, setTransferRunner] = useState<Runner | null>(null);
   const [transferData, setTransferData] = useState<Partial<Runner>>({});
@@ -210,35 +211,162 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         className="hidden"
       />
 
-      {/* Header & Search */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800/60">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Users className="text-indigo-400" />
-            Participantes ({filteredRunners.length})
-          </h2>
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-colors"
-            title="Baixar Excel/CSV"
-          >
-            <Download size={14} /> Exportar
-          </button>
+      {/* Header & Tabs */}
+      <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-4 space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Users className="text-indigo-400" />
+              Participantes ({runners.length})
+            </h2>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-colors"
+              title="Baixar Excel/CSV"
+            >
+              <Download size={14} /> Exportar
+            </button>
+          </div>
+
+          {activeTab === 'lista' && (
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <input
+                type="text"
+                placeholder="Buscar por nome, equipe, cidade ou CPF..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm"
+              />
+            </div>
+          )}
         </div>
 
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-          <input
-            type="text"
-            placeholder="Buscar por nome, equipe, cidade ou CPF..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm"
-          />
+        {/* Tabs */}
+        <div className="flex gap-1 bg-slate-800/60 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('lista')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+              activeTab === 'lista'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <List size={15} /> Lista
+          </button>
+          <button
+            onClick={() => setActiveTab('comprovantes')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+              activeTab === 'comprovantes'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FileImage size={15} /> Comprovantes
+            {runners.filter(r => r.paymentProof).length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${
+                activeTab === 'comprovantes' ? 'bg-white/20' : 'bg-indigo-500/20 text-indigo-400'
+              }`}>
+                {runners.filter(r => r.paymentProof).length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
+      {/* Comprovantes View */}
+      {activeTab === 'comprovantes' && (
+        <div className="space-y-4">
+          {/* Summary bar */}
+          <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-4 flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Comprovantes recebidos</p>
+              <p className="text-white font-bold text-2xl">
+                {runners.filter(r => r.paymentProof).length}
+                <span className="text-slate-600 font-normal text-base"> de {runners.length} inscritos</span>
+              </p>
+            </div>
+            <div className="flex gap-4 text-sm">
+              <div className="text-center">
+                <p className="text-emerald-400 font-bold text-lg">{runners.filter(r => r.paymentProof && r.isPaid).length}</p>
+                <p className="text-slate-500 text-xs">Confirmados</p>
+              </div>
+              <div className="text-center">
+                <p className="text-amber-400 font-bold text-lg">{runners.filter(r => r.paymentProof && !r.isPaid).length}</p>
+                <p className="text-slate-500 text-xs">Pendentes</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards grid */}
+          {runners.filter(r => r.paymentProof).length === 0 ? (
+            <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-12 text-center">
+              <FileImage size={40} className="text-slate-700 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">Nenhum comprovante recebido ainda.</p>
+              <p className="text-slate-600 text-sm mt-1">Os comprovantes enviados pelos inscritos aparecerão aqui.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {runners.filter(r => r.paymentProof).map(runner => (
+                <div key={runner.id} className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden hover:border-indigo-500/30 transition-all">
+                  {/* Card Header */}
+                  <div className="p-4 flex items-start justify-between gap-3 border-b border-slate-800">
+                    <div className="min-w-0">
+                      <p className="font-bold text-white truncate">{runner.fullName}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{runner.cpf}</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1.5 ${
+                        runner.teamName === 'Avulso' ? 'bg-slate-800 text-slate-300' : 'bg-indigo-500/10 text-indigo-400'
+                      }`}>
+                        {runner.teamName}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          if (onUpdate) {
+                            const updated = { ...runner, isPaid: !runner.isPaid };
+                            onUpdate(updated);
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                          runner.isPaid
+                            ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                            : 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                        }`}
+                      >
+                        {runner.isPaid
+                          ? <><CheckCircle size={12} /> PAGO</>
+                          : <><Clock size={12} /> PENDENTE</>
+                        }
+                      </button>
+                      <button
+                        onClick={() => setSelectedRunner(runner)}
+                        className="text-xs text-slate-500 hover:text-indigo-400 flex items-center gap-1 transition-colors"
+                      >
+                        <Eye size={12} /> Ver ficha
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Proof Image */}
+                  <div className="p-3 bg-slate-950/40">
+                    <img
+                      src={runner.paymentProof}
+                      alt={`Comprovante de ${runner.fullName}`}
+                      className="w-full rounded-lg border border-slate-800 object-contain max-h-64 bg-slate-950 cursor-zoom-in"
+                      onClick={() => setSelectedRunner(runner)}
+                      title="Clique para ver a ficha completa"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Table */}
+      {activeTab === 'lista' && (
       <div className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -364,6 +492,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           </table>
         </div>
       </div>
+      )}
 
       {/* MODAL DE TRANSFERÊNCIA DE INSCRIÇÃO */}
       {transferRunner && (
