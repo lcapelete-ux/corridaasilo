@@ -26,6 +26,8 @@ export interface Runner {
   registrationDate: string;
   isPaid?: boolean;
   paymentProof?: string; // Base64 image string
+  transferredFrom?: string; // Nome do titular anterior (inscrição transferida)
+  transferredAt?: string;   // Data ISO da transferência
 }
 
 export type SponsorType = 'Camiseta' | 'Medalha';
