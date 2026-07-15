@@ -7,7 +7,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis
 
 interface DashboardProps {
   runners: Runner[];
-  totalRevenue?: number; // Agora representa a soma de Patrocínios + Extra
+  totalRevenue?: number; // Soma de Inscrições pagas + Patrocínios + Extras
   totalExpenses?: number;
 }
 
@@ -91,11 +91,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
           description="Atletas cadastrados"
         />
         <StatsCard 
-          title="Receita Total" 
-          value={`R$ ${totalRevenue.toLocaleString('pt-BR', { notation: 'compact' })}`} 
-          icon={DollarSign} 
-          color="bg-emerald-500" 
-          description="Patrocínios + Extras"
+          title="Receita Total"
+          value={`R$ ${totalRevenue.toLocaleString('pt-BR', { notation: 'compact' })}`}
+          icon={DollarSign}
+          color="bg-emerald-500"
+          description="Inscrições + Patrocínios + Extras"
         />
         <StatsCard 
           title="Despesas" 
@@ -161,7 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
                 {stats.sortedTeams.map((team, idx) => (
                   <tr key={team.name} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 font-medium text-slate-300 flex items-center gap-2">
-                      {idx < 3 && <span className="text-xs">🥇🥈🥉'[idx]</span>}
+                      {idx < 3 && <span className="text-xs">{['🥇', '🥈', '🥉'][idx]}</span>}
                       {team.name}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-white">{team.count}</td>

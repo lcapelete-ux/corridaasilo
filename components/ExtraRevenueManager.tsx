@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ExtraRevenue } from '../types';
-import { Plus, Trash2, TrendingUp, Calendar, DollarSign } from 'lucide-react';
+import { ExtraRevenue, Runner } from '../types';
+import { getRegistrationFee, SENIOR_AGE } from '../constants';
+import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag } from 'lucide-react';
 
 interface ExtraRevenueManagerProps {
   revenues: ExtraRevenue[];
+  runners: Runner[];
   onSave: (revenue: ExtraRevenue) => void;
   onDelete: (id: string) => void;
 }
@@ -11,7 +13,7 @@ interface ExtraRevenueManagerProps {
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, onSave, onDelete }) => {
+export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete }) => {
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -38,18 +40,109 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
     setIsFormVisible(false);
   };
 
+  // Entradas automáticas: inscrições com pagamento confirmado
+  const paidRunners = runners
+    .filter(r => r.isPaid)
+    .sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
+  const totalRegistrations = paidRunners.reduce((acc, r) => acc + getRegistrationFee(r.age), 0);
+
   const totalExtra = revenues.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalGeral = totalRegistrations + totalExtra;
+
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header Card */}
-      <div className="bg-slate-900 p-6 rounded-xl border border-emerald-500/20 flex items-center justify-between">
-        <div>
-          <p className="text-emerald-400 font-bold text-sm">Total Receita Extra</p>
-          <h2 className="text-3xl font-black text-white">R$ {totalExtra.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+      {/* Header Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-slate-900 p-6 rounded-xl border border-indigo-500/20 flex items-center justify-between">
+          <div>
+            <p className="text-indigo-400 font-bold text-sm">Inscrições Confirmadas ({paidRunners.length})</p>
+            <h2 className="text-2xl font-black text-white">R$ {fmt(totalRegistrations)}</h2>
+          </div>
+          <div className="bg-indigo-500/10 p-3 rounded-full text-indigo-400">
+            <UserCheck size={22} />
+          </div>
         </div>
-        <div className="bg-emerald-500/10 p-3 rounded-full text-emerald-400">
-          <TrendingUp size={24} />
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 flex items-center justify-between">
+          <div>
+            <p className="text-slate-400 font-bold text-sm">Receitas Extras</p>
+            <h2 className="text-2xl font-black text-white">R$ {fmt(totalExtra)}</h2>
+          </div>
+          <div className="bg-slate-800 p-3 rounded-full text-slate-400">
+            <DollarSign size={22} />
+          </div>
+        </div>
+        <div className="bg-slate-900 p-6 rounded-xl border border-emerald-500/20 flex items-center justify-between">
+          <div>
+            <p className="text-emerald-400 font-bold text-sm">Total de Entradas</p>
+            <h2 className="text-2xl font-black text-white">R$ {fmt(totalGeral)}</h2>
+          </div>
+          <div className="bg-emerald-500/10 p-3 rounded-full text-emerald-400">
+            <TrendingUp size={22} />
+          </div>
+        </div>
+      </div>
+
+      {/* Entradas de Inscrições (automático) */}
+      <div className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden">
+        <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <UserCheck className="text-indigo-400" size={18} />
+            Entradas de Inscrições
+          </h2>
+          <span className="text-xs text-slate-500">
+            Geradas automaticamente ao confirmar o pagamento do inscrito
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-800/50 border-b border-slate-800">
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Atleta</th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Equipe</th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Data Inscrição</th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {paidRunners.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-slate-600">
+                    Nenhuma inscrição confirmada ainda. Ao marcar um inscrito como <span className="text-emerald-400 font-bold">PAGO</span> na lista de participantes, a entrada aparece aqui.
+                  </td>
+                </tr>
+              ) : (
+                paidRunners.map(runner => (
+                  <tr key={runner.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="p-4">
+                      <span className="font-medium text-white">{runner.fullName}</span>
+                      {runner.age >= SENIOR_AGE && (
+                        <span className="ml-2 inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                          <Tag size={9} /> 60+
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 text-sm text-slate-400">{runner.teamName}</td>
+                    <td className="p-4 text-sm text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12} className="text-slate-500" /> {new Date(runner.registrationDate).toLocaleDateString('pt-BR')}
+                      </span>
+                    </td>
+                    <td className="p-4 font-mono font-bold text-indigo-400 text-right">+ R$ {fmt(getRegistrationFee(runner.age))}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {paidRunners.length > 0 && (
+              <tfoot>
+                <tr className="bg-indigo-500/10 border-t border-slate-800">
+                  <td colSpan={3} className="p-4 text-sm font-bold text-indigo-400 uppercase">Subtotal Inscrições</td>
+                  <td className="p-4 font-mono font-black text-indigo-400 text-right">R$ {fmt(totalRegistrations)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
       </div>
 
