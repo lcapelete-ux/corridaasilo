@@ -2,6 +2,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, ViewState, UserSession } from './types';
 import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, saveOrganizer, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue } from './services/storageService';
+import { getRegistrationFee } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -170,10 +171,11 @@ const App: React.FC = () => {
   // Totals Calculation
   const totalSponsorRevenue = sponsors.reduce((acc, curr) => acc + (curr.isPaid ? curr.amount : 0), 0);
   const totalExtraRevenue = extraRevenues.reduce((acc, curr) => acc + curr.amount, 0);
+  const totalRegistrationRevenue = runners.reduce((acc, r) => acc + (r.isPaid ? getRegistrationFee(r.age) : 0), 0);
   const totalExpensesValue = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
-  // Grand Total Revenue (Sponsors + Extra)
-  const grandTotalRevenue = totalSponsorRevenue + totalExtraRevenue;
+  // Grand Total Revenue (Inscrições + Sponsors + Extra)
+  const grandTotalRevenue = totalRegistrationRevenue + totalSponsorRevenue + totalExtraRevenue;
 
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState; icon: any; label: string }) => (
     <button
@@ -378,8 +380,9 @@ const App: React.FC = () => {
             )}
 
             {currentView === 'extra_revenue' && (
-              <ExtraRevenueManager 
+              <ExtraRevenueManager
                 revenues={extraRevenues}
+                runners={runners}
                 onSave={handleSaveExtraRevenue}
                 onDelete={handleDeleteExtraRevenue}
               />

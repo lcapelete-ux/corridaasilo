@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Copy, Check, Timer, QrCode, Tag, AlertCircle } from 'lucide-react';
+import { REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR } from '../constants';
 
 interface RegistrationSuccessProps {
   onBack: () => void;
@@ -10,7 +11,8 @@ interface RegistrationSuccessProps {
 export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior }) => {
   const [copied, setCopied] = useState(false);
   const pixKey = "corridaasilo@gmail.com";
-  const price = isSenior ? "35,00" : "69,90";
+  const price = (isSenior ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE)
+    .toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
   const handleCopy = () => {
     navigator.clipboard.writeText(pixKey);
