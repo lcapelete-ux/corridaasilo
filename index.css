@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* O site é escuro por padrão: evita que o navegador (ex.: iPhone em modo escuro)
+   escolha cores próprias para inputs sem cor definida. Áreas claras usam
+   [color-scheme:light] localmente. */
+:root {
+  color-scheme: dark;
+}
+
 /* Scrollbar com a identidade visual do evento (noite + amarelo neon) */
 ::-webkit-scrollbar {
   width: 8px;

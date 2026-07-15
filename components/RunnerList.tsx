@@ -9,6 +9,10 @@ interface RunnerListProps {
   userSession?: UserSession | null;
 }
 
+// Modal de transferência tem fundo branco: cores explícitas + color-scheme light
+// para o texto não sumir quando o celular está em modo escuro
+const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 outline-none [color-scheme:light]";
+
 export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, userSession }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
@@ -509,36 +513,36 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             
             <form onSubmit={handleTransferSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="bg-orange-50 p-4 rounded-lg text-sm text-orange-800 border border-orange-200 mb-4">
-                <strong>Atenção:</strong> Você está editando os dados do titular desta inscrição. 
+                <strong>Atenção:</strong> Você está editando os dados do titular desta inscrição.
                 O status de pagamento e o ID da inscrição serão mantidos.
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Novo Titular (Nome Completo)</label>
-                <input required name="fullName" value={transferData.fullName || ''} onChange={handleTransferChange} className="w-full p-2 border rounded" />
+                <input required name="fullName" value={transferData.fullName || ''} onChange={handleTransferChange} className={transferInputCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-1">CPF</label>
-                   <input required name="cpf" value={transferData.cpf || ''} onChange={handleTransferChange} className="w-full p-2 border rounded" />
+                   <input required name="cpf" value={transferData.cpf || ''} onChange={handleTransferChange} className={transferInputCls} />
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-1">Nascimento</label>
-                   <input required type="date" name="birthDate" value={transferData.birthDate || ''} onChange={handleTransferChange} className="w-full p-2 border rounded" />
+                   <input required type="date" name="birthDate" value={transferData.birthDate || ''} onChange={handleTransferChange} className={transferInputCls} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-1">Gênero</label>
-                   <select name="gender" value={transferData.gender} onChange={handleTransferChange} className="w-full p-2 border rounded bg-white">
+                   <select name="gender" value={transferData.gender} onChange={handleTransferChange} className={transferInputCls}>
                       {Object.values(Gender).map(g => <option key={g} value={g}>{g}</option>)}
                    </select>
                 </div>
                 <div>
                    <label className="block text-sm font-bold text-slate-700 mb-1">Camiseta</label>
-                   <select name="shirtSize" value={transferData.shirtSize} onChange={handleTransferChange} className="w-full p-2 border rounded bg-white">
+                   <select name="shirtSize" value={transferData.shirtSize} onChange={handleTransferChange} className={transferInputCls}>
                       {Object.values(ShirtSize).map(s => <option key={s} value={s}>{s}</option>)}
                    </select>
                 </div>
@@ -546,17 +550,17 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
-                <input type="email" name="email" value={transferData.email || ''} onChange={handleTransferChange} className="w-full p-2 border rounded" />
+                <input type="email" name="email" value={transferData.email || ''} onChange={handleTransferChange} className={transferInputCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Cidade</label>
-                  <input name="city" value={transferData.city || ''} onChange={handleTransferChange} className="w-full p-2 border rounded" />
+                  <input name="city" value={transferData.city || ''} onChange={handleTransferChange} className={transferInputCls} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Equipe</label>
-                  <input name="teamName" value={transferData.teamName || ''} onChange={handleTransferChange} className="w-full p-2 border rounded" />
+                  <input name="teamName" value={transferData.teamName || ''} onChange={handleTransferChange} className={transferInputCls} />
                 </div>
               </div>
 
