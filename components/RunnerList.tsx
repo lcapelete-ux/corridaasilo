@@ -183,21 +183,34 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const handleTransferSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!transferRunner || !onUpdate) return;
-    
+
     // Recalcula idade se a data mudou
     const newAge = transferData.birthDate ? calculateAge(transferData.birthDate) : transferRunner.age;
+
+    // Só marca como transferida se o titular realmente mudou (nome ou CPF);
+    // correções de email/cidade não contam como transferência
+    const holderChanged =
+      (transferData.fullName && transferData.fullName.trim() !== transferRunner.fullName.trim()) ||
+      (transferData.cpf && transferData.cpf.trim() !== transferRunner.cpf.trim());
 
     const updatedRunner: Runner = {
       ...transferRunner,
       ...transferData as Runner, // Sobrescreve dados pessoais
       age: newAge,
       // Mantém ID, Data de registro original, Pagamento e Comprovante (pois a vaga está paga)
+      ...(holderChanged && {
+        transferredFrom: transferRunner.fullName,
+        transferredAt: new Date().toISOString(),
+      }),
     };
 
     if (confirm(`Confirma a transferência da inscrição para ${updatedRunner.fullName}?`)) {
       onUpdate(updatedRunner);
       setTransferRunner(null);
       setTransferData({});
+      if (holderChanged) {
+        alert(`Inscrição transferida de ${transferRunner.fullName} para ${updatedRunner.fullName}.`);
+      }
     }
   };
 
@@ -318,11 +331,21 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <div className="min-w-0">
                       <p className="font-bold text-white truncate">{runner.fullName}</p>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">{runner.cpf}</p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1.5 ${
-                        runner.teamName === 'Avulso' ? 'bg-slate-800 text-slate-300' : 'bg-indigo-500/10 text-indigo-400'
-                      }`}>
-                        {runner.teamName}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          runner.teamName === 'Avulso' ? 'bg-slate-800 text-slate-300' : 'bg-indigo-500/10 text-indigo-400'
+                        }`}>
+                          {runner.teamName}
+                        </span>
+                        {runner.transferredFrom && (
+                          <span
+                            className="inline-flex items-center gap-1 bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                            title={`Titular anterior: ${runner.transferredFrom}`}
+                          >
+                            <ArrowRightLeft size={10} /> Transferida
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <button
@@ -391,6 +414,14 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4">
                       <div className="font-medium text-white">{runner.fullName}</div>
                       <div className="text-xs text-slate-500">{runner.email}</div>
+                      {runner.transferredFrom && (
+                        <span
+                          className="inline-flex items-center gap-1 mt-1 bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          title={`Titular anterior: ${runner.transferredFrom}`}
+                        >
+                          <ArrowRightLeft size={10} /> Transferida
+                        </span>
+                      )}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1 text-sm text-slate-300">
@@ -596,7 +627,25 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
             {/* Modal Body */}
             <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
-              
+
+              {/* Aviso de Transferência */}
+              {selectedRunner.transferredFrom && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
+                  <div className="bg-orange-100 p-2 rounded-lg text-orange-500 shrink-0">
+                    <ArrowRightLeft size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-orange-800 uppercase tracking-wide">Inscrição Transferida</p>
+                    <p className="text-sm text-orange-700 mt-0.5">
+                      Titular anterior: <strong>{selectedRunner.transferredFrom}</strong>
+                      {selectedRunner.transferredAt && (
+                        <> — transferida em {formatDate(selectedRunner.transferredAt)}</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Seção 1: Dados Pessoais */}
               <div>
                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Dados Pessoais</h4>
