@@ -218,11 +218,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
   const inputClass = isPublicView
     ? "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all"
-    : "w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all";
+    : "w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all [color-scheme:light]";
 
   const selectClass = isPublicView
     ? "w-full px-4 py-3 bg-slate-800/60 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all [color-scheme:dark]"
-    : "w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all";
+    : "w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition-all [color-scheme:light]";
 
   const labelClass = isPublicView
     ? "block text-sm font-bold text-slate-300 mb-1"
