@@ -3,7 +3,7 @@ import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { getRunners } from '../services/storageService';
 import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket } from 'lucide-react';
-import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, PREDEFINED_TEAMS } from '../constants';
+import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS } from '../constants';
 
 interface RegistrationFormProps {
   onSave: (runner: Runner) => void;
@@ -79,6 +79,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
         setAppliedCoupon(null);
         setCouponError('');
       }
+      // Nascimento mudou para 60+: remove o cupom (meia inscrição não acumula)
+      if (name === 'birthDate' && appliedCoupon && value && calculateAge(value) >= SENIOR_AGE) {
+        setAppliedCoupon(null);
+        setCouponInput('');
+        setCouponError('Cupom removido: atletas 60+ já pagam meia inscrição e o desconto não acumula.');
+      }
     }
   };
 
@@ -122,6 +128,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const handleApplyCoupon = () => {
     const code = couponInput.trim().toUpperCase();
     setCouponError('');
+
+    if (isSeniorRegistrant) {
+      setCouponError(`Atletas 60+ já pagam meia inscrição (R$ ${REGISTRATION_PRICE_SENIOR.toFixed(2).replace('.', ',')}). O desconto não acumula com cupom.`);
+      setAppliedCoupon(null);
+      return;
+    }
 
     if (!code) {
       setCouponError('Digite o código do cupom.');
@@ -174,6 +186,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
   // Valores para o resumo (idade 60+ tem preço reduzido; sem nascimento, assume preço normal)
   const ageForFee = formData.birthDate ? calculateAge(formData.birthDate) : 0;
+  // 60+ já tem meia inscrição: cupom de academia não acumula
+  const isSeniorRegistrant = !!formData.birthDate && ageForFee >= SENIOR_AGE;
   const baseFee = formData.birthDate ? getRegistrationFee(ageForFee) : REGISTRATION_PRICE;
   const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
@@ -219,9 +233,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       return;
     }
 
-    // Desconto do cupom calculado sobre o valor real da inscrição (60+ paga menos)
+    // Desconto do cupom sobre o valor da inscrição — 60+ já tem meia inscrição, não acumula cupom
     const feeForRunner = getRegistrationFee(ageCalculated);
-    const discountForRunner = appliedCoupon ? calcCouponDiscount(feeForRunner, appliedCoupon) : 0;
+    const discountForRunner = appliedCoupon && ageCalculated < SENIOR_AGE
+      ? calcCouponDiscount(feeForRunner, appliedCoupon)
+      : 0;
 
     const newRunner: Runner = {
       id: crypto.randomUUID(),
@@ -237,7 +253,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       registrationDate: new Date().toISOString(),
       isPaid: formData.isPaid,
       paymentProof: formData.paymentProof,
-      ...(appliedCoupon && discountForRunner > 0 && {
+      ...(appliedCoupon && ageCalculated < SENIOR_AGE && discountForRunner > 0 && {
         couponCode: appliedCoupon.code,
         couponDiscount: discountForRunner,
       }),
@@ -498,7 +514,18 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   <Ticket size={14} /> Cupom da Academia <span className={isPublicView ? 'text-slate-500 font-normal' : 'text-slate-400 font-normal'}>(opcional)</span>
                 </label>
 
-                {appliedCoupon ? (
+                {isSeniorRegistrant ? (
+                  <div className={`flex items-center gap-2 rounded-lg px-4 py-3 border text-sm ${
+                    isPublicView
+                      ? 'bg-slate-800/60 border-slate-700 text-slate-400'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                  }`}>
+                    <AlertCircle size={16} className={isPublicView ? 'text-yellow-400 shrink-0' : 'text-yellow-600 shrink-0'} />
+                    <span>
+                      Atletas 60+ já pagam <strong>meia inscrição (R$ {fmt(REGISTRATION_PRICE_SENIOR)})</strong> — cupom de academia não se aplica.
+                    </span>
+                  </div>
+                ) : appliedCoupon ? (
                   <div className={`flex items-center justify-between rounded-lg px-4 py-3 border ${
                     isPublicView
                       ? 'bg-emerald-500/10 border-emerald-500/30'
@@ -548,7 +575,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   </div>
                 )}
 
-                {couponError && (
+                {couponError && !isSeniorRegistrant && (
                   <p className={`text-xs mt-2 font-bold flex items-center gap-1 ${isPublicView ? 'text-red-400' : 'text-red-600'}`}>
                     <AlertCircle size={12} /> {couponError}
                   </p>
