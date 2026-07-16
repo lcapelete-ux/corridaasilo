@@ -20,19 +20,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
     setLoading(true);
 
     try {
-      // 1. Autentica no Supabase Auth
+      // 1. Aceita usuário OU e-mail: sem "@", resolve o e-mail pelo usuário
+      let loginEmail = email.trim();
+      if (loginEmail && !loginEmail.includes('@')) {
+        const { data: resolved } = await supabase.rpc('get_login_email', {
+          p_username: loginEmail,
+        });
+        if (resolved) {
+          loginEmail = resolved as string;
+        } else {
+          setError('Usuário não encontrado.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Autentica no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: loginEmail,
         password,
       });
 
       if (authError || !authData.user) {
-        setError('E-mail ou senha inválidos.');
+        setError('Usuário/e-mail ou senha inválidos.');
         setLoading(false);
         return;
       }
 
-      // 2. Busca o perfil (papel + equipe) na tabela organizers
+      // 3. Busca o perfil (papel + equipe) na tabela organizers
       const { data: profile, error: profileError } = await supabase
         .from('organizers')
         .select('name, username, role, team_name')
@@ -80,20 +95,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Campo de E-mail */}
+          {/* Campo de Usuário ou E-mail */}
           <div>
-            <label className="block text-sm font-bold text-slate-300 mb-1">E-mail</label>
+            <label className="block text-sm font-bold text-slate-300 mb-1">Usuário ou E-mail</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setError('');
                 }}
                 className={inputCls(!!error)}
-                placeholder="seu@email.com"
+                placeholder="Ex: marcelo"
                 autoFocus
               />
             </div>
