@@ -1,16 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
 import { getTrainingTip } from '../services/geminiService';
-import { getRunners } from '../services/storageService';
+import { findCouponByCode } from '../services/storageService';
 import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket } from 'lucide-react';
 import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS } from '../constants';
 
 interface RegistrationFormProps {
-  onSave: (runner: Runner) => void;
+  onSave: (runner: Runner) => Promise<boolean>;
   existingTeams: string[];
   isPublicView?: boolean;
   userSession?: UserSession | null;
-  coupons?: TeamCoupon[];
 }
 
 const PREDEFINED_CITIES = [
@@ -23,7 +22,7 @@ const PREDEFINED_CITIES = [
   'Tiete'
 ];
 
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, isPublicView = false, userSession, coupons = [] }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, isPublicView = false, userSession }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -45,6 +44,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<TeamCoupon | null>(null);
   const [couponError, setCouponError] = useState('');
+  const [couponChecking, setCouponChecking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pre-fill team if team leader
@@ -125,7 +126,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setCouponError('');
   };
 
-  const handleApplyCoupon = () => {
+  const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
     setCouponError('');
 
@@ -140,20 +141,29 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       return;
     }
 
-    const coupon = coupons.find(c => c.code.toUpperCase() === code);
-    if (!coupon) {
-      setCouponError('Cupom não encontrado. Confira o código com a sua academia.');
-      setAppliedCoupon(null);
-      return;
-    }
+    setCouponChecking(true);
+    try {
+      const coupon = await findCouponByCode(code);
 
-    if (coupon.teamName.toLowerCase() !== formData.teamName.toLowerCase()) {
-      setCouponError(`Este cupom não pertence à academia selecionada (${formData.teamName || 'nenhuma'}).`);
-      setAppliedCoupon(null);
-      return;
-    }
+      if (!coupon) {
+        setCouponError('Cupom não encontrado. Confira o código com a sua academia.');
+        setAppliedCoupon(null);
+        return;
+      }
 
-    setAppliedCoupon(coupon);
+      if (coupon.teamName.toLowerCase() !== formData.teamName.toLowerCase()) {
+        setCouponError(`Este cupom não pertence à academia selecionada (${formData.teamName || 'nenhuma'}).`);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      setAppliedCoupon(coupon);
+    } catch (err: any) {
+      setCouponError(err?.message || 'Erro ao validar o cupom. Tente novamente.');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponChecking(false);
+    }
   };
 
   const handleRemoveCoupon = () => {
@@ -206,26 +216,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       return;
     }
 
-    // Verificação de duplicidade
-    const existingRunners = getRunners();
-
-    // 1. Verifica CPF duplicado
-    const duplicateCpf = existingRunners.find(r => r.cpf === formData.cpf);
-    if (duplicateCpf) {
-      setErrors(prev => ({ ...prev, cpf: 'CPF já cadastrado.' }));
-      alert("Erro: Já existe um atleta cadastrado com este CPF.");
-      return;
-    }
-
-    // 2. Verifica Email duplicado (apenas se preenchido)
-    if (formData.email) {
-      const duplicateEmail = existingRunners.find(r => r.email.toLowerCase() === formData.email.toLowerCase());
-      if (duplicateEmail) {
-        alert("Erro: Este e-mail já está sendo utilizado em outra inscrição.");
-        return;
-      }
-    }
-
+    // Duplicidade de CPF/e-mail é garantida pelo banco (índices únicos);
+    // se houver conflito, onSave retorna erro amigável.
     const ageCalculated = calculateAge(formData.birthDate);
 
     if (ageCalculated < 10) {
@@ -259,7 +251,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       }),
     };
 
-    onSave(newRunner);
+    setSubmitting(true);
+    const saved = await onSave(newRunner);
+    setSubmitting(false);
+    if (!saved) return;
 
     setFormData({
       fullName: '',
@@ -564,13 +559,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                     <button
                       type="button"
                       onClick={handleApplyCoupon}
-                      className={`px-5 rounded-lg font-bold text-sm transition-all shrink-0 ${
+                      disabled={couponChecking}
+                      className={`px-5 rounded-lg font-bold text-sm transition-all shrink-0 disabled:opacity-60 disabled:cursor-wait ${
                         isPublicView
                           ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
                           : 'bg-slate-900 text-yellow-400 hover:bg-slate-800'
                       }`}
                     >
-                      Aplicar
+                      {couponChecking ? 'Verificando...' : 'Aplicar'}
                     </button>
                   </div>
                 )}
@@ -682,20 +678,21 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
           <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
             <button
               type="submit"
+              disabled={submitting}
               className={isPublicView
-                ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden"
-                : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase"
+                ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden disabled:opacity-60 disabled:cursor-wait disabled:hover:scale-100"
+                : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase disabled:opacity-60 disabled:cursor-wait"
               }
             >
               {isPublicView ? (
                 <>
                   <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
                   <span className="relative z-10 flex items-center gap-2">
-                    <Save size={20} aria-hidden="true" /> Confirmar Inscrição
+                    <Save size={20} aria-hidden="true" /> {submitting ? 'Enviando...' : 'Confirmar Inscrição'}
                   </span>
                 </>
               ) : (
-                'Confirmar Inscrição'
+                submitting ? 'Salvando...' : 'Confirmar Inscrição'
               )}
             </button>
           </div>

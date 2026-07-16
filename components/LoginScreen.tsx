@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Lock, Timer, User, ShieldCheck } from 'lucide-react';
+import { Lock, Timer, Mail, ShieldCheck, Loader2 } from 'lucide-react';
 import { UserSession } from '../types';
-import { getOrganizers } from '../services/storageService';
+import { supabase } from '../services/supabaseClient';
 
 interface LoginScreenProps {
   onLogin: (session: UserSession) => void;
@@ -9,41 +9,60 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const user = username.trim().toLowerCase();
-    
-    // 1. Admin Master Access (Hardcoded)
-    if ((user === 'marcelo' || user === 'wilson') && password === '1234') {
-      onLogin({
-        username: user,
-        role: 'admin'
+    setError('');
+    setLoading(true);
+
+    try {
+      // 1. Autentica no Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
-      return;
-    }
 
-    // 2. Dynamic Team Leader Access (From Database)
-    const organizers = getOrganizers();
-    const organizer = organizers.find(
-      org => org.username.toLowerCase() === user && org.password === password
-    );
+      if (authError || !authData.user) {
+        setError('E-mail ou senha inválidos.');
+        setLoading(false);
+        return;
+      }
 
-    if (organizer) {
+      // 2. Busca o perfil (papel + equipe) na tabela organizers
+      const { data: profile, error: profileError } = await supabase
+        .from('organizers')
+        .select('name, username, role, team_name')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        await supabase.auth.signOut();
+        setError('Login sem perfil de organizador. Fale com o administrador.');
+        setLoading(false);
+        return;
+      }
+
       onLogin({
-        username: organizer.name,
-        role: 'team_leader',
-        teamAccess: organizer.teamName // Garante acesso apenas à equipe cadastrada
+        username: profile.name || profile.username,
+        role: profile.role,
+        teamAccess: profile.role === 'team_leader' ? profile.team_name : undefined,
       });
-      return;
+    } catch {
+      setError('Falha na conexão. Verifique sua internet e tente novamente.');
+      setLoading(false);
     }
-
-    setError(true);
   };
+
+  const inputCls = (hasError: boolean) =>
+    `w-full pl-10 pr-4 py-3 border rounded-xl outline-none focus:ring-2 transition-all font-medium bg-slate-800 text-white placeholder-slate-500 ${
+      hasError
+        ? 'border-red-500 focus:ring-red-500/30'
+        : 'border-slate-700 focus:ring-yellow-400/40 focus:border-yellow-400'
+    }`;
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 animate-fade-in relative overflow-hidden">
@@ -61,24 +80,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Campo de Usuário */}
+          {/* Campo de E-mail */}
           <div>
-            <label className="block text-sm font-bold text-slate-300 mb-1">Usuário</label>
+            <label className="block text-sm font-bold text-slate-300 mb-1">E-mail</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
               <input
-                type="text"
-                value={username}
+                type="email"
+                value={email}
                 onChange={(e) => {
-                  setUsername(e.target.value);
-                  setError(false);
+                  setEmail(e.target.value);
+                  setError('');
                 }}
-                className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none focus:ring-2 transition-all font-medium bg-slate-800 text-white placeholder-slate-500 ${
-                  error
-                    ? 'border-red-500 focus:ring-red-500/30'
-                    : 'border-slate-700 focus:ring-yellow-400/40 focus:border-yellow-400'
-                }`}
-                placeholder="Digite seu usuário..."
+                className={inputCls(!!error)}
+                placeholder="seu@email.com"
                 autoFocus
               />
             </div>
@@ -94,24 +109,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setError(false);
+                  setError('');
                 }}
-                className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none focus:ring-2 transition-all font-medium bg-slate-800 text-white placeholder-slate-500 ${
-                  error
-                    ? 'border-red-500 focus:ring-red-500/30'
-                    : 'border-slate-700 focus:ring-yellow-400/40 focus:border-yellow-400'
-                }`}
+                className={inputCls(!!error)}
                 placeholder="Digite sua senha..."
               />
             </div>
-            {error && <p className="text-red-400 text-xs mt-2 ml-1 font-bold">Credenciais inválidas.</p>}
+            {error && <p className="text-red-400 text-xs mt-2 ml-1 font-bold">{error}</p>}
           </div>
 
           <button
             type="submit"
-            className="w-full bg-yellow-400 text-slate-900 py-3 rounded-xl font-black tracking-wide hover:bg-yellow-300 transition-colors shadow-lg shadow-yellow-400/20 uppercase flex justify-center items-center gap-2"
+            disabled={loading}
+            className="w-full bg-yellow-400 text-slate-900 py-3 rounded-xl font-black tracking-wide hover:bg-yellow-300 transition-colors shadow-lg shadow-yellow-400/20 uppercase flex justify-center items-center gap-2 disabled:opacity-60 disabled:cursor-wait"
           >
-            <ShieldCheck size={18} /> Acessar Sistema
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+            {loading ? 'Entrando...' : 'Acessar Sistema'}
           </button>
         </form>
 

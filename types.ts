@@ -73,7 +73,8 @@ export interface Organizer {
   name: string;      // Nome do responsável (ex: Diego)
   teamName: string;  // Equipe que ele gerencia (ex: Luso)
   username: string;  // Login
-  password: string;  // Senha simples
+  role?: 'admin' | 'team_leader';
+  password?: string; // Legado (autenticação agora é pelo Supabase Auth)
   phone?: string;    // Contato
 }
 
