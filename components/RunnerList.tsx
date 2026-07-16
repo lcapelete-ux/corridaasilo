@@ -1,23 +1,28 @@
 import React, { useState, useRef } from 'react';
-import { Runner, UserSession, Gender, ShirtSize } from '../types';
-import { getRegistrationFee, getRunnerPaidValue } from '../constants';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List } from 'lucide-react';
+import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
+import { getRegistrationFee, getRunnerPaidValue, canTransferNow } from '../constants';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List, Lock, Settings, Ban } from 'lucide-react';
 
 interface RunnerListProps {
   runners: Runner[];
   onDelete: (id: string) => void;
   onUpdate?: (runner: Runner) => void;
   userSession?: UserSession | null;
+  transferSettings?: TransferSettings | null;
+  onUpdateTransferSettings?: (settings: TransferSettings) => void;
 }
 
 // Modal de transferência tem fundo branco: cores explícitas + color-scheme light
 // para o texto não sumir quando o celular está em modo escuro
 const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 outline-none [color-scheme:light]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, userSession }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, userSession, transferSettings, onUpdateTransferSettings }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes'>('lista');
+  const [showTransferSettings, setShowTransferSettings] = useState(false);
+  const [settingsDraft, setSettingsDraft] = useState<TransferSettings>({ transferDeadline: undefined, transfersBlocked: false });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Estados para Transferência
   const [transferRunner, setTransferRunner] = useState<Runner | null>(null);
@@ -162,7 +167,10 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
   // --- Lógica de Transferência ---
 
+  const canTransfer = userSession?.role === 'admin' || canTransferNow(transferSettings);
+
   const openTransferModal = (runner: Runner) => {
+    if (!canTransfer) return;
     setTransferRunner(runner);
     setTransferData({
       fullName: runner.fullName,
@@ -184,6 +192,10 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const handleTransferSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!transferRunner || !onUpdate) return;
+    if (!canTransfer) {
+      alert('Prazo para transferência de inscrições encerrado. Fale com o administrador.');
+      return;
+    }
 
     // Recalcula idade se a data mudou
     const newAge = transferData.birthDate ? calculateAge(transferData.birthDate) : transferRunner.age;
@@ -215,8 +227,24 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     }
   };
 
-  // Verifica permissão de edição financeira (Admin ou Team Leader)
-  const canEditFinancials = userSession?.role === 'admin' || userSession?.role === 'team_leader';
+  // Confirmar pagamento é exclusivo do admin — líder de equipe não pode
+  const canEditFinancials = userSession?.role === 'admin';
+
+  const openTransferSettings = () => {
+    setSettingsDraft({
+      transferDeadline: transferSettings?.transferDeadline,
+      transfersBlocked: transferSettings?.transfersBlocked || false,
+    });
+    setShowTransferSettings(true);
+  };
+
+  const handleSaveTransferSettings = async () => {
+    if (!onUpdateTransferSettings) return;
+    setSavingSettings(true);
+    await onUpdateTransferSettings(settingsDraft);
+    setSavingSettings(false);
+    setShowTransferSettings(false);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -244,6 +272,20 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             >
               <Download size={14} /> Exportar
             </button>
+            {userSession?.role === 'admin' && (
+              <button
+                onClick={() => showTransferSettings ? setShowTransferSettings(false) : openTransferSettings()}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  !canTransferNow(transferSettings)
+                    ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                }`}
+                title="Configurar prazo/bloqueio de transferência para líderes"
+              >
+                <Settings size={14} /> Transferências
+                {!canTransferNow(transferSettings) && <Ban size={12} />}
+              </button>
+            )}
           </div>
 
           {activeTab === 'lista' && (
@@ -291,6 +333,64 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           </button>
         </div>
       </div>
+
+      {/* Painel: Configurações de Transferência (admin) */}
+      {userSession?.role === 'admin' && showTransferSettings && (
+        <div className="bg-slate-900 rounded-xl border border-orange-500/30 p-5 space-y-4 animate-slide-down">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <ArrowRightLeft size={16} className="text-orange-400" />
+              Configurações de Transferência (Líderes de Equipe)
+            </h3>
+            <button onClick={() => setShowTransferSettings(false)} className="text-slate-500 hover:text-white">
+              <X size={18} />
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 -mt-2">
+            Controla até quando os líderes de equipe podem transferir inscrições da própria academia. O admin nunca é afetado por essas regras.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Prazo final (opcional)</label>
+              <input
+                type="date"
+                value={settingsDraft.transferDeadline || ''}
+                onChange={e => setSettingsDraft(prev => ({ ...prev, transferDeadline: e.target.value || undefined }))}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 outline-none transition-all text-sm [color-scheme:dark]"
+              />
+              <p className="text-[11px] text-slate-600 mt-1">Vazio = sem prazo (líderes podem transferir indefinidamente)</p>
+            </div>
+
+            <div className="flex items-end">
+              <label className="flex items-center gap-3 cursor-pointer bg-slate-800 p-2.5 rounded-lg w-full border border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={settingsDraft.transfersBlocked}
+                  onChange={e => setSettingsDraft(prev => ({ ...prev, transfersBlocked: e.target.checked }))}
+                  className="w-5 h-5 rounded border-slate-600 accent-red-500"
+                />
+                <span className="text-sm font-bold text-slate-300">Bloquear transferências agora (imediato)</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+            <p className="text-xs text-slate-500">
+              Status atual: {canTransferNow(transferSettings)
+                ? <span className="text-emerald-400 font-bold">liberado para líderes</span>
+                : <span className="text-red-400 font-bold">bloqueado para líderes</span>}
+            </p>
+            <button
+              onClick={handleSaveTransferSettings}
+              disabled={savingSettings}
+              className="px-5 py-2 bg-orange-500 text-white rounded-lg font-bold text-sm hover:bg-orange-600 transition-all disabled:opacity-60"
+            >
+              {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Comprovantes View */}
       {activeTab === 'comprovantes' && (
@@ -349,24 +449,34 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
-                      <button
-                        onClick={() => {
-                          if (onUpdate) {
-                            const updated = { ...runner, isPaid: !runner.isPaid };
-                            onUpdate(updated);
+                      {canEditFinancials ? (
+                        <button
+                          onClick={() => togglePaidStatus(runner)}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                            runner.isPaid
+                              ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                              : 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                          }`}
+                        >
+                          {runner.isPaid
+                            ? <><CheckCircle size={12} /> PAGO</>
+                            : <><Clock size={12} /> PENDENTE</>
                           }
-                        }}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                          runner.isPaid
-                            ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                            : 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
-                        }`}
-                      >
-                        {runner.isPaid
-                          ? <><CheckCircle size={12} /> PAGO</>
-                          : <><Clock size={12} /> PENDENTE</>
-                        }
-                      </button>
+                        </button>
+                      ) : (
+                        <span
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                            runner.isPaid
+                              ? 'bg-emerald-500/15 text-emerald-400'
+                              : 'bg-amber-500/15 text-amber-400'
+                          }`}
+                        >
+                          {runner.isPaid
+                            ? <><CheckCircle size={12} /> PAGO</>
+                            : <><Clock size={12} /> PENDENTE</>
+                          }
+                        </span>
+                      )}
                       <button
                         onClick={() => setSelectedRunner(runner)}
                         className="text-xs text-slate-500 hover:text-indigo-400 flex items-center gap-1 transition-colors"
@@ -476,14 +586,23 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {userSession?.role === 'admin' && (
-                          <button
-                            onClick={() => openTransferModal(runner)}
-                            className="p-2 rounded-lg text-slate-500 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
-                            title="Transferir Inscrição (Editar Titular)"
-                          >
-                            <ArrowRightLeft size={18} />
-                          </button>
+                        {(userSession?.role === 'admin' || userSession?.role === 'team_leader') && (
+                          canTransfer ? (
+                            <button
+                              onClick={() => openTransferModal(runner)}
+                              className="p-2 rounded-lg text-slate-500 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+                              title="Transferir Inscrição (Editar Titular)"
+                            >
+                              <ArrowRightLeft size={18} />
+                            </button>
+                          ) : (
+                            <span
+                              className="p-2 rounded-lg text-slate-700 cursor-not-allowed"
+                              title="Prazo para transferência de inscrições encerrado"
+                            >
+                              <Lock size={18} />
+                            </span>
+                          )
                         )}
 
                         {canEditFinancials && (
@@ -592,7 +711,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Equipe</label>
-                  <input name="teamName" value={transferData.teamName || ''} onChange={handleTransferChange} className={transferInputCls} />
+                  <input
+                    name="teamName"
+                    value={transferData.teamName || ''}
+                    onChange={handleTransferChange}
+                    disabled={userSession?.role === 'team_leader'}
+                    className={`${transferInputCls} ${userSession?.role === 'team_leader' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  />
+                  {userSession?.role === 'team_leader' && (
+                    <p className="text-[11px] text-slate-500 mt-1">Você só transfere inscrições dentro da sua própria equipe.</p>
+                  )}
                 </div>
               </div>
 

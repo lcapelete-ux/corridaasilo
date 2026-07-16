@@ -1,4 +1,4 @@
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, Gender, ShirtSize } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize } from '../types';
 import { supabase } from './supabaseClient';
 
 // Todos os dados agora vivem no Supabase (banco central), não mais no
@@ -15,6 +15,11 @@ const friendlyError = (error: { code?: string; message?: string } | null, fallba
   }
   if (msg.includes('row-level security')) {
     return new Error('Sem permissão para esta operação. Faça login novamente.');
+  }
+  if (error?.code === 'P0001') {
+    // Exceção lançada de propósito por uma função/trigger do banco (regra de
+    // negócio) — a mensagem já é escrita para o usuário final, sem prefixo.
+    return new Error(msg || fallback);
   }
   console.error(fallback, error);
   return new Error(`${fallback}${msg ? `: ${msg}` : ''}`);
@@ -310,6 +315,33 @@ export const deleteOrganizer = async (id: string): Promise<void> => {
   if (error) throw friendlyError(error, 'Erro ao remover organizador');
 };
 
+// Cria um novo login de organizador (líder de equipe ou admin) direto pelo
+// site. A checagem de permissão (só admin pode) é feita dentro da função no
+// banco — ver admin_create_login em supabase/atualizacao_app.sql.
+export const createOrganizerLogin = async (params: {
+  email: string;
+  password: string;
+  name: string;
+  username: string;
+  teamName: string;
+  role: 'admin' | 'team_leader';
+  phone?: string;
+}): Promise<void> => {
+  const { data, error } = await supabase.rpc('admin_create_login', {
+    p_email: params.email,
+    p_password: params.password,
+    p_name: params.name,
+    p_username: params.username,
+    p_team_name: params.teamName,
+    p_role: params.role,
+    p_phone: params.phone || null,
+  });
+  if (error) throw friendlyError(error, 'Erro ao criar login');
+  if (typeof data === 'string' && data.startsWith('Já existia')) {
+    throw new Error('Já existe um login cadastrado com este e-mail.');
+  }
+};
+
 // --- Cupons de Desconto (por academia) ---
 
 interface CouponRow {
@@ -377,4 +409,36 @@ export const findCouponByCode = async (code: string): Promise<TeamCoupon | null>
     discountType: row.discount_type,
     value: Number(row.value),
   };
+};
+
+// --- Configurações de Transferência (prazo/bloqueio definidos pelo admin) ---
+
+interface AppSettingsRow {
+  transfer_deadline: string | null;
+  transfers_blocked: boolean;
+}
+
+export const getTransferSettings = async (): Promise<TransferSettings> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('transfer_deadline, transfers_blocked')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar configurações de transferência');
+  const row = data as AppSettingsRow | null;
+  return {
+    transferDeadline: row?.transfer_deadline || undefined,
+    transfersBlocked: row?.transfers_blocked ?? false,
+  };
+};
+
+export const updateTransferSettings = async (settings: TransferSettings): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({
+      transfer_deadline: settings.transferDeadline || null,
+      transfers_blocked: settings.transfersBlocked,
+    })
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar configurações de transferência');
 };

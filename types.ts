@@ -90,4 +90,9 @@ export interface UserSession {
   teamAccess?: string; // Se for team_leader, qual equipe ele gerencia
 }
 
+export interface TransferSettings {
+  transferDeadline?: string; // Data (YYYY-MM-DD) até quando líderes podem transferir; sem valor = sem prazo
+  transfersBlocked: boolean; // Bloqueio manual imediato definido pelo admin
+}
+
 export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons';
