@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ExtraRevenue, Runner } from '../types';
-import { getRegistrationFee, SENIOR_AGE } from '../constants';
+import { getRunnerPaidValue, SENIOR_AGE } from '../constants';
 import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag } from 'lucide-react';
 
 interface ExtraRevenueManagerProps {
@@ -44,7 +44,7 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
   const paidRunners = runners
     .filter(r => r.isPaid)
     .sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
-  const totalRegistrations = paidRunners.reduce((acc, r) => acc + getRegistrationFee(r.age), 0);
+  const totalRegistrations = paidRunners.reduce((acc, r) => acc + getRunnerPaidValue(r), 0);
 
   const totalExtra = revenues.reduce((acc, curr) => acc + curr.amount, 0);
   const totalGeral = totalRegistrations + totalExtra;
@@ -122,6 +122,14 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
                           <Tag size={9} /> 60+
                         </span>
                       )}
+                      {runner.couponCode && (
+                        <span
+                          className="ml-2 inline-flex items-center gap-1 bg-yellow-400/10 text-yellow-400 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono"
+                          title={`Desconto de R$ ${(runner.couponDiscount || 0).toFixed(2)}`}
+                        >
+                          <Tag size={9} /> {runner.couponCode}
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-sm text-slate-400">{runner.teamName}</td>
                     <td className="p-4 text-sm text-slate-400">
@@ -129,7 +137,7 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
                         <Calendar size={12} className="text-slate-500" /> {new Date(runner.registrationDate).toLocaleDateString('pt-BR')}
                       </span>
                     </td>
-                    <td className="p-4 font-mono font-bold text-indigo-400 text-right">+ R$ {fmt(getRegistrationFee(runner.age))}</td>
+                    <td className="p-4 font-mono font-bold text-indigo-400 text-right">+ R$ {fmt(getRunnerPaidValue(runner))}</td>
                   </tr>
                 ))
               )}
