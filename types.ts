@@ -28,6 +28,16 @@ export interface Runner {
   paymentProof?: string; // Base64 image string
   transferredFrom?: string; // Nome do titular anterior (inscrição transferida)
   transferredAt?: string;   // Data ISO da transferência
+  couponCode?: string;      // Cupom de desconto aplicado na inscrição
+  couponDiscount?: number;  // Valor do desconto em R$ efetivamente aplicado
+}
+
+export interface TeamCoupon {
+  id: string;
+  teamName: string;               // Academia/equipe dona do cupom
+  code: string;                   // Ex: LUSO10
+  discountType: 'fixed' | 'percent';
+  value: number;                  // R$ (fixed) ou % (percent)
 }
 
 export type SponsorType = 'Camiseta' | 'Medalha';
@@ -79,4 +89,4 @@ export interface UserSession {
   teamAccess?: string; // Se for team_leader, qual equipe ele gerencia
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue';
+export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons';

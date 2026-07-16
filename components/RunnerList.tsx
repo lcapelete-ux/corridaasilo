@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize } from '../types';
+import { getRegistrationFee, getRunnerPaidValue } from '../constants';
 import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List } from 'lucide-react';
 
 interface RunnerListProps {
@@ -714,6 +715,17 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
               <div className="break-inside-avoid">
                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Pagamento & Comprovante</h4>
                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="mb-4 pb-3 border-b border-slate-200">
+                      <p className="text-xs text-slate-500 font-bold">Valor da Inscrição</p>
+                      <p className="text-slate-800 font-black text-2xl">
+                        R$ {getRunnerPaidValue(selectedRunner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      {selectedRunner.couponCode && (
+                        <p className="text-xs text-emerald-600 font-bold mt-0.5">
+                          Cupom {selectedRunner.couponCode} aplicado: R$ {getRegistrationFee(selectedRunner.age).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} − R$ {(selectedRunner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
+                    </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                       <div>
                         <p className="text-xs text-slate-500 font-bold">Status Atual</p>

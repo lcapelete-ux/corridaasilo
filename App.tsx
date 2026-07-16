@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, saveOrganizer, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue } from './services/storageService';
-import { getRegistrationFee } from './constants';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, ViewState, UserSession } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, saveOrganizer, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon } from './services/storageService';
+import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -11,10 +11,11 @@ import { SponsorsManager } from './components/SponsorsManager';
 import { ExpensesManager } from './components/ExpensesManager';
 import { ExtraRevenueManager } from './components/ExtraRevenueManager';
 import { OrganizersManager } from './components/OrganizersManager';
+import { CouponsManager } from './components/CouponsManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -30,12 +31,14 @@ const App: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [organizers, setOrganizers] = useState<Organizer[]>([]);
   const [extraRevenues, setExtraRevenues] = useState<ExtraRevenue[]>([]);
+  const [coupons, setCoupons] = useState<TeamCoupon[]>([]);
   
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [lastRegisteredAge, setLastRegisteredAge] = useState<number>(0);
+  const [lastRegisteredDiscount, setLastRegisteredDiscount] = useState<number>(0);
   
   // Auth State
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -46,6 +49,7 @@ const App: React.FC = () => {
     setExpenses(getExpenses());
     setOrganizers(getOrganizers());
     setExtraRevenues(getExtraRevenues());
+    setCoupons(getCoupons());
   }, []);
 
   // --- Runner Actions ---
@@ -53,6 +57,7 @@ const App: React.FC = () => {
     saveRunner(runner);
     setRunners(getRunners());
     setLastRegisteredAge(runner.age);
+    setLastRegisteredDiscount(runner.couponDiscount || 0);
     
     // Check if we are in public mode to redirect to success screen
     if (mode === 'public') {
@@ -137,6 +142,30 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Coupon Actions ---
+  const handleSaveCoupon = (coupon: TeamCoupon) => {
+    saveCoupon(coupon);
+    setCoupons(getCoupons());
+  };
+
+  const handleUpdateCoupon = (coupon: TeamCoupon) => {
+    updateCoupon(coupon);
+    setCoupons(getCoupons());
+  };
+
+  const handleDeleteCoupon = (id: string) => {
+    deleteCoupon(id);
+    setCoupons(getCoupons());
+  };
+
+  // Academias disponíveis para cupons (oficiais + criadas por inscrições/organizadores)
+  const getCouponTeams = () => {
+    const set = new Set<string>(PREDEFINED_TEAMS);
+    runners.forEach(r => { if (r.teamName && r.teamName !== 'Avulso') set.add(r.teamName); });
+    organizers.forEach(o => { if (o.teamName) set.add(o.teamName); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  };
+
   // --- Auth & Permissions ---
   const handleLogin = (session: UserSession) => {
     setUserSession(session);
@@ -171,7 +200,7 @@ const App: React.FC = () => {
   // Totals Calculation
   const totalSponsorRevenue = sponsors.reduce((acc, curr) => acc + (curr.isPaid ? curr.amount : 0), 0);
   const totalExtraRevenue = extraRevenues.reduce((acc, curr) => acc + curr.amount, 0);
-  const totalRegistrationRevenue = runners.reduce((acc, r) => acc + (r.isPaid ? getRegistrationFee(r.age) : 0), 0);
+  const totalRegistrationRevenue = runners.reduce((acc, r) => acc + (r.isPaid ? getRunnerPaidValue(r) : 0), 0);
   const totalExpensesValue = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
   // Grand Total Revenue (Inscrições + Sponsors + Extra)
@@ -217,7 +246,7 @@ const App: React.FC = () => {
 
   // RENDER: TELA DE SUCESSO DO PIX
   if (mode === 'registration_success') {
-    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} />;
+    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} />;
   }
 
   // RENDER: FORMULÁRIO PÚBLICO
@@ -247,6 +276,7 @@ const App: React.FC = () => {
              onSave={handleSaveRunner}
              existingTeams={getExistingTeams()}
              isPublicView={true}
+             coupons={coupons}
            />
 
            <div className="max-w-3xl mx-auto mt-4 mb-8 text-center text-slate-500 text-sm">
@@ -311,6 +341,7 @@ const App: React.FC = () => {
                 <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-3 px-4">Gestão</p>
               </div>
               <NavItem target="organizers" icon={Shield} label="Organizadores" />
+              <NavItem target="coupons" icon={Ticket} label="Cupons" />
             </>
           )}
         </nav>
@@ -356,6 +387,7 @@ const App: React.FC = () => {
                 existingTeams={getExistingTeams()} 
                 isPublicView={false}
                 userSession={userSession}
+                coupons={coupons}
               />
             )}
             
@@ -393,6 +425,16 @@ const App: React.FC = () => {
                 expenses={expenses}
                 onSave={handleSaveExpense}
                 onDelete={handleDeleteExpense}
+              />
+            )}
+
+            {currentView === 'coupons' && (
+              <CouponsManager
+                coupons={coupons}
+                teams={getCouponTeams()}
+                onSave={handleSaveCoupon}
+                onUpdate={handleUpdateCoupon}
+                onDelete={handleDeleteCoupon}
               />
             )}
 

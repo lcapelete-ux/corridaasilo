@@ -1,14 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { Gender, Runner, ShirtSize, UserSession } from '../types';
+import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { getRunners } from '../services/storageService';
-import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle } from 'lucide-react';
+import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket } from 'lucide-react';
+import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, PREDEFINED_TEAMS } from '../constants';
 
 interface RegistrationFormProps {
   onSave: (runner: Runner) => void;
   existingTeams: string[];
   isPublicView?: boolean;
   userSession?: UserSession | null;
+  coupons?: TeamCoupon[];
 }
 
 const PREDEFINED_CITIES = [
@@ -21,19 +23,7 @@ const PREDEFINED_CITIES = [
   'Tiete'
 ];
 
-const PREDEFINED_TEAMS = [
-  'Ai que Fome (Tiete)',
-  'Alcatéia',
-  'Ecort (Tiete)',
-  'Luso',
-  'Runners Sempre Jovens',
-  'Spazio',
-  'Team Dani',
-  'Time Runners (Tiete)',
-  'Tribo'
-];
-
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, isPublicView = false, userSession }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, isPublicView = false, userSession, coupons = [] }) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -50,6 +40,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const [errors, setErrors] = useState<{ cpf?: string }>({});
   const [isCustomCity, setIsCustomCity] = useState(false);
   const [isCustomTeam, setIsCustomTeam] = useState(false);
+
+  // --- Cupom de desconto da academia ---
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<TeamCoupon | null>(null);
+  const [couponError, setCouponError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pre-fill team if team leader
@@ -79,6 +74,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
+      // Mudou o nome da equipe digitado: cupom aplicado deixa de valer
+      if (name === 'teamName' && appliedCoupon) {
+        setAppliedCoupon(null);
+        setCouponError('');
+      }
     }
   };
 
@@ -113,6 +113,41 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       setIsCustomTeam(false);
       setFormData(prev => ({ ...prev, teamName: value }));
     }
+    // Trocou de academia: o cupom precisa ser validado de novo
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
+  };
+
+  const handleApplyCoupon = () => {
+    const code = couponInput.trim().toUpperCase();
+    setCouponError('');
+
+    if (!code) {
+      setCouponError('Digite o código do cupom.');
+      return;
+    }
+
+    const coupon = coupons.find(c => c.code.toUpperCase() === code);
+    if (!coupon) {
+      setCouponError('Cupom não encontrado. Confira o código com a sua academia.');
+      setAppliedCoupon(null);
+      return;
+    }
+
+    if (coupon.teamName.toLowerCase() !== formData.teamName.toLowerCase()) {
+      setCouponError(`Este cupom não pertence à academia selecionada (${formData.teamName || 'nenhuma'}).`);
+      setAppliedCoupon(null);
+      return;
+    }
+
+    setAppliedCoupon(coupon);
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,6 +171,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     }
     return age;
   };
+
+  // Valores para o resumo (idade 60+ tem preço reduzido; sem nascimento, assume preço normal)
+  const ageForFee = formData.birthDate ? calculateAge(formData.birthDate) : 0;
+  const baseFee = formData.birthDate ? getRegistrationFee(ageForFee) : REGISTRATION_PRICE;
+  const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
+  const finalFee = Math.max(0, baseFee - couponDiscountValue);
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +219,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       return;
     }
 
+    // Desconto do cupom calculado sobre o valor real da inscrição (60+ paga menos)
+    const feeForRunner = getRegistrationFee(ageCalculated);
+    const discountForRunner = appliedCoupon ? calcCouponDiscount(feeForRunner, appliedCoupon) : 0;
+
     const newRunner: Runner = {
       id: crypto.randomUUID(),
       fullName: formData.fullName,
@@ -190,7 +236,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       shirtSize: formData.shirtSize as ShirtSize,
       registrationDate: new Date().toISOString(),
       isPaid: formData.isPaid,
-      paymentProof: formData.paymentProof
+      paymentProof: formData.paymentProof,
+      ...(appliedCoupon && discountForRunner > 0 && {
+        couponCode: appliedCoupon.code,
+        couponDiscount: discountForRunner,
+      }),
     };
 
     onSave(newRunner);
@@ -210,6 +260,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setErrors({});
     setIsCustomCity(false);
     setIsCustomTeam(false);
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
 
     if (!isPublicView) {
        alert("Cadastrado com sucesso!");
@@ -437,7 +490,103 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 )}
               </div>
             </div>
+
+            {/* Cupom de Desconto da Academia */}
+            {formData.teamName && formData.teamName !== 'Avulso' && (
+              <div className="col-span-2 animate-fade-in">
+                <label className={`${labelClass} flex items-center gap-1`}>
+                  <Ticket size={14} /> Cupom da Academia <span className={isPublicView ? 'text-slate-500 font-normal' : 'text-slate-400 font-normal'}>(opcional)</span>
+                </label>
+
+                {appliedCoupon ? (
+                  <div className={`flex items-center justify-between rounded-lg px-4 py-3 border ${
+                    isPublicView
+                      ? 'bg-emerald-500/10 border-emerald-500/30'
+                      : 'bg-emerald-50 border-emerald-300'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className={isPublicView ? 'text-emerald-400' : 'text-emerald-600'} />
+                      <div>
+                        <p className={`font-bold text-sm ${isPublicView ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                          Cupom {appliedCoupon.code} aplicado!
+                        </p>
+                        <p className={`text-xs ${isPublicView ? 'text-emerald-500/80' : 'text-emerald-600'}`}>
+                          Desconto de {appliedCoupon.discountType === 'percent'
+                            ? `${appliedCoupon.value}%`
+                            : `R$ ${fmt(appliedCoupon.value)}`} — Academia {appliedCoupon.teamName}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className={`text-xs font-bold underline ${isPublicView ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                      className={`${inputClass} uppercase font-mono flex-1`}
+                      placeholder="Ex: LUSO10"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      className={`px-5 rounded-lg font-bold text-sm transition-all shrink-0 ${
+                        isPublicView
+                          ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
+                          : 'bg-slate-900 text-yellow-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                )}
+
+                {couponError && (
+                  <p className={`text-xs mt-2 font-bold flex items-center gap-1 ${isPublicView ? 'text-red-400' : 'text-red-600'}`}>
+                    <AlertCircle size={12} /> {couponError}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Resumo do Valor da Inscrição */}
+          {appliedCoupon && (
+            <div className={`mt-6 rounded-xl p-5 border animate-fade-in ${
+              isPublicView
+                ? 'bg-slate-800/60 border-slate-700'
+                : 'bg-slate-50 border-slate-200'
+            }`}>
+              <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${isPublicView ? 'text-slate-500' : 'text-slate-400'}`}>
+                Resumo da Inscrição
+              </p>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className={isPublicView ? 'text-slate-400' : 'text-slate-600'}>
+                    Inscrição{formData.birthDate && ageForFee >= 60 ? ' (60+)' : ''}
+                  </span>
+                  <span className={`font-mono ${isPublicView ? 'text-slate-300' : 'text-slate-700'}`}>R$ {fmt(baseFee)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={isPublicView ? 'text-emerald-400' : 'text-emerald-600'}>
+                    Cupom {appliedCoupon.code}
+                  </span>
+                  <span className={`font-mono font-bold ${isPublicView ? 'text-emerald-400' : 'text-emerald-600'}`}>− R$ {fmt(couponDiscountValue)}</span>
+                </div>
+                <div className={`flex justify-between pt-2 mt-1 border-t ${isPublicView ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <span className={`font-bold ${isPublicView ? 'text-white' : 'text-slate-900'}`}>Total a pagar</span>
+                  <span className={`font-mono font-black text-lg ${isPublicView ? 'text-yellow-400' : 'text-slate-900'}`}>R$ {fmt(finalFee)}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* SESSÃO FINANCEIRA (APENAS ORGANIZADORES) */}
           {userSession && (

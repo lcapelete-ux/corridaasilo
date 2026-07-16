@@ -1,11 +1,12 @@
 
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon } from '../types';
 
 const RUNNERS_KEY = 'runtrack_5k_data';
 const SPONSORS_KEY = 'runtrack_5k_sponsors';
 const EXPENSES_KEY = 'runtrack_5k_expenses';
 const ORGANIZERS_KEY = 'runtrack_5k_organizers';
 const EXTRA_REVENUE_KEY = 'runtrack_5k_extra_revenue';
+const COUPONS_KEY = 'runtrack_5k_coupons';
 
 // --- Runners ---
 
@@ -167,10 +168,45 @@ export const deleteOrganizer = (id: string): void => {
 };
 
 
+// --- Cupons de Desconto (por academia) ---
+
+export const getCoupons = (): TeamCoupon[] => {
+  try {
+    const data = localStorage.getItem(COUPONS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error("Failed to load coupons", e);
+    return [];
+  }
+};
+
+export const saveCoupon = (coupon: TeamCoupon): void => {
+  const coupons = getCoupons();
+  coupons.push(coupon);
+  localStorage.setItem(COUPONS_KEY, JSON.stringify(coupons));
+};
+
+export const updateCoupon = (updatedCoupon: TeamCoupon): void => {
+  const coupons = getCoupons();
+  const index = coupons.findIndex(c => c.id === updatedCoupon.id);
+  if (index !== -1) {
+    coupons[index] = updatedCoupon;
+    localStorage.setItem(COUPONS_KEY, JSON.stringify(coupons));
+  }
+};
+
+export const deleteCoupon = (id: string): void => {
+  const coupons = getCoupons();
+  const filtered = coupons.filter(c => c.id !== id);
+  localStorage.setItem(COUPONS_KEY, JSON.stringify(filtered));
+};
+
+
 export const clearAllData = (): void => {
   localStorage.removeItem(RUNNERS_KEY);
   localStorage.removeItem(SPONSORS_KEY);
   localStorage.removeItem(EXPENSES_KEY);
   localStorage.removeItem(ORGANIZERS_KEY);
   localStorage.removeItem(EXTRA_REVENUE_KEY);
+  localStorage.removeItem(COUPONS_KEY);
 };

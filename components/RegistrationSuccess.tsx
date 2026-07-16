@@ -6,13 +6,16 @@ import { REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR } from '../constants';
 interface RegistrationSuccessProps {
   onBack: () => void;
   isSenior: boolean;
+  discount?: number; // Desconto do cupom da academia (R$)
 }
 
-export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior }) => {
+export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0 }) => {
   const [copied, setCopied] = useState(false);
   const pixKey = "corridaasilo@gmail.com";
-  const price = (isSenior ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE)
-    .toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  const basePrice = isSenior ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
+  const finalPrice = Math.max(0, basePrice - discount);
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  const price = fmt(finalPrice);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(pixKey);
@@ -54,6 +57,11 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
               <span className="text-xl font-medium">R$</span>
               <span className="text-5xl font-black tracking-tighter">{price}</span>
             </div>
+            {discount > 0 && (
+              <p className="mt-2 text-xs font-bold text-emerald-600 flex items-center justify-center gap-1">
+                <Tag size={11} /> Cupom aplicado: R$ {fmt(basePrice)} − R$ {fmt(discount)} de desconto
+              </p>
+            )}
           </div>
 
           <div className="space-y-4">
