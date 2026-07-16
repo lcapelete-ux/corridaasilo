@@ -50,13 +50,15 @@ const App: React.FC = () => {
 
   // Carrega os dados do banco conforme o papel do usuário logado
   const loadDataForSession = async (session: UserSession) => {
+    // Configurações de transferência são "melhor esforço": se a tabela ainda
+    // não existir no banco (migração pendente), não pode travar o carregamento
+    // dos corredores — só assume "sem restrição" e segue o app funcionando.
+    getTransferSettings()
+      .then(setTransferSettings)
+      .catch(e => console.warn('Configurações de transferência indisponíveis:', e?.message));
+
     try {
-      const [runnersData, settings] = await Promise.all([
-        getRunners(),
-        getTransferSettings(), // líder também precisa saber se pode transferir agora
-      ]);
-      setRunners(runnersData);
-      setTransferSettings(settings);
+      setRunners(await getRunners());
 
       if (session.role === 'admin') {
         const [sp, ex, org, rev, cp] = await Promise.all([
@@ -470,6 +472,17 @@ const App: React.FC = () => {
            <div className="max-w-3xl mx-auto mt-4 mb-8 text-center text-slate-500 text-sm">
              <p className="font-bold text-slate-300">Laranjal Paulista</p>
              <p className="mt-2">&copy; 2026 Corrida Noturna LSC. Todos os direitos reservados.</p>
+             <p className="mt-3 text-[11px] text-slate-600">
+               Desenvolvido por{' '}
+               <a
+                 href="https://wa.me/5515991334809"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="text-slate-500 hover:text-yellow-400 font-bold transition-colors"
+               >
+                 Marcelo Capelete
+               </a>
+             </p>
            </div>
         </main>
       </div>
