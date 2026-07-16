@@ -21,27 +21,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
   const [musicOn, setMusicOn] = useState(() => localStorage.getItem('lsc_musica') !== 'off');
   const musicOnRef = useRef(musicOn);
   musicOnRef.current = musicOn;
+  const introDoneRef = useRef(introDone);
+  introDoneRef.current = introDone;
 
   useEffect(() => {
-    // Navegadores bloqueiam áudio antes do primeiro toque: tenta tocar já e,
-    // se não der, começa no primeiro clique/tecla em qualquer lugar da página
-    const startOnGesture = () => {
-      if (musicOnRef.current) nightMusic.start();
-      remove();
-    };
-    const remove = () => {
-      window.removeEventListener('pointerdown', startOnGesture);
-      window.removeEventListener('keydown', startOnGesture);
-    };
-
-    if (musicOn) {
-      nightMusic.start().then(ok => {
-        if (!ok) {
-          window.addEventListener('pointerdown', startOnGesture);
-          window.addEventListener('keydown', startOnGesture);
+    // Navegadores bloqueiam áudio antes do primeiro toque. Destrava já; se
+    // não der, o primeiro toque/tecla destrava (e a contagem/música soam a
+    // partir dali). Quando a intro vai rodar, quem inicia a música é o
+    // "LARGADA!" — aqui só inicia direto se a intro não for exibida.
+    const onGesture = () => {
+      nightMusic.unlock().then(ok => {
+        if (ok && musicOnRef.current && introDoneRef.current) {
+          nightMusic.start();
         }
       });
-    }
+      if (introDoneRef.current) remove();
+    };
+    const remove = () => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+    };
+
+    nightMusic.unlock().then(ok => {
+      if (ok && musicOnRef.current && introDoneRef.current) {
+        nightMusic.start();
+      }
+    });
+    window.addEventListener('pointerdown', onGesture);
+    window.addEventListener('keydown', onGesture);
 
     // Saiu da página inicial: para a música
     return () => {
@@ -106,8 +113,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Vinheta de Largada (contagem 3-2-1 + corredor) */}
       {!introDone && (
         <RaceIntro
+          soundEnabled={musicOn}
           onReveal={() => setContentVisible(true)}
-          onFinish={() => setIntroDone(true)}
+          onFinish={() => {
+            setIntroDone(true);
+            if (musicOnRef.current) nightMusic.start();
+          }}
         />
       )}
 

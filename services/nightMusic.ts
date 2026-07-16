@@ -25,6 +25,7 @@ const semi = (base: number, s: number) => base * Math.pow(2, s / 12);
 class NightMusicEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private out: DynamicsCompressorNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private arpBus: GainNode | null = null;
   private timer: number | null = null;
@@ -39,9 +40,9 @@ class NightMusicEngine {
 
       this.master = this.ctx.createGain();
       this.master.gain.value = 0;
-      const comp = this.ctx.createDynamicsCompressor();
-      this.master.connect(comp);
-      comp.connect(this.ctx.destination);
+      this.out = this.ctx.createDynamicsCompressor();
+      this.master.connect(this.out);
+      this.out.connect(this.ctx.destination);
 
       // Ruído branco compartilhado (bateria)
       const len = this.ctx.sampleRate;
@@ -196,6 +197,54 @@ class NightMusicEngine {
     }
   };
 
+  /** Destrava o áudio (navegadores exigem um toque antes de tocar som). */
+  async unlock(): Promise<boolean> {
+    const ctx = this.ensureContext();
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch {
+        return false;
+      }
+    }
+    return ctx.state === 'running';
+  }
+
+  /** Bipe da contagem regressiva: 3/2/1 curtos, largada longa e uma oitava acima. */
+  countBeep(final = false) {
+    const ctx = this.ensureContext();
+    if (ctx.state !== 'running' || !this.out) return;
+    const t = ctx.currentTime + 0.01;
+    const dur = final ? 0.65 : 0.16;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = final ? 880 : 440;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(final ? 0.34 : 0.26, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(lp); lp.connect(g); g.connect(this.out);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+
+    if (final) {
+      // Camada extra na largada: quinta acima, pra soar épico
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'triangle';
+      osc2.frequency.value = 1318.5;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0.14, t);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc2.connect(g2);
+      g2.connect(this.out);
+      osc2.start(t);
+      osc2.stop(t + dur + 0.02);
+    }
+  }
+
   /** Tenta tocar. Retorna false se o navegador bloqueou (precisa de um toque). */
   async start(): Promise<boolean> {
     const ctx = this.ensureContext();
@@ -214,7 +263,7 @@ class NightMusicEngine {
     this.nextTime = ctx.currentTime + 0.06;
     this.master!.gain.cancelScheduledValues(ctx.currentTime);
     this.master!.gain.setValueAtTime(0.0001, ctx.currentTime);
-    this.master!.gain.exponentialRampToValueAtTime(0.62, ctx.currentTime + 1.2);
+    this.master!.gain.exponentialRampToValueAtTime(0.62, ctx.currentTime + 0.12);
     this.timer = window.setInterval(this.tick, LOOKAHEAD_MS);
     return true;
   }
