@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Flag } from 'lucide-react';
+import { nightMusic } from '../services/nightMusic';
 
 // A vinheta roda uma única vez por carregamento da página (voltar de outra tela não repete)
 let alreadyPlayed = false;
@@ -33,17 +34,20 @@ const RunnerIcon: React.FC<{ className?: string }> = ({ className }) => (
 interface RaceIntroProps {
   onReveal: () => void;  // conteúdo da página pode aparecer (início do fade)
   onFinish: () => void;  // overlay pode ser desmontado
+  soundEnabled?: boolean; // bipes da contagem + música na largada
 }
 
-export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
+export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish, soundEnabled = true }) => {
   const [step, setStep] = useState<IntroStep>('ready');
   const onRevealRef = useRef(onReveal);
   const onFinishRef = useRef(onFinish);
+  const soundRef = useRef(soundEnabled);
   const finishedRef = useRef(false);
 
   useEffect(() => {
     onRevealRef.current = onReveal;
     onFinishRef.current = onFinish;
+    soundRef.current = soundEnabled;
   });
 
   const finish = useCallback(() => {
@@ -55,11 +59,26 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
 
   useEffect(() => {
     alreadyPlayed = true;
+    // Destrava o áudio já na abertura (se o navegador deixar, a contagem toca)
+    nightMusic.unlock();
+
+    const count = (n: IntroStep) => {
+      setStep(n);
+      if (soundRef.current) nightMusic.countBeep();
+    };
+
     const timers = [
-      setTimeout(() => setStep('3'), 400),
-      setTimeout(() => setStep('2'), 1150),
-      setTimeout(() => setStep('1'), 1900),
-      setTimeout(() => setStep('go'), 2650),
+      setTimeout(() => count('3'), 400),
+      setTimeout(() => count('2'), 1150),
+      setTimeout(() => count('1'), 1900),
+      setTimeout(() => {
+        setStep('go');
+        // LARGADA: bipe longo + música entrando junto
+        if (soundRef.current) {
+          nightMusic.countBeep(true);
+          nightMusic.start();
+        }
+      }, 2650),
       setTimeout(() => { setStep('exit'); onRevealRef.current(); }, 3850),
       setTimeout(() => {
         if (!finishedRef.current) {
