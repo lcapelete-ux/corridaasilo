@@ -94,7 +94,7 @@ export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCr
             value={newTeamName}
             onChange={e => setNewTeamName(e.target.value)}
             placeholder="Nome da academia/equipe"
-            className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+            className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 outline-none text-sm [color-scheme:light]"
           />
           <button
             type="submit"
