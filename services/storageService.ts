@@ -68,25 +68,32 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   couponDiscount: r.coupon_discount != null ? Number(r.coupon_discount) : undefined,
 });
 
-const runnerToRow = (r: Runner) => ({
-  id: r.id,
-  full_name: r.fullName,
-  email: r.email,
-  cpf: r.cpf,
-  city: r.city,
-  birth_date: r.birthDate,
-  age: r.age,
-  gender: r.gender,
-  team_name: r.teamName,
-  shirt_size: r.shirtSize,
-  registration_date: r.registrationDate,
-  is_paid: r.isPaid ?? false,
-  payment_proof: r.paymentProof || null,
-  transferred_from: r.transferredFrom || null,
-  transferred_at: r.transferredAt || null,
-  coupon_code: r.couponCode || null,
-  coupon_discount: r.couponDiscount ?? null,
-});
+const runnerToRow = (r: Runner) => {
+  // Colunas base — existem desde o setup inicial
+  const row: Record<string, unknown> = {
+    id: r.id,
+    full_name: r.fullName,
+    email: r.email,
+    cpf: r.cpf,
+    city: r.city,
+    birth_date: r.birthDate,
+    age: r.age,
+    gender: r.gender,
+    team_name: r.teamName,
+    shirt_size: r.shirtSize,
+    registration_date: r.registrationDate,
+    is_paid: r.isPaid ?? false,
+    payment_proof: r.paymentProof || null,
+  };
+  // Colunas adicionadas pela migração (transferência/cupom): só são enviadas
+  // quando realmente têm valor. Assim, cadastro e upload de comprovante
+  // continuam funcionando mesmo que a migração ainda não tenha sido rodada.
+  if (r.transferredFrom) row.transferred_from = r.transferredFrom;
+  if (r.transferredAt) row.transferred_at = r.transferredAt;
+  if (r.couponCode) row.coupon_code = r.couponCode;
+  if (r.couponDiscount != null) row.coupon_discount = r.couponDiscount;
+  return row;
+};
 
 export const getRunners = async (): Promise<Runner[]> => {
   const { data, error } = await supabase

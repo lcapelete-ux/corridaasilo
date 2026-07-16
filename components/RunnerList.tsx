@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, canTransferNow } from '../constants';
+import { prepareProofFile } from '../services/imageUtils';
 import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List, Lock, Settings, Ban } from 'lucide-react';
 
 interface RunnerListProps {
@@ -137,25 +138,25 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && uploadingId && onUpdate) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        const runner = runners.find(r => r.id === uploadingId);
-        if (runner) {
-          const updatedRunner = { ...runner, paymentProof: base64String, isPaid: runner.isPaid };
-          onUpdate(updatedRunner);
-          if (selectedRunner?.id === uploadingId) {
-            setSelectedRunner(updatedRunner);
-          }
-          alert("Comprovante enviado com sucesso!");
+    if (!file || !uploadingId || !onUpdate) return;
+    try {
+      const base64String = await prepareProofFile(file);
+      const runner = runners.find(r => r.id === uploadingId);
+      if (runner) {
+        const updatedRunner = { ...runner, paymentProof: base64String, isPaid: runner.isPaid };
+        onUpdate(updatedRunner);
+        if (selectedRunner?.id === uploadingId) {
+          setSelectedRunner(updatedRunner);
         }
-        setUploadingId(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-      reader.readAsDataURL(file);
+        alert("Comprovante enviado com sucesso!");
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Não foi possível preparar o comprovante.');
+    } finally {
+      setUploadingId(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

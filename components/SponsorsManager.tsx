@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Sponsor, SponsorType } from '../types';
+import { prepareProofFile } from '../services/imageUtils';
 import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase } from 'lucide-react';
 
 interface SponsorsManagerProps {
@@ -28,14 +29,14 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
 
   const [isFormVisible, setIsFormVisible] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, receiptImage: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const prepared = await prepareProofFile(file);
+      setFormData(prev => ({ ...prev, receiptImage: prepared }));
+    } catch (err: any) {
+      alert(err?.message || 'Não foi possível preparar o arquivo.');
     }
   };
 
