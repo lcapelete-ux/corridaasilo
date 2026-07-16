@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle } from 'lucide-react';
-import { getRunners, updateRunner } from '../services/storageService';
+import { findRunnerByCpf, attachPaymentProof } from '../services/storageService';
 import { Runner } from '../types';
 
 interface ProofUploadScreenProps {
@@ -11,7 +11,8 @@ interface ProofUploadScreenProps {
 export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) => {
   const [step, setStep] = useState<'search' | 'upload' | 'success'>('search');
   const [cpf, setCpf] = useState('');
-  const [runner, setRunner] = useState<Runner | null>(null);
+  const [runner, setRunner] = useState<Partial<Runner> | null>(null);
+  const [busy, setBusy] = useState(false);
   const [proofFile, setProofFile] = useState<string | null>(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,25 +31,31 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
     setError('');
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cpf.length < 14) {
       setError('CPF incompleto.');
       return;
     }
 
-    const runners = getRunners();
-    const found = runners.find(r => r.cpf === cpf);
+    setBusy(true);
+    try {
+      const found = await findRunnerByCpf(cpf);
 
-    if (found) {
-      setRunner(found);
-      setStep('upload');
-      // Se já tiver comprovante, preenche o estado, mas permite trocar
-      if (found.paymentProof) {
-        setProofFile(found.paymentProof);
+      if (found) {
+        setRunner(found);
+        setStep('upload');
+        // Se já tiver comprovante, preenche o estado, mas permite trocar
+        if (found.paymentProof) {
+          setProofFile(found.paymentProof);
+        }
+      } else {
+        setError('Inscrição não encontrada para este CPF.');
       }
-    } else {
-      setError('Inscrição não encontrada para este CPF.');
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao buscar. Verifique sua internet.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -63,11 +70,16 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
     }
   };
 
-  const handleSubmitProof = () => {
-    if (runner && proofFile) {
-      const updatedRunner = { ...runner, paymentProof: proofFile };
-      updateRunner(updatedRunner);
+  const handleSubmitProof = async () => {
+    if (!runner || !proofFile) return;
+    setBusy(true);
+    try {
+      await attachPaymentProof(runner.cpf || cpf, proofFile);
       setStep('success');
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao enviar o comprovante. Tente novamente.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -114,9 +126,10 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
               
               <button
                 type="submit"
-                className="w-full bg-yellow-400 text-slate-900 font-black italic uppercase py-3 rounded-xl hover:bg-white transition-colors flex justify-center items-center gap-2"
+                disabled={busy}
+                className="w-full bg-yellow-400 text-slate-900 font-black italic uppercase py-3 rounded-xl hover:bg-white transition-colors flex justify-center items-center gap-2 disabled:opacity-60 disabled:cursor-wait"
               >
-                Buscar Inscrição
+                {busy ? 'Buscando...' : 'Buscar Inscrição'}
               </button>
             </form>
           </div>
@@ -176,14 +189,14 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
 
             <button
               onClick={handleSubmitProof}
-              disabled={!proofFile}
+              disabled={!proofFile || busy}
               className={`w-full py-4 rounded-xl font-black italic uppercase tracking-wider transition-all shadow-lg ${
-                proofFile 
+                proofFile && !busy
                   ? 'bg-emerald-500 text-white hover:bg-emerald-400' 
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed'
               }`}
             >
-              {proofFile ? 'Confirmar Envio' : 'Selecione um arquivo'}
+              {busy ? 'Enviando...' : proofFile ? 'Confirmar Envio' : 'Selecione um arquivo'}
             </button>
           </div>
         )}

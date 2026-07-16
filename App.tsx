@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, saveOrganizer, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon } from './services/storageService';
+import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
@@ -43,119 +44,228 @@ const App: React.FC = () => {
   // Auth State
   const [userSession, setUserSession] = useState<UserSession | null>(null);
 
-  useEffect(() => {
-    setRunners(getRunners());
-    setSponsors(getSponsors());
-    setExpenses(getExpenses());
-    setOrganizers(getOrganizers());
-    setExtraRevenues(getExtraRevenues());
-    setCoupons(getCoupons());
-  }, []);
-
-  // --- Runner Actions ---
-  const handleSaveRunner = (runner: Runner) => {
-    saveRunner(runner);
-    setRunners(getRunners());
-    setLastRegisteredAge(runner.age);
-    setLastRegisteredDiscount(runner.couponDiscount || 0);
-    
-    // Check if we are in public mode to redirect to success screen
-    if (mode === 'public') {
-      setMode('registration_success');
-    } else if (mode === 'restricted_area') {
-      // Se for admin ou team leader cadastrando, volta pra lista
-      setCurrentView('runners');
+  // Carrega os dados do banco conforme o papel do usuário logado
+  const loadDataForSession = async (session: UserSession) => {
+    try {
+      setRunners(await getRunners());
+      if (session.role === 'admin') {
+        const [sp, ex, org, rev, cp] = await Promise.all([
+          getSponsors(),
+          getExpenses(),
+          getOrganizers(),
+          getExtraRevenues(),
+          getCoupons(),
+        ]);
+        setSponsors(sp);
+        setExpenses(ex);
+        setOrganizers(org);
+        setExtraRevenues(rev);
+        setCoupons(cp);
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao carregar dados do banco.');
     }
   };
 
-  const handleUpdateRunner = (runner: Runner) => {
-    updateRunner(runner);
-    setRunners(getRunners());
+  // Restaura a sessão do Supabase ao abrir o site (login fica salvo)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const user = data.session?.user;
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('organizers')
+          .select('name, username, role, team_name')
+          .eq('id', user.id)
+          .single();
+
+        if (!profile) return;
+
+        const session: UserSession = {
+          username: profile.name || profile.username,
+          role: profile.role,
+          teamAccess: profile.role === 'team_leader' ? profile.team_name : undefined,
+        };
+        setUserSession(session);
+        loadDataForSession(session);
+      } catch {
+        // Sem sessão salva ou sem conexão: segue deslogado
+      }
+    })();
+  }, []);
+
+  const refreshRunners = async () => {
+    try {
+      setRunners(await getRunners());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao atualizar a lista.');
+    }
   };
 
-  const handleDeleteRunner = (id: string) => {
+  // --- Runner Actions ---
+  const handleSaveRunner = async (runner: Runner): Promise<boolean> => {
+    try {
+      await saveRunner(runner);
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao salvar inscrição.');
+      return false;
+    }
+
+    setLastRegisteredAge(runner.age);
+    setLastRegisteredDiscount(runner.couponDiscount || 0);
+
+    if (mode === 'public') {
+      setMode('registration_success');
+    } else if (mode === 'restricted_area') {
+      await refreshRunners();
+      setCurrentView('runners');
+    }
+    return true;
+  };
+
+  const handleUpdateRunner = async (runner: Runner) => {
+    try {
+      await updateRunner(runner);
+      await refreshRunners();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao atualizar inscrição.');
+    }
+  };
+
+  const handleDeleteRunner = async (id: string) => {
     if (confirm('Tem certeza que deseja remover este atleta?')) {
-      deleteRunner(id);
-      setRunners(getRunners());
+      try {
+        await deleteRunner(id);
+        await refreshRunners();
+      } catch (e: any) {
+        alert(e?.message || 'Erro ao remover inscrição.');
+      }
     }
   };
 
   // --- Sponsor Actions ---
-  const handleSaveSponsor = (sponsor: Sponsor) => {
-    saveSponsor(sponsor);
-    setSponsors(getSponsors());
+  const handleSaveSponsor = async (sponsor: Sponsor) => {
+    try {
+      await saveSponsor(sponsor);
+      setSponsors(await getSponsors());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao salvar patrocinador.');
+    }
   };
 
-  const handleUpdateSponsor = (sponsor: Sponsor) => {
-    updateSponsor(sponsor);
-    setSponsors(getSponsors());
+  const handleUpdateSponsor = async (sponsor: Sponsor) => {
+    try {
+      await updateSponsor(sponsor);
+      setSponsors(await getSponsors());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao atualizar patrocinador.');
+    }
   };
 
-  const handleDeleteSponsor = (id: string) => {
+  const handleDeleteSponsor = async (id: string) => {
     if (confirm('Remover este patrocinador?')) {
-      deleteSponsor(id);
-      setSponsors(getSponsors());
+      try {
+        await deleteSponsor(id);
+        setSponsors(await getSponsors());
+      } catch (e: any) {
+        alert(e?.message || 'Erro ao remover patrocinador.');
+      }
     }
   };
 
   // --- Expense Actions ---
-  const handleSaveExpense = (expense: Expense) => {
-    saveExpense(expense);
-    setExpenses(getExpenses());
+  const handleSaveExpense = async (expense: Expense) => {
+    try {
+      await saveExpense(expense);
+      setExpenses(await getExpenses());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao salvar despesa.');
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
+  const handleDeleteExpense = async (id: string) => {
     if (confirm('Remover esta despesa?')) {
-      deleteExpense(id);
-      setExpenses(getExpenses());
+      try {
+        await deleteExpense(id);
+        setExpenses(await getExpenses());
+      } catch (e: any) {
+        alert(e?.message || 'Erro ao remover despesa.');
+      }
     }
   };
 
   // --- Extra Revenue Actions ---
-  const handleSaveExtraRevenue = (revenue: ExtraRevenue) => {
-    saveExtraRevenue(revenue);
-    setExtraRevenues(getExtraRevenues());
+  const handleSaveExtraRevenue = async (revenue: ExtraRevenue) => {
+    try {
+      await saveExtraRevenue(revenue);
+      setExtraRevenues(await getExtraRevenues());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao salvar receita.');
+    }
   };
 
-  const handleDeleteExtraRevenue = (id: string) => {
+  const handleDeleteExtraRevenue = async (id: string) => {
     if (confirm('Remover esta receita?')) {
-      deleteExtraRevenue(id);
-      setExtraRevenues(getExtraRevenues());
+      try {
+        await deleteExtraRevenue(id);
+        setExtraRevenues(await getExtraRevenues());
+      } catch (e: any) {
+        alert(e?.message || 'Erro ao remover receita.');
+      }
     }
   };
 
   // --- Organizer Actions ---
-  const handleSaveOrganizer = (organizer: Organizer) => {
-    saveOrganizer(organizer);
-    setOrganizers(getOrganizers());
+  // Criação de novos logins é feita pelo SQL Editor do Supabase
+  // (admin_create_login) — o site edita/remove apenas o perfil.
+  const handleUpdateOrganizer = async (organizer: Organizer) => {
+    try {
+      await updateOrganizer(organizer);
+      setOrganizers(await getOrganizers());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao atualizar organizador.');
+    }
   };
 
-  const handleUpdateOrganizer = (organizer: Organizer) => {
-    updateOrganizer(organizer);
-    setOrganizers(getOrganizers());
-  };
-
-  const handleDeleteOrganizer = (id: string) => {
+  const handleDeleteOrganizer = async (id: string) => {
     if (confirm('Remover este organizador? Ele perderá o acesso ao sistema.')) {
-      deleteOrganizer(id);
-      setOrganizers(getOrganizers());
+      try {
+        await deleteOrganizer(id);
+        setOrganizers(await getOrganizers());
+      } catch (e: any) {
+        alert(e?.message || 'Erro ao remover organizador.');
+      }
     }
   };
 
   // --- Coupon Actions ---
-  const handleSaveCoupon = (coupon: TeamCoupon) => {
-    saveCoupon(coupon);
-    setCoupons(getCoupons());
+  const handleSaveCoupon = async (coupon: TeamCoupon) => {
+    try {
+      await saveCoupon(coupon);
+      setCoupons(await getCoupons());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao salvar cupom.');
+    }
   };
 
-  const handleUpdateCoupon = (coupon: TeamCoupon) => {
-    updateCoupon(coupon);
-    setCoupons(getCoupons());
+  const handleUpdateCoupon = async (coupon: TeamCoupon) => {
+    try {
+      await updateCoupon(coupon);
+      setCoupons(await getCoupons());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao atualizar cupom.');
+    }
   };
 
-  const handleDeleteCoupon = (id: string) => {
-    deleteCoupon(id);
-    setCoupons(getCoupons());
+  const handleDeleteCoupon = async (id: string) => {
+    try {
+      await deleteCoupon(id);
+      setCoupons(await getCoupons());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao remover cupom.');
+    }
   };
 
   // Academias disponíveis para cupons (oficiais + criadas por inscrições/organizadores)
@@ -170,7 +280,8 @@ const App: React.FC = () => {
   const handleLogin = (session: UserSession) => {
     setUserSession(session);
     setMode('restricted_area');
-    
+    loadDataForSession(session);
+
     // Redirecionamento inicial baseado no cargo
     if (session.role === 'team_leader') {
       setCurrentView('runners'); // Líder vê direto a lista
@@ -179,8 +290,19 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Mesmo sem conexão, encerra a sessão local
+    }
     setUserSession(null);
+    setRunners([]);
+    setSponsors([]);
+    setExpenses([]);
+    setOrganizers([]);
+    setExtraRevenues([]);
+    setCoupons([]);
     setMode('landing'); // Logout volta para a Landing Page
   };
 
@@ -228,7 +350,7 @@ const App: React.FC = () => {
     return (
       <LandingPage 
         onStartRegistration={() => setMode('public')} 
-        onAdminLogin={() => setMode('auth_screen')} 
+        onAdminLogin={() => setMode(userSession ? 'restricted_area' : 'auth_screen')} 
         onOpenProofUpload={() => setMode('proof_upload')}
       />
     );
@@ -276,7 +398,6 @@ const App: React.FC = () => {
              onSave={handleSaveRunner}
              existingTeams={getExistingTeams()}
              isPublicView={true}
-             coupons={coupons}
            />
 
            <div className="max-w-3xl mx-auto mt-4 mb-8 text-center text-slate-500 text-sm">
@@ -387,7 +508,6 @@ const App: React.FC = () => {
                 existingTeams={getExistingTeams()} 
                 isPublicView={false}
                 userSession={userSession}
-                coupons={coupons}
               />
             )}
             
@@ -441,7 +561,6 @@ const App: React.FC = () => {
             {currentView === 'organizers' && (
               <OrganizersManager 
                 organizers={organizers}
-                onSave={handleSaveOrganizer}
                 onUpdate={handleUpdateOrganizer}
                 onDelete={handleDeleteOrganizer}
               />

@@ -1,23 +1,32 @@
 import React, { useState } from 'react';
 import { Organizer } from '../types';
-import { Shield, Plus, Trash2, User, Key, Flag, Phone, Pencil } from 'lucide-react';
+import { Shield, Trash2, User, Flag, Phone, Pencil, Info, Copy, Check } from 'lucide-react';
 
 interface OrganizersManagerProps {
   organizers: Organizer[];
-  onSave: (organizer: Organizer) => void;
   onUpdate: (organizer: Organizer) => void;
   onDelete: (id: string) => void;
 }
 
-export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers, onSave, onUpdate, onDelete }) => {
-  const [isFormVisible, setIsFormVisible] = useState(false);
+const SQL_TEMPLATE = `select public.admin_create_login(
+  'email@exemplo.com',   -- e-mail de login
+  'senha1234',           -- senha (mínimo 4 caracteres)
+  'Nome Completo',       -- nome
+  'usuario',             -- usuário
+  'Nome da Equipe',      -- equipe que lidera
+  'team_leader',         -- 'admin' ou 'team_leader'
+  '(15) 99999-0000'      -- telefone (opcional)
+);`;
+
+export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers, onUpdate, onDelete }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     teamName: '',
     username: '',
-    password: '',
     phone: ''
   });
 
@@ -26,45 +35,34 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
       name: org.name,
       teamName: org.teamName,
       username: org.username,
-      password: org.password,
       phone: org.phone || ''
     });
     setEditingId(org.id);
-    setIsFormVisible(true);
-  };
-
-  const handleCreateNew = () => {
-    setFormData({ name: '', teamName: '', username: '', password: '', phone: '' });
-    setEditingId(null);
-    setIsFormVisible(!isFormVisible);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.teamName || !formData.username || !formData.password) {
+    if (!editingId) return;
+    if (!formData.name || !formData.teamName || !formData.username) {
       alert("Preencha todos os campos obrigatórios");
       return;
     }
 
-    if (editingId) {
-      // Update Mode
-      const updatedOrganizer: Organizer = {
-        id: editingId,
-        ...formData
-      };
-      onUpdate(updatedOrganizer);
-    } else {
-      // Create Mode
-      const newOrganizer: Organizer = {
-        id: crypto.randomUUID(),
-        ...formData
-      };
-      onSave(newOrganizer);
-    }
+    const original = organizers.find(o => o.id === editingId);
+    onUpdate({
+      id: editingId,
+      role: original?.role,
+      ...formData
+    });
 
-    setFormData({ name: '', teamName: '', username: '', password: '', phone: '' });
+    setFormData({ name: '', teamName: '', username: '', phone: '' });
     setEditingId(null);
-    setIsFormVisible(false);
+  };
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SQL_TEMPLATE);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const inputCls = "w-full p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm";
@@ -81,22 +79,44 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
             Organizadores de Equipe
           </h2>
           <p className="text-slate-500 text-sm mt-1">
-            Cadastre ou edite os líderes que terão acesso ao sistema.
+            Os acessos são autenticados pelo Supabase. Edite os perfis aqui.
           </p>
         </div>
         <button
-          onClick={handleCreateNew}
+          onClick={() => setShowInstructions(!showInstructions)}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
         >
-          <Plus size={18} /> Novo Organizador
+          <Info size={18} /> Como criar um login
         </button>
       </div>
 
-      {/* Formulário */}
-      {isFormVisible && (
+      {/* Instruções de criação de login */}
+      {showInstructions && (
+        <div className="bg-slate-900 p-6 rounded-xl border border-indigo-500/30 animate-slide-down">
+          <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-3">Criar novo login de organizador</h3>
+          <ol className="text-sm text-slate-300 space-y-1.5 list-decimal list-inside mb-4">
+            <li>Abra o painel do Supabase e vá em <strong className="text-white">SQL Editor</strong></li>
+            <li>Cole o comando abaixo, ajuste os dados e clique em <strong className="text-white">Run</strong></li>
+            <li>O login já sai pronto: e-mail confirmado e perfil criado automaticamente</li>
+          </ol>
+          <div className="relative">
+            <pre className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs text-emerald-300 font-mono overflow-x-auto">{SQL_TEMPLATE}</pre>
+            <button
+              onClick={handleCopySql}
+              className={`absolute top-2 right-2 p-2 rounded-lg transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'}`}
+              title="Copiar SQL"
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Formulário de edição */}
+      {editingId && (
         <form onSubmit={handleSubmit} className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 animate-slide-down">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 pb-3 border-b border-slate-800">
-            {editingId ? 'Editar Organizador' : 'Novo Organizador'}
+            Editar Organizador
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -128,7 +148,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
             </div>
 
             <div>
-              <label className={labelCls}>Login (Usuário)</label>
+              <label className={labelCls}>Usuário</label>
               <input
                 required
                 value={formData.username}
@@ -136,20 +156,6 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 className={inputCls}
                 placeholder="usuario.acesso"
               />
-            </div>
-
-            <div>
-              <label className={labelCls}>Senha de Acesso</label>
-              <div className="relative">
-                <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  required
-                  value={formData.password}
-                  onChange={e => setFormData({...formData, password: e.target.value})}
-                  className={inputIconCls}
-                  placeholder="Ex: 1234"
-                />
-              </div>
             </div>
 
             <div>
@@ -168,7 +174,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
             <div className="col-span-1 md:col-span-2 pt-4 flex justify-end gap-3 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => { setIsFormVisible(false); setEditingId(null); }}
+                onClick={() => setEditingId(null)}
                 className="px-4 py-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg text-sm font-medium transition-all"
               >
                 Cancelar
@@ -177,7 +183,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 type="submit"
                 className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-md transition-all"
               >
-                {editingId ? 'Atualizar Dados' : 'Cadastrar Organizador'}
+                Atualizar Dados
               </button>
             </div>
           </div>
@@ -190,14 +196,21 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
           <div key={org.id} className="bg-slate-900 p-5 rounded-xl border border-slate-800/60 flex flex-col justify-between hover:border-indigo-500/30 transition-all">
             <div>
               <div className="flex justify-between items-start mb-3">
-                <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide">
-                  {org.teamName}
+                <div className="flex items-center gap-2">
+                  <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide">
+                    {org.teamName}
+                  </div>
+                  {org.role === 'admin' && (
+                    <div className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide">
+                      Admin
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleEdit(org)}
                     className="text-slate-600 hover:text-indigo-400 transition-colors p-1"
-                    title="Editar Acesso"
+                    title="Editar Perfil"
                   >
                     <Pencil size={16} />
                   </button>
@@ -217,12 +230,9 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 </p>
               )}
               <div className="mt-4 pt-3 border-t border-slate-800">
-                <p className="text-xs text-slate-600 font-bold uppercase tracking-wider mb-2">Credenciais</p>
+                <p className="text-xs text-slate-600 font-bold uppercase tracking-wider mb-2">Acesso</p>
                 <div className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/60 px-3 py-2 rounded-lg">
                   <User size={13} className="text-slate-500 shrink-0" /> {org.username}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/60 px-3 py-2 rounded-lg mt-1.5">
-                  <Key size={13} className="text-slate-500 shrink-0" /> {org.password}
                 </div>
               </div>
             </div>
@@ -231,7 +241,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
 
         {organizers.length === 0 && (
           <div className="col-span-full p-10 text-center text-slate-600 italic">
-            Nenhum organizador cadastrado.
+            Nenhum organizador cadastrado. Use "Como criar um login" acima.
           </div>
         )}
       </div>

@@ -1,10 +1,20 @@
 # Banco de dados — 2ª Corrida Noturna LSC (Supabase)
 
-Este diretório contém **um único arquivo de instalação**, o
-[`setup_completo.sql`](./setup_completo.sql), que monta todo o banco do
-sistema de inscrições em um projeto [Supabase](https://supabase.com)
-(PostgreSQL + Auth + RLS), substituindo o armazenamento atual em
-`localStorage` (`services/storageService.ts`).
+Este diretório contém os arquivos de instalação do banco do sistema de
+inscrições em um projeto [Supabase](https://supabase.com)
+(PostgreSQL + Auth + RLS):
+
+| Arquivo | O que faz | Quando rodar |
+| --- | --- | --- |
+| [`setup_completo.sql`](./setup_completo.sql) | Estrutura completa: tabelas, RLS, logins de admin | Uma vez, na instalação |
+| [`atualizacao_app.sql`](./atualizacao_app.sql) | Cupons de desconto, transferência de inscrição e ajustes | Depois do setup, uma vez |
+
+O site (frontend) **já está conectado** a este banco via
+`services/supabaseClient.ts` — inscrições, comprovantes, cupons e o
+financeiro são salvos centralmente e aparecem em qualquer navegador.
+
+> **Importante:** rode também o `atualizacao_app.sql` (SQL Editor > Run).
+> Sem ele, cupons e transferências de inscrição não funcionam.
 
 ## Instalação (3 passos)
 
