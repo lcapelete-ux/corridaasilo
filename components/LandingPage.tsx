@@ -199,6 +199,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
              Realização: Lar São Cristóvão
            </div>
         </div>
+        <div className="max-w-6xl mx-auto px-6 mt-4 pt-4 border-t border-slate-900 text-center">
+          <p className="text-slate-600 text-[11px]">
+            Desenvolvido por{' '}
+            <a
+              href="https://wa.me/5515991334809"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-yellow-400 font-bold transition-colors"
+            >
+              Marcelo Capelete
+            </a>
+          </p>
+        </div>
       </footer>
 
       </>)}
