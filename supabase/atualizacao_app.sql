@@ -13,6 +13,10 @@
 --   6. E-mail deixa de ser único quando vazio (e-mail é opcional na inscrição)
 --   7. RPC get_login_email — permite entrar só com o usuário (sem digitar
 --      o e-mail completo) na tela de login
+--   8. admin_create_login passa a ser chamável pelo próprio site (tela
+--      Organizadores), não só pelo SQL Editor — continua exigindo admin
+--   9. Líder de equipe não pode mais confirmar pagamento e só transfere
+--      inscrição dentro do prazo definido pelo admin (tabela app_settings)
 --
 -- Pode rodar mais de uma vez sem problema (idempotente).
 -- ============================================================================
@@ -115,10 +119,210 @@ $$;
 
 grant execute on function public.get_login_email(text) to anon, authenticated;
 
+-- 8. Criação de login de organizador diretamente pelo site --------------------
+-- Antes só rodava pelo SQL Editor (service_role). Agora a verificação de
+-- admin é feita DENTRO da função: se quem chama tem uma sessão autenticada
+-- (site), precisa ser admin; se não tem sessão (SQL Editor / service_role,
+-- como no setup_completo.sql), continua liberado como antes — por isso o
+-- "PASSO 15" do setup e chamadas manuais no SQL Editor continuam funcionando.
+create or replace function public.admin_create_login(
+  p_email text,
+  p_password text,
+  p_name text,
+  p_username text,
+  p_team_name text default 'Avulso',
+  p_role text default 'team_leader',
+  p_phone text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = extensions, public
+as $$
+declare
+  v_user_id uuid;
+begin
+  if auth.uid() is not null and not public.is_admin() then
+    raise exception 'Apenas administradores podem criar logins de acesso.';
+  end if;
+
+  if p_email is null or position('@' in p_email) = 0 then
+    raise exception 'E-mail inválido: "%"', coalesce(p_email, '(vazio)');
+  end if;
+
+  if p_password is null
+     or btrim(p_password) = 'TROQUE-ESTA-SENHA'
+     or length(btrim(p_password)) < 4 then
+    raise exception 'Senha inválida: use no mínimo 4 caracteres.';
+  end if;
+
+  if p_role not in ('admin', 'team_leader') then
+    raise exception 'Papel inválido: "%" (use admin ou team_leader)', p_role;
+  end if;
+
+  -- Já existe? Não mexe (não troca senha nem papel por aqui).
+  select u.id into v_user_id
+  from auth.users u
+  where lower(u.email) = lower(p_email);
+
+  if v_user_id is not null then
+    return 'Já existia, nada alterado: ' || p_email;
+  end if;
+
+  v_user_id := gen_random_uuid();
+
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change, email_change_token_new, email_change_token_current,
+    phone_change, phone_change_token, reauthentication_token
+  ) values (
+    '00000000-0000-0000-0000-000000000000',
+    v_user_id,
+    'authenticated',
+    'authenticated',
+    lower(p_email),
+    crypt(p_password, gen_salt('bf')),
+    now(),
+    '{"provider": "email", "providers": ["email"]}'::jsonb,
+    jsonb_build_object(
+      'name', p_name,
+      'username', p_username,
+      'team_name', coalesce(p_team_name, 'Avulso'),
+      'role', p_role,
+      'phone', p_phone
+    ),
+    now(), now(),
+    '', '', '', '', '', '', '', ''
+  );
+
+  insert into auth.identities (
+    id, user_id, identity_data, provider, provider_id,
+    last_sign_in_at, created_at, updated_at
+  ) values (
+    gen_random_uuid(),
+    v_user_id,
+    jsonb_build_object(
+      'sub', v_user_id::text,
+      'email', lower(p_email),
+      'email_verified', true,
+      'phone_verified', false
+    ),
+    'email',
+    v_user_id::text,
+    now(), now(), now()
+  );
+
+  return 'Criado: ' || p_email || ' (' || p_role || ')';
+end;
+$$;
+
+-- Site (usuário autenticado) pode chamar — a checagem de admin é interna.
+-- SQL Editor/service_role continua podendo (auth.uid() é nulo nesse contexto).
+revoke all on function public.admin_create_login(text, text, text, text, text, text, text)
+  from public, anon;
+grant execute on function public.admin_create_login(text, text, text, text, text, text, text)
+  to authenticated, service_role;
+
+-- 9. Regras de líder de equipe: sem confirmar pagamento, transferência com prazo
+-- ----------------------------------------------------------------------------
+
+-- 9a. Cadastro manual pelo líder sempre nasce como pendente (a confirmação de
+--     pagamento é sempre do admin, nunca de quem está cadastrando)
+drop policy if exists "runners_public_insert" on public.runners;
+create policy "runners_public_insert" on public.runners
+  for insert
+  with check (
+    public.is_admin()
+    or (lower(team_name) = lower(public.my_team()) and is_paid = false)
+    or (is_paid = false and (payment_proof is null or payment_proof = ''))
+  );
+
+-- 9b. Configuração de transferência (definida pelo admin): prazo final e/ou
+--     bloqueio manual imediato. Tabela de uma linha só (singleton).
+create table if not exists public.app_settings (
+  id boolean primary key default true,
+  transfer_deadline date,
+  transfers_blocked boolean not null default false,
+  constraint app_settings_singleton check (id)
+);
+insert into public.app_settings (id) values (true) on conflict (id) do nothing;
+
+alter table public.app_settings enable row level security;
+
+drop policy if exists "app_settings_select_all" on public.app_settings;
+create policy "app_settings_select_all" on public.app_settings
+  for select using (true);
+drop policy if exists "app_settings_admin_write" on public.app_settings;
+create policy "app_settings_admin_write" on public.app_settings
+  for update using (public.is_admin()) with check (public.is_admin());
+
+create or replace function public.can_transfer_registrations()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    not coalesce((select transfers_blocked from public.app_settings limit 1), false)
+    and (
+      (select transfer_deadline from public.app_settings limit 1) is null
+      or current_date <= (select transfer_deadline from public.app_settings limit 1)
+    );
+$$;
+
+grant execute on function public.can_transfer_registrations() to anon, authenticated;
+
+-- 9c. Trigger: aplica as duas regras diretamente no banco (defesa em
+--     profundidade — a interface já esconde esses controles para o líder,
+--     mas a regra vale mesmo que alguém tente contornar a tela). Admin
+--     nunca é afetado.
+create or replace function public.enforce_runner_update_rules()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_is_transfer boolean;
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  -- Confirmação de pagamento é exclusiva do admin: reverte silenciosamente
+  if new.is_paid is distinct from old.is_paid then
+    new.is_paid := old.is_paid;
+  end if;
+
+  -- "Transferir" = trocar o titular (nome ou CPF), mesmo critério usado
+  -- pela tela de transferência para marcar transferred_from/transferred_at
+  v_is_transfer := (
+    new.full_name is distinct from old.full_name or
+    new.cpf is distinct from old.cpf
+  );
+
+  if v_is_transfer and not public.can_transfer_registrations() then
+    raise exception 'Prazo para transferência de inscrições encerrado. Fale com a organização.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_runner_update_rules on public.runners;
+create trigger trg_enforce_runner_update_rules
+  before update on public.runners
+  for each row execute function public.enforce_runner_update_rules();
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
 select
   (select count(*) from public.runners)      as inscricoes,
   (select count(*) from public.team_coupons) as cupons,
+  (select count(*) from public.organizers)   as organizadores,
   'Banco atualizado com sucesso!'            as status;

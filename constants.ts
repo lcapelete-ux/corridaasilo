@@ -1,4 +1,4 @@
-import { Runner, TeamCoupon } from './types';
+import { Runner, TeamCoupon, TransferSettings } from './types';
 
 // Valores da inscrição da 2ª Corrida Noturna LSC
 export const REGISTRATION_PRICE = 69.90;
@@ -31,4 +31,16 @@ export const calcCouponDiscount = (fee: number, coupon: Pick<TeamCoupon, 'discou
 export const getRunnerPaidValue = (runner: Pick<Runner, 'age' | 'couponDiscount'>): number => {
   const fee = getRegistrationFee(runner.age);
   return Math.max(0, Math.round((fee - (runner.couponDiscount || 0)) * 100) / 100);
+};
+
+// Se, agora, um líder de equipe pode transferir inscrições (admin sempre pode,
+// independente destas configurações — a regra só limita o líder)
+export const canTransferNow = (settings: TransferSettings | null | undefined): boolean => {
+  if (!settings) return true; // ainda carregando: não bloqueia otimisticamente na tela
+  if (settings.transfersBlocked) return false;
+  if (settings.transferDeadline) {
+    const deadline = new Date(`${settings.transferDeadline}T23:59:59`);
+    if (new Date() > deadline) return false;
+  }
+  return true;
 };

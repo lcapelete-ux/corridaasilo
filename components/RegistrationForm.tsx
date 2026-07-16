@@ -633,7 +633,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 <h3 className="font-bold text-slate-800">Financeiro <span className="text-slate-400 font-medium text-sm">(Área Restrita)</span></h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className={`grid grid-cols-1 gap-6 ${userSession?.role === 'admin' ? 'md:grid-cols-2' : ''}`}>
                 {/* Upload Comprovante */}
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Comprovante de Pagamento</label>
@@ -666,25 +666,33 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   )}
                 </div>
 
-                {/* Status Toggle */}
-                <div className="flex flex-col justify-center">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Status do Pagamento</label>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, isPaid: !prev.isPaid }))}
-                    className={`w-full py-3 px-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
-                      formData.isPaid
-                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                        : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'
-                    }`}
-                  >
-                    {formData.isPaid ? (
-                      <><CheckCircle size={20} /> PAGO</>
-                    ) : (
-                      <><XCircle size={20} /> PENDENTE</>
-                    )}
-                  </button>
-                </div>
+                {/* Status Toggle: confirmação de pagamento é exclusiva do admin */}
+                {userSession?.role === 'admin' && (
+                  <div className="flex flex-col justify-center">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Status do Pagamento</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, isPaid: !prev.isPaid }))}
+                      className={`w-full py-3 px-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
+                        formData.isPaid
+                          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                          : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      {formData.isPaid ? (
+                        <><CheckCircle size={20} /> PAGO</>
+                      ) : (
+                        <><XCircle size={20} /> PENDENTE</>
+                      )}
+                    </button>
+                  </div>
+                )}
+                {userSession?.role === 'team_leader' && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-100 rounded-lg px-3 py-2">
+                    <AlertCircle size={14} className="text-slate-400 shrink-0" />
+                    A confirmação de pagamento é feita pelo administrador após conferir o comprovante.
+                  </div>
+                )}
               </div>
             </div>
           )}

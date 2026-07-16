@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon } from './services/storageService';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -33,7 +33,8 @@ const App: React.FC = () => {
   const [organizers, setOrganizers] = useState<Organizer[]>([]);
   const [extraRevenues, setExtraRevenues] = useState<ExtraRevenue[]>([]);
   const [coupons, setCoupons] = useState<TeamCoupon[]>([]);
-  
+  const [transferSettings, setTransferSettings] = useState<TransferSettings | null>(null);
+
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -47,7 +48,13 @@ const App: React.FC = () => {
   // Carrega os dados do banco conforme o papel do usuário logado
   const loadDataForSession = async (session: UserSession) => {
     try {
-      setRunners(await getRunners());
+      const [runnersData, settings] = await Promise.all([
+        getRunners(),
+        getTransferSettings(), // líder também precisa saber se pode transferir agora
+      ]);
+      setRunners(runnersData);
+      setTransferSettings(settings);
+
       if (session.role === 'admin') {
         const [sp, ex, org, rev, cp] = await Promise.all([
           getSponsors(),
@@ -218,8 +225,19 @@ const App: React.FC = () => {
   };
 
   // --- Organizer Actions ---
-  // Criação de novos logins é feita pelo SQL Editor do Supabase
-  // (admin_create_login) — o site edita/remove apenas o perfil.
+  const handleCreateOrganizerLogin = async (params: {
+    email: string;
+    password: string;
+    name: string;
+    username: string;
+    teamName: string;
+    role: 'admin' | 'team_leader';
+    phone?: string;
+  }) => {
+    await createOrganizerLogin(params); // erros propagam para o formulário tratar
+    setOrganizers(await getOrganizers());
+  };
+
   const handleUpdateOrganizer = async (organizer: Organizer) => {
     try {
       await updateOrganizer(organizer);
@@ -268,6 +286,16 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Transfer Settings Actions ---
+  const handleUpdateTransferSettings = async (settings: TransferSettings) => {
+    try {
+      await updateTransferSettings(settings);
+      setTransferSettings(await getTransferSettings());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao salvar configurações de transferência.');
+    }
+  };
+
   // Academias disponíveis para cupons (oficiais + criadas por inscrições/organizadores)
   const getCouponTeams = () => {
     const set = new Set<string>(PREDEFINED_TEAMS);
@@ -303,6 +331,7 @@ const App: React.FC = () => {
     setOrganizers([]);
     setExtraRevenues([]);
     setCoupons([]);
+    setTransferSettings(null);
     setMode('landing'); // Logout volta para a Landing Page
   };
 
@@ -512,11 +541,13 @@ const App: React.FC = () => {
             )}
             
             {currentView === 'runners' && (
-              <RunnerList 
-                runners={getVisibleRunners()} 
-                onDelete={handleDeleteRunner} 
+              <RunnerList
+                runners={getVisibleRunners()}
+                onDelete={handleDeleteRunner}
                 onUpdate={handleUpdateRunner}
                 userSession={userSession}
+                transferSettings={transferSettings}
+                onUpdateTransferSettings={handleUpdateTransferSettings}
               />
             )}
             
@@ -559,8 +590,10 @@ const App: React.FC = () => {
             )}
 
             {currentView === 'organizers' && (
-              <OrganizersManager 
+              <OrganizersManager
                 organizers={organizers}
+                teams={getCouponTeams()}
+                onCreateLogin={handleCreateOrganizerLogin}
                 onUpdate={handleUpdateOrganizer}
                 onDelete={handleDeleteOrganizer}
               />

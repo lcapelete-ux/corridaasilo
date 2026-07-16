@@ -1,73 +1,120 @@
 import React, { useState } from 'react';
 import { Organizer } from '../types';
-import { Shield, Trash2, User, Flag, Phone, Pencil, Info, Copy, Check } from 'lucide-react';
+import { Shield, Plus, Trash2, User, Key, Flag, Phone, Pencil, Mail, CheckCircle, Copy, Check, X } from 'lucide-react';
 
 interface OrganizersManagerProps {
   organizers: Organizer[];
+  teams: string[];
+  onCreateLogin: (params: {
+    email: string;
+    password: string;
+    name: string;
+    username: string;
+    teamName: string;
+    role: 'admin' | 'team_leader';
+    phone?: string;
+  }) => Promise<void>;
   onUpdate: (organizer: Organizer) => void;
   onDelete: (id: string) => void;
 }
 
-const SQL_TEMPLATE = `select public.admin_create_login(
-  'email@exemplo.com',   -- e-mail de login
-  'senha1234',           -- senha (mínimo 4 caracteres)
-  'Nome Completo',       -- nome
-  'usuario',             -- usuário
-  'Nome da Equipe',      -- equipe que lidera
-  'team_leader',         -- 'admin' ou 'team_leader'
-  '(15) 99999-0000'      -- telefone (opcional)
-);`;
+const inputCls = "w-full p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm";
+const inputIconCls = "w-full pl-9 p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm";
+const selectCls = "w-full p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm [color-scheme:dark]";
+const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers, onUpdate, onDelete }) => {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [showInstructions, setShowInstructions] = useState(false);
+const emptyCreateForm = {
+  name: '',
+  teamName: '',
+  isCustomTeam: false,
+  username: '',
+  email: '',
+  password: '',
+  phone: '',
+  role: 'team_leader' as 'admin' | 'team_leader',
+};
+
+const emptyEditForm = { name: '', teamName: '', username: '', phone: '' };
+
+export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers, teams, onCreateLogin, onUpdate, onDelete }) => {
+  // --- Criar novo login ---
+  const [isCreateVisible, setIsCreateVisible] = useState(false);
+  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [justCreated, setJustCreated] = useState<{ name: string; teamName: string; username: string; email: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    teamName: '',
-    username: '',
-    phone: ''
-  });
+  // --- Editar organizador existente ---
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(emptyEditForm);
 
   const handleEdit = (org: Organizer) => {
-    setFormData({
-      name: org.name,
-      teamName: org.teamName,
-      username: org.username,
-      phone: org.phone || ''
-    });
+    setEditForm({ name: org.name, teamName: org.teamName, username: org.username, phone: org.phone || '' });
     setEditingId(org.id);
+    setIsCreateVisible(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
-    if (!formData.name || !formData.teamName || !formData.username) {
+    if (!editForm.name || !editForm.teamName || !editForm.username) {
       alert("Preencha todos os campos obrigatórios");
       return;
     }
-
     const original = organizers.find(o => o.id === editingId);
-    onUpdate({
-      id: editingId,
-      role: original?.role,
-      ...formData
-    });
-
-    setFormData({ name: '', teamName: '', username: '', phone: '' });
+    onUpdate({ id: editingId, role: original?.role, ...editForm });
+    setEditForm(emptyEditForm);
     setEditingId(null);
   };
 
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SQL_TEMPLATE);
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateError('');
+
+    if (!createForm.name || !createForm.teamName || !createForm.username || !createForm.email || !createForm.password) {
+      setCreateError('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    if (createForm.password.length < 4) {
+      setCreateError('A senha precisa ter no mínimo 4 caracteres.');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      await onCreateLogin({
+        email: createForm.email.trim(),
+        password: createForm.password,
+        name: createForm.name.trim(),
+        username: createForm.username.trim().toLowerCase(),
+        teamName: createForm.teamName,
+        role: createForm.role,
+        phone: createForm.phone || undefined,
+      });
+      setJustCreated({
+        name: createForm.name,
+        teamName: createForm.teamName,
+        username: createForm.username.toLowerCase(),
+        email: createForm.email,
+        password: createForm.password,
+      });
+      setCreateForm(emptyCreateForm);
+      setIsCreateVisible(false);
+    } catch (err: any) {
+      setCreateError(err?.message || 'Erro ao criar login.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCopyCredentials = () => {
+    if (!justCreated) return;
+    const text = `Acesso ao sistema da Corrida Noturna LSC\nUsuário: ${justCreated.username}\nSenha: ${justCreated.password}`;
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  const inputCls = "w-full p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm";
-  const inputIconCls = "w-full pl-9 p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all text-sm";
-  const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -79,44 +126,50 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
             Organizadores de Equipe
           </h2>
           <p className="text-slate-500 text-sm mt-1">
-            Os acessos são autenticados pelo Supabase. Edite os perfis aqui.
+            Crie um login para cada líder de academia: ele só verá e cadastrará inscritos da própria equipe.
           </p>
         </div>
         <button
-          onClick={() => setShowInstructions(!showInstructions)}
+          onClick={() => { setIsCreateVisible(!isCreateVisible); setEditingId(null); setJustCreated(null); }}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
         >
-          <Info size={18} /> Como criar um login
+          <Plus size={18} /> Novo Login
         </button>
       </div>
 
-      {/* Instruções de criação de login */}
-      {showInstructions && (
-        <div className="bg-slate-900 p-6 rounded-xl border border-indigo-500/30 animate-slide-down">
-          <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-3">Criar novo login de organizador</h3>
-          <ol className="text-sm text-slate-300 space-y-1.5 list-decimal list-inside mb-4">
-            <li>Abra o painel do Supabase e vá em <strong className="text-white">SQL Editor</strong></li>
-            <li>Cole o comando abaixo, ajuste os dados e clique em <strong className="text-white">Run</strong></li>
-            <li>O login já sai pronto: e-mail confirmado e perfil criado automaticamente</li>
-          </ol>
-          <div className="relative">
-            <pre className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs text-emerald-300 font-mono overflow-x-auto">{SQL_TEMPLATE}</pre>
-            <button
-              onClick={handleCopySql}
-              className={`absolute top-2 right-2 p-2 rounded-lg transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'}`}
-              title="Copiar SQL"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </button>
+      {/* Confirmação de criação (mostra a senha uma última vez para repassar ao líder) */}
+      {justCreated && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 flex items-start gap-4 animate-slide-down">
+          <div className="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 shrink-0">
+            <CheckCircle size={20} />
           </div>
+          <div className="flex-1">
+            <p className="font-bold text-emerald-400">Login criado para {justCreated.name} ({justCreated.teamName})</p>
+            <p className="text-sm text-slate-300 mt-1">
+              Anote agora — a senha não aparece novamente. Repasse ao líder pelo WhatsApp ou pessoalmente.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 mt-3 bg-slate-900/60 rounded-lg p-3 font-mono text-sm">
+              <span className="text-slate-400">Usuário: <strong className="text-white">{justCreated.username}</strong></span>
+              <span className="text-slate-400">Senha: <strong className="text-white">{justCreated.password}</strong></span>
+              <button
+                onClick={handleCopyCredentials}
+                className={`ml-auto flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+          </div>
+          <button onClick={() => setJustCreated(null)} className="text-slate-500 hover:text-white shrink-0">
+            <X size={18} />
+          </button>
         </div>
       )}
 
-      {/* Formulário de edição */}
-      {editingId && (
-        <form onSubmit={handleSubmit} className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 animate-slide-down">
+      {/* Formulário: Novo Login */}
+      {isCreateVisible && (
+        <form onSubmit={handleCreateSubmit} className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 animate-slide-down">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 pb-3 border-b border-slate-800">
-            Editar Organizador
+            Novo Login de Organizador
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -125,37 +178,100 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   required
-                  value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  value={createForm.name}
+                  onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
                   className={inputIconCls}
-                  placeholder="Ex: João da Silva"
+                  placeholder="Ex: Diego"
                 />
               </div>
             </div>
 
             <div>
-              <label className={labelCls}>Equipe Gerenciada</label>
+              <label className={labelCls}>Academia / Equipe</label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Flag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  {createForm.isCustomTeam ? (
+                    <input
+                      required
+                      value={createForm.teamName}
+                      onChange={e => setCreateForm({ ...createForm, teamName: e.target.value })}
+                      className={inputIconCls}
+                      placeholder="Digite o nome da academia"
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      required
+                      value={createForm.teamName}
+                      onChange={e => {
+                        if (e.target.value === '__outra__') {
+                          setCreateForm({ ...createForm, isCustomTeam: true, teamName: '' });
+                        } else {
+                          setCreateForm({ ...createForm, teamName: e.target.value });
+                        }
+                      }}
+                      className={`${selectCls} pl-9`}
+                    >
+                      <option value="">Selecione...</option>
+                      {teams.map(t => <option key={t} value={t}>{t}</option>)}
+                      <option value="__outra__">Outra (digitar)</option>
+                    </select>
+                  )}
+                </div>
+                {createForm.isCustomTeam && (
+                  <button
+                    type="button"
+                    onClick={() => setCreateForm({ ...createForm, isCustomTeam: false, teamName: '' })}
+                    className="text-xs text-slate-500 hover:text-slate-300 shrink-0"
+                  >
+                    Escolher da lista
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>E-mail (login)</label>
               <div className="relative">
-                <Flag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   required
-                  value={formData.teamName}
-                  onChange={e => setFormData({...formData, teamName: e.target.value})}
+                  type="email"
+                  value={createForm.email}
+                  onChange={e => setCreateForm({ ...createForm, email: e.target.value })}
                   className={inputIconCls}
-                  placeholder="Ex: Luso, Alcatéia..."
+                  placeholder="diego@exemplo.com"
                 />
               </div>
             </div>
 
             <div>
-              <label className={labelCls}>Usuário</label>
-              <input
-                required
-                value={formData.username}
-                onChange={e => setFormData({...formData, username: e.target.value.toLowerCase()})}
-                className={inputCls}
-                placeholder="usuario.acesso"
-              />
+              <label className={labelCls}>Usuário (login alternativo)</label>
+              <div className="relative">
+                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  required
+                  value={createForm.username}
+                  onChange={e => setCreateForm({ ...createForm, username: e.target.value.toLowerCase() })}
+                  className={inputIconCls}
+                  placeholder="diego"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelCls}>Senha de Acesso</label>
+              <div className="relative">
+                <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  required
+                  value={createForm.password}
+                  onChange={e => setCreateForm({ ...createForm, password: e.target.value })}
+                  className={inputIconCls}
+                  placeholder="Mínimo 4 caracteres"
+                />
+              </div>
             </div>
 
             <div>
@@ -163,26 +279,95 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
               <div className="relative">
                 <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
-                  value={formData.phone}
-                  onChange={e => setFormData({...formData, phone: e.target.value})}
+                  value={createForm.phone}
+                  onChange={e => setCreateForm({ ...createForm, phone: e.target.value })}
                   className={inputIconCls}
                   placeholder="(00) 00000-0000"
                 />
               </div>
             </div>
 
+            <div className="col-span-1 md:col-span-2">
+              <label className={labelCls}>Nível de Acesso</label>
+              <div className="flex gap-3">
+                <label className={`flex-1 flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                  createForm.role === 'team_leader' ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-slate-800 border-slate-700 text-slate-400'
+                }`}>
+                  <input type="radio" className="accent-indigo-500" checked={createForm.role === 'team_leader'} onChange={() => setCreateForm({ ...createForm, role: 'team_leader' })} />
+                  <span className="text-sm font-bold">Líder de Equipe <span className="font-normal opacity-70">(vê só a própria academia)</span></span>
+                </label>
+                <label className={`flex-1 flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                  createForm.role === 'admin' ? 'bg-yellow-400/10 border-yellow-400/40 text-yellow-300' : 'bg-slate-800 border-slate-700 text-slate-400'
+                }`}>
+                  <input type="radio" className="accent-yellow-400" checked={createForm.role === 'admin'} onChange={() => setCreateForm({ ...createForm, role: 'admin' })} />
+                  <span className="text-sm font-bold">Administrador <span className="font-normal opacity-70">(acesso total)</span></span>
+                </label>
+              </div>
+            </div>
+
+            {createError && (
+              <div className="col-span-1 md:col-span-2 text-red-400 text-sm font-bold bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                {createError}
+              </div>
+            )}
+
             <div className="col-span-1 md:col-span-2 pt-4 flex justify-end gap-3 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => setEditingId(null)}
+                onClick={() => { setIsCreateVisible(false); setCreateForm(emptyCreateForm); setCreateError(''); }}
                 className="px-4 py-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg text-sm font-medium transition-all"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-md transition-all"
+                disabled={creating}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-md transition-all disabled:opacity-60"
               >
+                {creating ? 'Criando...' : 'Criar Login'}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* Formulário: Editar Organizador */}
+      {editingId && (
+        <form onSubmit={handleEditSubmit} className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 animate-slide-down">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 pb-3 border-b border-slate-800">
+            Editar Organizador
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Nome do Responsável</label>
+              <div className="relative">
+                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input required value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className={inputIconCls} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Equipe Gerenciada</label>
+              <div className="relative">
+                <Flag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input required value={editForm.teamName} onChange={e => setEditForm({ ...editForm, teamName: e.target.value })} className={inputIconCls} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Usuário</label>
+              <input required value={editForm.username} onChange={e => setEditForm({ ...editForm, username: e.target.value.toLowerCase() })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Telefone/Whatsapp (Opcional)</label>
+              <div className="relative">
+                <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} className={inputIconCls} />
+              </div>
+            </div>
+            <div className="col-span-1 md:col-span-2 pt-4 flex justify-end gap-3 border-t border-slate-800">
+              <button type="button" onClick={() => { setEditingId(null); setEditForm(emptyEditForm); }} className="px-4 py-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg text-sm font-medium transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-md transition-all">
                 Atualizar Dados
               </button>
             </div>
@@ -196,7 +381,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
           <div key={org.id} className="bg-slate-900 p-5 rounded-xl border border-slate-800/60 flex flex-col justify-between hover:border-indigo-500/30 transition-all">
             <div>
               <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide">
                     {org.teamName}
                   </div>
@@ -210,7 +395,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                   <button
                     onClick={() => handleEdit(org)}
                     className="text-slate-600 hover:text-indigo-400 transition-colors p-1"
-                    title="Editar Perfil"
+                    title="Editar Acesso"
                   >
                     <Pencil size={16} />
                   </button>
@@ -230,7 +415,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 </p>
               )}
               <div className="mt-4 pt-3 border-t border-slate-800">
-                <p className="text-xs text-slate-600 font-bold uppercase tracking-wider mb-2">Acesso</p>
+                <p className="text-xs text-slate-600 font-bold uppercase tracking-wider mb-2">Login</p>
                 <div className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/60 px-3 py-2 rounded-lg">
                   <User size={13} className="text-slate-500 shrink-0" /> {org.username}
                 </div>
@@ -241,7 +426,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
 
         {organizers.length === 0 && (
           <div className="col-span-full p-10 text-center text-slate-600 italic">
-            Nenhum organizador cadastrado. Use "Como criar um login" acima.
+            Nenhum organizador cadastrado. Clique em "Novo Login" para criar o primeiro.
           </div>
         )}
       </div>
