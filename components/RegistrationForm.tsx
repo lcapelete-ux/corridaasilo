@@ -9,6 +9,7 @@ import { RegulationModal } from './RegulationModal';
 interface RegistrationFormProps {
   onSave: (runner: Runner) => Promise<boolean>;
   existingTeams: string[];
+  officialTeams?: string[]; // Lista de equipes cadastradas (banco); sem isso, usa PREDEFINED_TEAMS
   isPublicView?: boolean;
   userSession?: UserSession | null;
 }
@@ -23,7 +24,10 @@ const PREDEFINED_CITIES = [
   'Tiete'
 ];
 
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, isPublicView = false, userSession }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, isPublicView = false, userSession }) => {
+  // "Avulso" já tem opção própria no <select>: não repete aqui
+  const teamOptions = (officialTeams && officialTeams.length > 0 ? officialTeams : PREDEFINED_TEAMS)
+    .filter(t => t !== 'Avulso');
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -495,7 +499,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   }`}
                 >
                   <option value="Avulso" className={optionClass}>Avulso (Sem equipe)</option>
-                  {PREDEFINED_TEAMS.map(team => (
+                  {teamOptions.map(team => (
                     <option key={team} value={team} className={optionClass}>{team}</option>
                   ))}
                   <option value="Outra" className={optionClass}>Outra (Digitar nome da equipe)</option>
