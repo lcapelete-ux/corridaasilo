@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
+import { prepareProofFile } from '../services/imageUtils';
 import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket } from 'lucide-react';
 import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS } from '../constants';
 import { RegulationModal } from './RegulationModal';
@@ -182,14 +183,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setCouponError('');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, paymentProof: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const prepared = await prepareProofFile(file);
+      setFormData(prev => ({ ...prev, paymentProof: prepared }));
+    } catch (err: any) {
+      alert(err?.message || 'Não foi possível preparar o comprovante.');
     }
   };
 
