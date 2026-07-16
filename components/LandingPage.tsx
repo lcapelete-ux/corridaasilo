@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Volume2, VolumeX } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
@@ -18,56 +18,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
   const [contentVisible, setContentVisible] = useState(introDone);
 
   // --- Trilha sonora (synthwave noturno gerado no navegador) ---
-  const [musicOn, setMusicOn] = useState(() => localStorage.getItem('lsc_musica') !== 'off');
-  const musicOnRef = useRef(musicOn);
-  musicOnRef.current = musicOn;
-  const introDoneRef = useRef(introDone);
-  introDoneRef.current = introDone;
-
+  // Com a vinheta, quem dispara a música é o "LARGADA!". Sem vinheta
+  // (revisita/reduced motion), toca direto — se o navegador bloquear,
+  // o requestStart aguarda o primeiro toque e começa sozinho.
   useEffect(() => {
-    // Navegadores bloqueiam áudio antes do primeiro toque. Destrava já; se
-    // não der, o primeiro toque/tecla destrava (e a contagem/música soam a
-    // partir dali). Quando a intro vai rodar, quem inicia a música é o
-    // "LARGADA!" — aqui só inicia direto se a intro não for exibida.
-    const onGesture = () => {
-      nightMusic.unlock().then(ok => {
-        if (ok && musicOnRef.current && introDoneRef.current) {
-          nightMusic.start();
-        }
-      });
-      if (introDoneRef.current) remove();
-    };
-    const remove = () => {
-      window.removeEventListener('pointerdown', onGesture);
-      window.removeEventListener('keydown', onGesture);
-    };
-
-    nightMusic.unlock().then(ok => {
-      if (ok && musicOnRef.current && introDoneRef.current) {
-        nightMusic.start();
-      }
-    });
-    window.addEventListener('pointerdown', onGesture);
-    window.addEventListener('keydown', onGesture);
-
-    // Saiu da página inicial: para a música
-    return () => {
-      remove();
-      nightMusic.stop();
-    };
+    if (introDone) nightMusic.requestStart();
+    // Saiu da página inicial: para a música e cancela toque pendente
+    return () => nightMusic.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const toggleMusic = () => {
-    const next = !musicOn;
-    setMusicOn(next);
-    localStorage.setItem('lsc_musica', next ? 'on' : 'off');
-    if (next) {
-      nightMusic.start();
-    } else {
-      nightMusic.stop();
-    }
-  };
 
   useEffect(() => {
     // Gerar posições aleatórias para os "flashes" de câmera/luz
@@ -113,11 +72,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Vinheta de Largada (contagem 3-2-1 + corredor) */}
       {!introDone && (
         <RaceIntro
-          soundEnabled={musicOn}
           onReveal={() => setContentVisible(true)}
           onFinish={() => {
             setIntroDone(true);
-            if (musicOnRef.current) nightMusic.start();
+            nightMusic.requestStart();
           }}
         />
       )}
@@ -244,21 +202,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       </footer>
 
       </>)}
-
-      {/* Botão da trilha sonora (fica acima da vinheta) */}
-      <button
-        onClick={toggleMusic}
-        aria-label={musicOn ? 'Desligar música' : 'Ligar música'}
-        title={musicOn ? 'Desligar música' : 'Ligar música'}
-        className={`fixed bottom-4 right-4 z-[60] flex items-center gap-2 rounded-full border backdrop-blur-md px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all shadow-lg ${
-          musicOn
-            ? 'bg-slate-900/80 border-yellow-400/40 text-yellow-400 shadow-yellow-400/10'
-            : 'bg-slate-900/80 border-slate-700 text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        {musicOn ? <Volume2 size={16} className="animate-pulse" /> : <VolumeX size={16} />}
-        <span className="hidden md:inline">{musicOn ? 'Som ligado' : 'Som desligado'}</span>
-      </button>
 
     </div>
   );

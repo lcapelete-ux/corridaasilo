@@ -34,20 +34,17 @@ const RunnerIcon: React.FC<{ className?: string }> = ({ className }) => (
 interface RaceIntroProps {
   onReveal: () => void;  // conteúdo da página pode aparecer (início do fade)
   onFinish: () => void;  // overlay pode ser desmontado
-  soundEnabled?: boolean; // bipes da contagem + música na largada
 }
 
-export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish, soundEnabled = true }) => {
+export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
   const [step, setStep] = useState<IntroStep>('ready');
   const onRevealRef = useRef(onReveal);
   const onFinishRef = useRef(onFinish);
-  const soundRef = useRef(soundEnabled);
   const finishedRef = useRef(false);
 
   useEffect(() => {
     onRevealRef.current = onReveal;
     onFinishRef.current = onFinish;
-    soundRef.current = soundEnabled;
   });
 
   const finish = useCallback(() => {
@@ -64,7 +61,7 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish, soundE
 
     const count = (n: IntroStep) => {
       setStep(n);
-      if (soundRef.current) nightMusic.countBeep();
+      nightMusic.countBeep();
     };
 
     const timers = [
@@ -73,11 +70,10 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish, soundE
       setTimeout(() => count('1'), 1900),
       setTimeout(() => {
         setStep('go');
-        // LARGADA: bipe longo + música entrando junto
-        if (soundRef.current) {
-          nightMusic.countBeep(true);
-          nightMusic.start();
-        }
+        // LARGADA: bipe longo + música entrando junto (ou no primeiro toque,
+        // se o navegador ainda estiver bloqueando o áudio)
+        nightMusic.countBeep(true);
+        nightMusic.requestStart();
       }, 2650),
       setTimeout(() => { setStep('exit'); onRevealRef.current(); }, 3850),
       setTimeout(() => {
