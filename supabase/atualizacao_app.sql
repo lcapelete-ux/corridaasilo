@@ -11,6 +11,8 @@
 --   4. RPC find_coupon_by_code (validação pública de cupom no formulário)
 --   5. find_runner_by_cpf passa a retornar também equipe e cidade
 --   6. E-mail deixa de ser único quando vazio (e-mail é opcional na inscrição)
+--   7. RPC get_login_email — permite entrar só com o usuário (sem digitar
+--      o e-mail completo) na tela de login
 --
 -- Pode rodar mais de uma vez sem problema (idempotente).
 -- ============================================================================
@@ -93,6 +95,25 @@ drop index if exists public.runners_email_key;
 create unique index if not exists runners_email_key
   on public.runners (lower(email))
   where email <> '';
+
+-- 7. Login pelo usuário (sem digitar o e-mail completo) -----------------------
+-- A tela de login aceita usuário OU e-mail. Quando vem só o usuário, esta
+-- função devolve o e-mail de login correspondente (organizers -> auth.users).
+create or replace function public.get_login_email(p_username text)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select u.email
+  from public.organizers o
+  join auth.users u on u.id = o.id
+  where lower(o.username) = lower(btrim(p_username))
+  limit 1;
+$$;
+
+grant execute on function public.get_login_email(text) to anon, authenticated;
 
 -- ============================================================================
 -- Resumo final
