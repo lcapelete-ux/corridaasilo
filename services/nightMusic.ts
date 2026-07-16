@@ -32,6 +32,7 @@ class NightMusicEngine {
   private nextTime = 0;
   private step = 0;
   private playing = false;
+  private gestureHandler: (() => void) | null = null;
 
   private ensureContext(): AudioContext {
     if (!this.ctx) {
@@ -197,15 +198,15 @@ class NightMusicEngine {
     }
   };
 
-  /** Destrava o áudio (navegadores exigem um toque antes de tocar som). */
+  /** Destrava o áudio (navegadores exigem um toque antes de tocar som).
+   *  resume() sem gesto pode ficar pendente para sempre — corre contra um timeout. */
   async unlock(): Promise<boolean> {
     const ctx = this.ensureContext();
     if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch {
-        return false;
-      }
+      await Promise.race([
+        ctx.resume().catch(() => {}),
+        new Promise(res => setTimeout(res, 250)),
+      ]);
     }
     return ctx.state === 'running';
   }
@@ -249,11 +250,10 @@ class NightMusicEngine {
   async start(): Promise<boolean> {
     const ctx = this.ensureContext();
     if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch {
-        return false;
-      }
+      await Promise.race([
+        ctx.resume().catch(() => {}),
+        new Promise(res => setTimeout(res, 250)),
+      ]);
     }
     if (ctx.state !== 'running') return false;
     if (this.playing) return true;
@@ -268,7 +268,33 @@ class NightMusicEngine {
     return true;
   }
 
+  /** Toca agora; se o navegador bloquear, começa sozinho no primeiro toque. */
+  requestStart() {
+    this.start().then(ok => {
+      if (ok || this.gestureHandler) return;
+      const handler = () => {
+        this.start().then(started => {
+          if (started) this.cancelPendingStart();
+        });
+      };
+      this.gestureHandler = handler;
+      window.addEventListener('pointerdown', handler);
+      window.addEventListener('keydown', handler);
+      window.addEventListener('touchend', handler);
+    });
+  }
+
+  cancelPendingStart() {
+    if (this.gestureHandler) {
+      window.removeEventListener('pointerdown', this.gestureHandler);
+      window.removeEventListener('keydown', this.gestureHandler);
+      window.removeEventListener('touchend', this.gestureHandler);
+      this.gestureHandler = null;
+    }
+  }
+
   stop() {
+    this.cancelPendingStart();
     if (!this.playing) return;
     this.playing = false;
     if (this.timer !== null) {

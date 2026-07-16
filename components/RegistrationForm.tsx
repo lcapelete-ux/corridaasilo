@@ -4,6 +4,7 @@ import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
 import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket } from 'lucide-react';
 import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS } from '../constants';
+import { RegulationModal } from './RegulationModal';
 
 interface RegistrationFormProps {
   onSave: (runner: Runner) => Promise<boolean>;
@@ -46,6 +47,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const [couponError, setCouponError] = useState('');
   const [couponChecking, setCouponChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // --- Regulamento da prova (obrigatório na inscrição pública) ---
+  const [agreedToRules, setAgreedToRules] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  const [rulesError, setRulesError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pre-fill team if team leader
@@ -210,6 +216,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       return;
     }
 
+    if (isPublicView && !agreedToRules) {
+      setRulesError(true);
+      alert("Para confirmar a inscrição é preciso concordar com o regulamento da prova.");
+      return;
+    }
+
     if (formData.cpf.length !== 14) {
       setErrors(prev => ({ ...prev, cpf: 'CPF inválido ou incompleto.' }));
       alert("Por favor, corrija o CPF antes de continuar.");
@@ -274,6 +286,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setAppliedCoupon(null);
     setCouponInput('');
     setCouponError('');
+    setAgreedToRules(false);
+    setRulesError(false);
 
     if (!isPublicView) {
        alert("Cadastrado com sucesso!");
@@ -675,6 +689,44 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
             </div>
           )}
 
+          {/* Aceite do Regulamento (inscrição pública) */}
+          {isPublicView && (
+            <div className={`mt-6 rounded-xl border p-4 transition-colors ${
+              rulesError
+                ? 'border-red-500/60 bg-red-500/5'
+                : agreedToRules
+                  ? 'border-emerald-500/40 bg-emerald-500/5'
+                  : 'border-slate-700 bg-slate-800/40'
+            }`}>
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={agreedToRules}
+                  onChange={e => {
+                    setAgreedToRules(e.target.checked);
+                    if (e.target.checked) setRulesError(false);
+                  }}
+                  className="mt-0.5 w-5 h-5 rounded accent-yellow-400 shrink-0 cursor-pointer"
+                />
+                <span className="text-sm text-slate-300">
+                  Li e <strong className="text-white">estou de acordo com o regulamento</strong> da 2ª Corrida Noturna LSC.
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowRules(true)}
+                className="mt-2 ml-8 text-yellow-400 text-sm font-bold underline underline-offset-2 hover:text-yellow-300 inline-flex items-center gap-1.5 transition-colors"
+              >
+                <FileText size={14} /> Ler regulamento
+              </button>
+              {rulesError && (
+                <p className="mt-2 ml-8 text-red-400 text-xs font-bold flex items-center gap-1">
+                  <AlertCircle size={12} /> Marque a caixinha acima para confirmar a inscrição.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
             <button
               type="submit"
@@ -698,6 +750,18 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
           </div>
         </form>
       </div>
+
+      {/* Modal do Regulamento */}
+      {showRules && (
+        <RegulationModal
+          onClose={() => setShowRules(false)}
+          onAgree={() => {
+            setAgreedToRules(true);
+            setRulesError(false);
+            setShowRules(false);
+          }}
+        />
+      )}
     </div>
   );
 };
