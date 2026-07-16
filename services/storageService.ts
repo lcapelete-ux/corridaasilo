@@ -11,6 +11,7 @@ const friendlyError = (error: { code?: string; message?: string } | null, fallba
     if (msg.includes('runners_cpf')) return new Error('Já existe uma inscrição com este CPF.');
     if (msg.includes('runners_email')) return new Error('Este e-mail já está sendo utilizado em outra inscrição.');
     if (msg.includes('team_coupons_code')) return new Error('Já existe um cupom com este código.');
+    if (msg.includes('teams_pkey')) return new Error('Já existe uma equipe com este nome.');
     return new Error('Registro duplicado.');
   }
   if (msg.includes('row-level security')) {
@@ -441,4 +442,23 @@ export const updateTransferSettings = async (settings: TransferSettings): Promis
     })
     .eq('id', true);
   if (error) throw friendlyError(error, 'Erro ao salvar configurações de transferência');
+};
+
+// --- Equipes/Academias oficiais (lista usada pelos formulários) ---
+// Tabela pública de leitura livre (RLS: select para todos, escrita só admin)
+
+export const getTeams = async (): Promise<string[]> => {
+  const { data, error } = await supabase.from('teams').select('name').order('name');
+  if (error) throw friendlyError(error, 'Erro ao carregar equipes');
+  return (data as { name: string }[]).map(t => t.name);
+};
+
+export const createTeam = async (name: string): Promise<void> => {
+  const { error } = await supabase.from('teams').insert({ name: name.trim() });
+  if (error) throw friendlyError(error, 'Erro ao criar equipe');
+};
+
+export const deleteTeam = async (name: string): Promise<void> => {
+  const { error } = await supabase.from('teams').delete().eq('name', name);
+  if (error) throw friendlyError(error, 'Erro ao remover equipe');
 };

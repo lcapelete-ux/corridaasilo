@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -34,6 +34,9 @@ const App: React.FC = () => {
   const [extraRevenues, setExtraRevenues] = useState<ExtraRevenue[]>([]);
   const [coupons, setCoupons] = useState<TeamCoupon[]>([]);
   const [transferSettings, setTransferSettings] = useState<TransferSettings | null>(null);
+  // Lista de equipes/academias: seed com a constante e some para a versão
+  // ao vivo do banco assim que carrega — funciona até para visitante anônimo
+  const [officialTeams, setOfficialTeams] = useState<string[]>(PREDEFINED_TEAMS);
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -102,6 +105,39 @@ const App: React.FC = () => {
       }
     })();
   }, []);
+
+  // Lista de equipes: carrega sempre, mesmo sem login (o formulário público
+  // de inscrição precisa dela). RLS da tabela "teams" já permite leitura
+  // pública. Se falhar (sem internet), mantém a lista padrão como reserva.
+  const refreshTeams = async () => {
+    try {
+      setOfficialTeams(await getTeams());
+    } catch {
+      // Mantém o valor atual (a constante padrão ou o último carregado)
+    }
+  };
+
+  useEffect(() => {
+    refreshTeams();
+  }, []);
+
+  const handleCreateTeam = async (name: string) => {
+    try {
+      await createTeam(name);
+      await refreshTeams();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao criar equipe.');
+    }
+  };
+
+  const handleDeleteTeam = async (name: string) => {
+    try {
+      await deleteTeam(name);
+      await refreshTeams();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao remover equipe.');
+    }
+  };
 
   const refreshRunners = async () => {
     try {
@@ -296,9 +332,10 @@ const App: React.FC = () => {
     }
   };
 
-  // Academias disponíveis para cupons (oficiais + criadas por inscrições/organizadores)
+  // Academias disponíveis para cupons/login (oficiais do banco + criadas por
+  // inscrições/organizadores, para não perder equipes digitadas via "Outra")
   const getCouponTeams = () => {
-    const set = new Set<string>(PREDEFINED_TEAMS);
+    const set = new Set<string>(officialTeams.filter(t => t !== 'Avulso'));
     runners.forEach(r => { if (r.teamName && r.teamName !== 'Avulso') set.add(r.teamName); });
     organizers.forEach(o => { if (o.teamName) set.add(o.teamName); });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -426,6 +463,7 @@ const App: React.FC = () => {
            <RegistrationForm
              onSave={handleSaveRunner}
              existingTeams={getExistingTeams()}
+             officialTeams={officialTeams}
              isPublicView={true}
            />
 
@@ -532,9 +570,10 @@ const App: React.FC = () => {
             )}
             
             {currentView === 'registration' && (
-              <RegistrationForm 
-                onSave={handleSaveRunner} 
-                existingTeams={getExistingTeams()} 
+              <RegistrationForm
+                onSave={handleSaveRunner}
+                existingTeams={getExistingTeams()}
+                officialTeams={officialTeams}
                 isPublicView={false}
                 userSession={userSession}
               />
@@ -551,7 +590,14 @@ const App: React.FC = () => {
               />
             )}
             
-            {currentView === 'teams' && <TeamView runners={runners} />}
+            {currentView === 'teams' && (
+              <TeamView
+                runners={runners}
+                officialTeams={officialTeams}
+                onCreateTeam={handleCreateTeam}
+                onDeleteTeam={handleDeleteTeam}
+              />
+            )}
             
             {currentView === 'sponsors' && (
               <SponsorsManager 
