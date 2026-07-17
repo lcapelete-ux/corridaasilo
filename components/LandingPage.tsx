@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload } from 'lucide-react';
+import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
@@ -179,11 +179,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
           </button>
         </div>
 
-        {/* Location Footer */}
-        <div className="mt-12 flex items-center justify-center gap-2 text-slate-400 text-sm font-medium animate-fade-in-up animation-delay-300">
-          <MapPin size={16} className="text-yellow-400" aria-hidden="true" />
-          <span>PRAÇA ARMANDO SALES DE OLIVEIRA - LARANJAL PAULISTA/SP</span>
+        {/* Atrações do evento */}
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-3 animate-fade-in-up animation-delay-300">
+          <div className="flex items-center gap-2 bg-slate-900/40 backdrop-blur-md border border-slate-800 px-4 py-2 rounded-full text-slate-300 text-sm font-bold">
+            <Utensils size={16} className="text-yellow-400" aria-hidden="true" />
+            Praça de Alimentação
+          </div>
+          <div className="flex items-center gap-2 bg-slate-900/40 backdrop-blur-md border border-slate-800 px-4 py-2 rounded-full text-slate-300 text-sm font-bold">
+            <Music size={16} className="text-yellow-400" aria-hidden="true" />
+            Shows ao Vivo
+          </div>
         </div>
+
+        {/* Local (clique abre o mapa) */}
+        <a
+          href="https://maps.app.goo.gl/6ewu6ySUqkhBb1J87"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mt-4 inline-flex items-center justify-center gap-2 text-slate-400 hover:text-yellow-400 text-sm font-medium animate-fade-in-up animation-delay-300 transition-colors text-center px-4"
+          title="Abrir no Google Maps"
+        >
+          <MapPin size={16} className="text-yellow-400 shrink-0" aria-hidden="true" />
+          <span className="group-hover:underline underline-offset-2">PRAÇA ARMANDO SALES DE OLIVEIRA - LARANJAL PAULISTA/SP</span>
+          <ExternalLink size={13} className="shrink-0 opacity-60 group-hover:opacity-100" aria-hidden="true" />
+        </a>
+        <p className="mt-1 text-[11px] text-slate-600 uppercase tracking-widest font-bold animate-fade-in-up animation-delay-300">
+          Toque para ver o local no mapa
+        </p>
 
       </main>
 
