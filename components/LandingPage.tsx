@@ -4,15 +4,17 @@ import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
+import { formatBrDate } from '../constants';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
   onAdminLogin: () => void;
   onOpenProofUpload: () => void;
   raceGroupName?: string;
+  promoDeadline?: string;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
   // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
@@ -149,6 +151,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded mt-2 uppercase font-bold tracking-wide border border-emerald-500/20">
                Lote Promocional
              </span>
+             {promoDeadline && (
+               <span className="text-[11px] text-slate-400 mt-1.5 font-medium">
+                 Desconto até <span className="text-emerald-400 font-bold">{formatBrDate(promoDeadline)}</span>
+               </span>
+             )}
           </div>
         </div>
 

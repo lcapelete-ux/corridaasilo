@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, getRaceGroupName, updateRaceGroupName } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -39,6 +39,7 @@ const App: React.FC = () => {
   // ao vivo do banco assim que carrega — funciona até para visitante anônimo
   const [officialTeams, setOfficialTeams] = useState<string[]>(PREDEFINED_TEAMS);
   const [raceGroupName, setRaceGroupName] = useState('2ª CORRIDA NOTURNA LSC');
+  const [promoDeadline, setPromoDeadline] = useState('2026-08-23');
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -124,6 +125,7 @@ const App: React.FC = () => {
   useEffect(() => {
     refreshTeams();
     refreshRaceGroupName();
+    refreshPromoDeadline();
   }, []);
 
   const refreshRaceGroupName = async () => {
@@ -141,6 +143,19 @@ const App: React.FC = () => {
     } catch (e: any) {
       throw e;
     }
+  };
+
+  const refreshPromoDeadline = async () => {
+    try {
+      setPromoDeadline(await getPromoDeadline());
+    } catch {
+      // Mantém o valor atual (padrão)
+    }
+  };
+
+  const handleUpdatePromoDeadline = async (date: string) => {
+    await updatePromoDeadline(date);
+    await refreshPromoDeadline();
   };
 
   const handleCreateTeam = async (name: string) => {
@@ -441,6 +456,7 @@ const App: React.FC = () => {
         onAdminLogin={() => setMode(userSession ? 'restricted_area' : 'auth_screen')}
         onOpenProofUpload={() => setMode('proof_upload')}
         raceGroupName={raceGroupName}
+        promoDeadline={promoDeadline}
       />
     );
   }
@@ -689,6 +705,8 @@ const App: React.FC = () => {
                 onUpdateRaceGroupName={handleUpdateRaceGroupName}
                 transferSettings={transferSettings}
                 onUpdateTransferSettings={handleUpdateTransferSettings}
+                promoDeadline={promoDeadline}
+                onUpdatePromoDeadline={handleUpdatePromoDeadline}
               />
             )}
           </div>

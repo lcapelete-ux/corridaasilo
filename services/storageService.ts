@@ -472,6 +472,26 @@ export const updateRaceGroupName = async (name: string): Promise<void> => {
   if (error) throw friendlyError(error, 'Erro ao salvar nome do grupo');
 };
 
+// --- Lote promocional: data final do desconto (mostrada na página inicial) ---
+
+export const getPromoDeadline = async (): Promise<string> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('promo_deadline')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar data do lote promocional');
+  return (data as { promo_deadline: string | null } | null)?.promo_deadline || '2026-08-23';
+};
+
+export const updatePromoDeadline = async (date: string): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ promo_deadline: date || null })
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar data do lote promocional');
+};
+
 // --- Equipes/Academias oficiais (lista usada pelos formulários) ---
 // Tabela pública de leitura livre (RLS: select para todos, escrita só admin)
 

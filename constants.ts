@@ -5,6 +5,15 @@ export const REGISTRATION_PRICE = 69.90;
 export const REGISTRATION_PRICE_SENIOR = 35.00; // Desconto 60+
 export const SENIOR_AGE = 60;
 
+// Formata "YYYY-MM-DD" (data do banco) como "DD/MM" sem sofrer com fuso horário.
+// (new Date('2026-08-23') vira meia-noite UTC e pode "voltar" um dia no Brasil)
+export const formatBrDate = (isoDate?: string | null, withYear = false): string => {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  if (!y || !m || !d) return '';
+  return withYear ? `${d}/${m}/${y}` : `${d}/${m}`;
+};
+
 export const getRegistrationFee = (age: number): number =>
   age >= SENIOR_AGE ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
 
