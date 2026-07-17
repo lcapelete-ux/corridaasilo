@@ -26,11 +26,14 @@ alter table public.runners add column if not exists transferred_from text;
 alter table public.runners add column if not exists transferred_at timestamptz;
 alter table public.runners add column if not exists coupon_code text;
 alter table public.runners add column if not exists coupon_discount numeric(10, 2);
+alter table public.runners add column if not exists phone text;
 
 comment on column public.runners.transferred_from is
   'Nome do titular anterior quando a inscrição foi transferida';
 comment on column public.runners.coupon_discount is
   'Desconto em R$ aplicado pelo cupom da academia no momento da inscrição';
+comment on column public.runners.phone is
+  'Telefone de contato do atleta';
 
 -- 3. Cupons de desconto por academia ----------------------------------------
 create table if not exists public.team_coupons (

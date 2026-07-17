@@ -17,6 +17,7 @@ export interface Runner {
   fullName: string;
   email: string;
   cpf: string;
+  phone?: string;
   city: string;
   birthDate: string;
   age: number;
