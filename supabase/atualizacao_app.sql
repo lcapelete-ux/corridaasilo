@@ -334,6 +334,7 @@ create table if not exists public.app_settings (
   transfers_blocked boolean not null default false,
   race_group_name text default '2ª CORRIDA NOTURNA LSC',
   promo_deadline date default '2026-08-23',
+  registration_deadline date default '2026-09-05',
   constraint app_settings_singleton check (id)
 );
 insert into public.app_settings (id) values (true) on conflict (id) do nothing;
@@ -341,9 +342,12 @@ insert into public.app_settings (id) values (true) on conflict (id) do nothing;
 -- Adiciona colunas se ainda não existirem (bancos criados antes destas features)
 alter table public.app_settings add column if not exists race_group_name text default '2ª CORRIDA NOTURNA LSC';
 alter table public.app_settings add column if not exists promo_deadline date default '2026-08-23';
+alter table public.app_settings add column if not exists registration_deadline date default '2026-09-05';
 
 comment on column public.app_settings.promo_deadline is
   'Data final do lote promocional (desconto) exibida na página inicial';
+comment on column public.app_settings.registration_deadline is
+  'Data final das inscrições (definida pelo admin); depois dela o formulário público fecha';
 
 alter table public.app_settings enable row level security;
 

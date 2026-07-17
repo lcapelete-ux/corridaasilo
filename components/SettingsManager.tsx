@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban, Tag } from 'lucide-react';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users } from 'lucide-react';
 import { TransferSettings } from '../types';
-import { formatBrDate } from '../constants';
+import { formatBrDate, MAX_ATHLETES } from '../constants';
 
 interface SettingsManagerProps {
   raceGroupName: string;
@@ -10,9 +10,12 @@ interface SettingsManagerProps {
   onUpdateTransferSettings?: (settings: TransferSettings) => Promise<void>;
   promoDeadline?: string;
   onUpdatePromoDeadline?: (date: string) => Promise<void>;
+  registrationDeadline?: string;
+  onUpdateRegistrationDeadline?: (date: string) => Promise<void>;
+  totalRunners?: number;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0 }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -22,6 +25,11 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
   const [savingPromo, setSavingPromo] = useState(false);
   const [promoError, setPromoError] = useState('');
   const [promoSuccess, setPromoSuccess] = useState(false);
+
+  const [regDraft, setRegDraft] = useState(registrationDeadline || '');
+  const [savingReg, setSavingReg] = useState(false);
+  const [regError, setRegError] = useState('');
+  const [regSuccess, setRegSuccess] = useState(false);
 
   const [transferDraft, setTransferDraft] = useState<TransferSettings>({
     transferDeadline: transferSettings?.transferDeadline,
@@ -93,11 +101,34 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
     }
   };
 
+  const handleSaveReg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onUpdateRegistrationDeadline) return;
+
+    setSavingReg(true);
+    setRegError('');
+    setRegSuccess(false);
+
+    try {
+      await onUpdateRegistrationDeadline(regDraft);
+      setRegSuccess(true);
+      setTimeout(() => setRegSuccess(false), 3000);
+    } catch (err: any) {
+      setRegError(err?.message || 'Erro ao salvar o prazo de inscrição.');
+    } finally {
+      setSavingReg(false);
+    }
+  };
+
   const canTransferNow = () => {
     if (transferSettings?.transfersBlocked) return false;
     if (!transferSettings?.transferDeadline) return true;
     return new Date().toISOString().split('T')[0] <= transferSettings.transferDeadline;
   };
+
+  const todayIso = new Date().toISOString().split('T')[0];
+  const registrationsOpen = !registrationDeadline || todayIso <= registrationDeadline;
+  const pct = Math.min(100, Math.round((totalRunners / MAX_ATHLETES) * 100));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -213,6 +244,89 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
             className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           >
             <Save size={18} /> {savingPromo ? 'Salvando...' : 'Salvar Data'}
+          </button>
+        </form>
+      </div>
+
+      {/* Inscrições: prazo final + contador de vagas (500) */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className={`p-3 rounded-lg ${registrationsOpen ? 'bg-emerald-100' : 'bg-red-100'}`}>
+            <CalendarClock size={24} className={registrationsOpen ? 'text-emerald-600' : 'text-red-600'} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-800">Inscrições</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Status: <span className={`font-bold ${registrationsOpen ? 'text-emerald-600' : 'text-red-600'}`}>
+                {registrationsOpen ? '✓ Abertas' : '✗ Encerradas'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Contador de vagas (só admin vê) */}
+        <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <Users size={16} className="text-indigo-500" /> Inscritos
+            </span>
+            <span className="text-sm font-bold text-slate-800">
+              {totalRunners} <span className="text-slate-400 font-medium">de {MAX_ATHLETES}</span>
+            </span>
+          </div>
+          <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-red-500' : pct >= 85 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            {totalRunners >= MAX_ATHLETES
+              ? 'Limite de 500 atletas atingido.'
+              : `Faltam ${MAX_ATHLETES - totalRunners} vagas para o limite de ${MAX_ATHLETES}.`}
+          </p>
+        </div>
+
+        <form onSubmit={handleSaveReg} className="space-y-6">
+          <div className="max-w-xs">
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              <CalendarClock size={16} className="inline mr-2" />
+              Prazo final das inscrições
+            </label>
+            <input
+              type="date"
+              value={regDraft}
+              onChange={(e) => {
+                setRegDraft(e.target.value);
+                setRegError('');
+                setRegSuccess(false);
+              }}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all [color-scheme:light]"
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              Depois desta data, o formulário público fecha automaticamente. Deixe vazio para não ter prazo. (Admin e líderes continuam podendo cadastrar.)
+            </p>
+          </div>
+
+          {regError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-red-700 font-medium text-sm">{regError}</p>
+            </div>
+          )}
+
+          {regSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <p className="text-emerald-700 font-medium text-sm">✓ Prazo salvo com sucesso!</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={savingReg || !onUpdateRegistrationDeadline || regDraft === (registrationDeadline || '')}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          >
+            <Save size={18} /> {savingReg ? 'Salvando...' : 'Salvar Prazo'}
           </button>
         </form>
       </div>

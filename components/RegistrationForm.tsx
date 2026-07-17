@@ -3,8 +3,8 @@ import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
 import { prepareProofFile } from '../services/imageUtils';
-import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket, ShieldAlert, UserCheck } from 'lucide-react';
-import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS, MIN_AGE, MINOR_AGE, EVENT_DATE, ageOnDate, isMinorAtEvent } from '../constants';
+import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket, ShieldAlert, UserCheck, Trophy } from 'lucide-react';
+import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS, MIN_AGE, MINOR_AGE, AGE_REF_DATE, ageOnDate, isMinorAtEvent, getAgeCategory } from '../constants';
 import { RegulationModal } from './RegulationModal';
 
 interface RegistrationFormProps {
@@ -227,12 +227,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const ageForFee = formData.birthDate ? calculateAge(formData.birthDate) : 0;
   // 60+ já tem meia inscrição: cupom de academia não acumula
   const isSeniorRegistrant = !!formData.birthDate && ageForFee >= SENIOR_AGE;
-  // Idade na data da prova (regra do regulamento)
-  const ageAtEvent = formData.birthDate ? ageOnDate(formData.birthDate, EVENT_DATE) : null;
+  // Idade considerada para mínimo/categoria (a que terá em 31/12/2026, conforme regulamento)
+  const ageRef = formData.birthDate ? ageOnDate(formData.birthDate, AGE_REF_DATE) : null;
   // Menor de 18 na data da prova: exige nome do responsável (autorização vem no comprovante)
   const isMinor = isMinorAtEvent(formData.birthDate);
   // Abaixo da idade mínima permitida (14): não pode se inscrever
-  const isUnderMinAge = ageAtEvent !== null && ageAtEvent < MIN_AGE;
+  const isUnderMinAge = ageRef !== null && ageRef < MIN_AGE;
+  // Categoria de faixa etária (ex.: "30 a 34 anos")
+  const category = getAgeCategory(formData.birthDate);
   const baseFee = formData.birthDate ? getRegistrationFee(ageForFee) : REGISTRATION_PRICE;
   const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
@@ -448,6 +450,23 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 className={`${inputClass} ${isPublicView ? '[color-scheme:dark]' : ''}`}
               />
             </div>
+
+            {/* Categoria (faixa etária + sexo), conforme regulamento */}
+            {category && (
+              <div className="col-span-2 md:col-span-1 flex items-end">
+                <div className={`w-full rounded-lg px-4 py-3 border flex items-center gap-2 ${
+                  isPublicView ? 'bg-slate-800/60 border-slate-700' : 'bg-indigo-50 border-indigo-200'
+                }`}>
+                  <Trophy size={16} className={isPublicView ? 'text-yellow-400 shrink-0' : 'text-indigo-500 shrink-0'} />
+                  <div className="min-w-0">
+                    <p className={`text-[10px] uppercase font-bold tracking-wide ${isPublicView ? 'text-slate-500' : 'text-slate-400'}`}>Categoria</p>
+                    <p className={`text-sm font-bold truncate ${isPublicView ? 'text-white' : 'text-slate-800'}`}>
+                      {formData.gender} · {category}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Aviso e campo do responsável (menor de 18 na data da prova) */}
             {isUnderMinAge && (

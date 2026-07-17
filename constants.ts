@@ -7,8 +7,10 @@ export const SENIOR_AGE = 60;
 
 // Regras de idade do regulamento (2ª Corrida Night Run – Asilo São Cristóvão)
 export const EVENT_DATE = '2026-09-19';   // data da prova
+export const AGE_REF_DATE = '2026-12-31'; // "idade considerada" p/ mínimo e categoria (regulamento)
 export const MIN_AGE = 14;                // idade mínima (Confederação Brasileira de Atletismo)
 export const MINOR_AGE = 18;              // abaixo disso: precisa de autorização do responsável
+export const MAX_ATHLETES = 500;          // limite de inscritos (regulamento)
 
 // Idade que a pessoa terá numa data de referência (ambas em YYYY-MM-DD).
 // Aritmética pura de inteiros: imune a fuso horário (sem new Date()).
@@ -25,6 +27,31 @@ export const ageOnDate = (birthDate: string, refIso: string): number => {
 // Menor de idade na data da prova → exige autorização do pai/responsável.
 export const isMinorAtEvent = (birthDate: string): boolean =>
   !!birthDate && ageOnDate(birthDate, EVENT_DATE) < MINOR_AGE;
+
+// Idade considerada para mínimo/categoria (a que o atleta terá em 31/12/2026).
+export const ageForCategory = (birthDate: string): number => ageOnDate(birthDate, AGE_REF_DATE);
+
+// Faixas etárias do regulamento (Corrida 5K)
+const AGE_BRACKETS: [number, number][] = [
+  [14, 19], [20, 24], [25, 29], [30, 34], [35, 39], [40, 44],
+  [45, 49], [50, 54], [55, 59], [60, 64], [65, 69],
+];
+
+// Categoria de faixa etária do atleta (ex.: "30 a 34 anos"), conforme 31/12/2026.
+export const getAgeCategory = (birthDate: string): string => {
+  const age = ageForCategory(birthDate);
+  if (!age || age < MIN_AGE) return '';
+  if (age >= 70) return '70+';
+  const bracket = AGE_BRACKETS.find(([lo, hi]) => age >= lo && age <= hi);
+  return bracket ? `${bracket[0]} a ${bracket[1]} anos` : '';
+};
+
+// Categoria completa com o sexo (ex.: "Masculino · 30 a 34 anos")
+export const getFullCategory = (birthDate: string, gender?: string): string => {
+  const faixa = getAgeCategory(birthDate);
+  if (!faixa) return '';
+  return gender ? `${gender} · ${faixa}` : faixa;
+};
 
 // Formata "YYYY-MM-DD" (data do banco) como "DD/MM" sem sofrer com fuso horário.
 // (new Date('2026-08-23') vira meia-noite UTC e pode "voltar" um dia no Brasil)
