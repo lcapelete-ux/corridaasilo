@@ -687,6 +687,8 @@ const App: React.FC = () => {
               <SettingsManager
                 raceGroupName={raceGroupName}
                 onUpdateRaceGroupName={handleUpdateRaceGroupName}
+                transferSettings={transferSettings}
+                onUpdateTransferSettings={handleUpdateTransferSettings}
               />
             )}
           </div>
