@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -76,6 +76,13 @@ const App: React.FC = () => {
         setOrganizers(org);
         setExtraRevenues(rev);
         setCoupons(cp);
+      } else if (session.role === 'team_leader') {
+        // Líder só precisa dos cupons da própria equipe (RLS filtra) para o
+        // botão de aplicar na inscrição manual. É "melhor esforço": se a
+        // migração de bloqueio/RLS ainda não rodou, apenas segue sem os botões.
+        getCoupons()
+          .then(setCoupons)
+          .catch(e => console.warn('Cupons da equipe indisponíveis:', e?.message));
       }
     } catch (e: any) {
       alert(e?.message || 'Erro ao carregar dados do banco.');
@@ -370,6 +377,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleToggleCouponBlock = async (coupon: TeamCoupon) => {
+    try {
+      await setCouponBlocked(coupon.id, !coupon.blocked);
+      setCoupons(await getCoupons());
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao bloquear/desbloquear o cupom.');
+    }
+  };
+
   // --- Transfer Settings Actions ---
   const handleUpdateTransferSettings = async (settings: TransferSettings) => {
     try {
@@ -641,6 +657,7 @@ const App: React.FC = () => {
                 officialTeams={officialTeams}
                 isPublicView={false}
                 userSession={userSession}
+                coupons={coupons}
               />
             )}
             
@@ -698,6 +715,7 @@ const App: React.FC = () => {
                 onSave={handleSaveCoupon}
                 onUpdate={handleUpdateCoupon}
                 onDelete={handleDeleteCoupon}
+                onToggleBlock={handleToggleCouponBlock}
               />
             )}
 

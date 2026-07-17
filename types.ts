@@ -39,6 +39,7 @@ export interface TeamCoupon {
   code: string;                   // Ex: LUSO10
   discountType: 'fixed' | 'percent';
   value: number;                  // R$ (fixed) ou % (percent)
+  blocked?: boolean;              // Bloqueado pelo admin: fica inativo na inscrição
 }
 
 export type SponsorType = 'Camiseta' | 'Medalha';

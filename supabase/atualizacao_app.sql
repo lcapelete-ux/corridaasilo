@@ -48,6 +48,12 @@ create table if not exists public.team_coupons (
 create unique index if not exists team_coupons_code_key
   on public.team_coupons (upper(code));
 
+-- Cupom pode ser bloqueado pelo admin: some do botão de aplicar e deixa de
+-- ser aceito (nem digitado nem pelo botão do líder).
+alter table public.team_coupons add column if not exists blocked boolean not null default false;
+comment on column public.team_coupons.blocked is
+  'Quando true, o cupom fica inativo: não aparece para aplicar nem é aceito';
+
 alter table public.team_coupons enable row level security;
 
 -- Gestão dos cupons: somente admins (a tela Cupons é só de admin)
@@ -55,9 +61,16 @@ drop policy if exists "team_coupons_admin_all" on public.team_coupons;
 create policy "team_coupons_admin_all" on public.team_coupons
   for all using (public.is_admin()) with check (public.is_admin());
 
+-- Líder de equipe pode LER os cupons da própria academia (para o botão de
+-- aplicar na inscrição manual). Continua sem poder criar/editar/excluir.
+drop policy if exists "team_coupons_select_own_team" on public.team_coupons;
+create policy "team_coupons_select_own_team" on public.team_coupons
+  for select using (lower(team_name) = lower(public.my_team()));
+
 -- 4. Validação pública de cupom ----------------------------------------------
 -- O formulário de inscrição busca o cupom pelo código digitado. security
 -- definer: funciona para visitantes anônimos sem abrir a tabela inteira.
+-- Cupom bloqueado não é retornado (equivale a "não encontrado").
 create or replace function public.find_coupon_by_code(p_code text)
 returns table (id uuid, team_name text, code text, discount_type text, value numeric)
 language sql
@@ -67,7 +80,8 @@ set search_path = public
 as $$
   select c.id, c.team_name, c.code, c.discount_type, c.value
   from public.team_coupons c
-  where upper(c.code) = upper(btrim(p_code));
+  where upper(c.code) = upper(btrim(p_code))
+    and coalesce(c.blocked, false) = false;
 $$;
 
 grant execute on function public.find_coupon_by_code(text) to anon, authenticated;
