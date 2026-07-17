@@ -9,9 +9,10 @@ interface LandingPageProps {
   onStartRegistration: () => void;
   onAdminLogin: () => void;
   onOpenProofUpload: () => void;
+  raceGroupName?: string;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
   // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
@@ -110,13 +111,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         {/* Big Typography Logo */}
         <h1 className="relative mb-8 transform -rotate-2 md:-rotate-3 animate-zoom-in">
           <span className="block text-[2.75rem] md:text-[5rem] leading-[0.9] font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-2xl">
-            2ª CORRIDA
-          </span>
-          <span className="block text-[3.5rem] md:text-[6.5rem] leading-[0.85] font-black italic tracking-tighter text-yellow-400 neon-text">
-            NOTURNA
-          </span>
-          <span className="block text-[3.5rem] md:text-[6.5rem] leading-[0.85] font-black italic tracking-tighter text-white">
-            LSC
+            {raceGroupName}
           </span>
         </h1>
 

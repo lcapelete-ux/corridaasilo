@@ -451,6 +451,24 @@ export const updateTransferSettings = async (settings: TransferSettings): Promis
   if (error) throw friendlyError(error, 'Erro ao salvar configurações de transferência');
 };
 
+export const getRaceGroupName = async (): Promise<string> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('race_group_name')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar nome do grupo');
+  return (data as { race_group_name: string } | null)?.race_group_name || '2ª CORRIDA NOTURNA LSC';
+};
+
+export const updateRaceGroupName = async (name: string): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ race_group_name: name.trim() })
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar nome do grupo');
+};
+
 // --- Equipes/Academias oficiais (lista usada pelos formulários) ---
 // Tabela pública de leitura livre (RLS: select para todos, escrita só admin)
 

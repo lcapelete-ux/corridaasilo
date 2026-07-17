@@ -246,9 +246,13 @@ create table if not exists public.app_settings (
   id boolean primary key default true,
   transfer_deadline date,
   transfers_blocked boolean not null default false,
+  race_group_name text default '2ª CORRIDA NOTURNA LSC',
   constraint app_settings_singleton check (id)
 );
 insert into public.app_settings (id) values (true) on conflict (id) do nothing;
+
+-- Adiciona coluna race_group_name se ainda não existir
+alter table public.app_settings add column if not exists race_group_name text default '2ª CORRIDA NOTURNA LSC';
 
 alter table public.app_settings enable row level security;
 
