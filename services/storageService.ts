@@ -361,6 +361,7 @@ interface CouponRow {
   code: string;
   discount_type: 'fixed' | 'percent';
   value: number;
+  blocked?: boolean;
 }
 
 const couponFromRow = (c: CouponRow): TeamCoupon => ({
@@ -369,6 +370,7 @@ const couponFromRow = (c: CouponRow): TeamCoupon => ({
   code: c.code,
   discountType: c.discount_type,
   value: Number(c.value),
+  blocked: c.blocked ?? false,
 });
 
 export const getCoupons = async (): Promise<TeamCoupon[]> => {
@@ -404,6 +406,14 @@ export const updateCoupon = async (coupon: TeamCoupon): Promise<void> => {
 export const deleteCoupon = async (id: string): Promise<void> => {
   const { error } = await supabase.from('team_coupons').delete().eq('id', id);
   if (error) throw friendlyError(error, 'Erro ao remover cupom');
+};
+
+// Bloqueia/desbloqueia o cupom (só admin, via RLS). Função separada de
+// updateCoupon para não exigir a coluna "blocked" na edição normal do cupom:
+// só quem usa este toggle depende da migração que criou a coluna.
+export const setCouponBlocked = async (id: string, blocked: boolean): Promise<void> => {
+  const { error } = await supabase.from('team_coupons').update({ blocked }).eq('id', id);
+  if (error) throw friendlyError(error, 'Erro ao alterar o bloqueio do cupom');
 };
 
 // Validação pública de cupom (formulário de inscrição) — busca pelo código

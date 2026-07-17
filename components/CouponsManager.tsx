@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TeamCoupon } from '../types';
 import { REGISTRATION_PRICE, calcCouponDiscount } from '../constants';
-import { Plus, Trash2, Ticket, Pencil, Flag, BadgePercent } from 'lucide-react';
+import { Plus, Trash2, Ticket, Pencil, Flag, BadgePercent, Lock, Unlock } from 'lucide-react';
 
 interface CouponsManagerProps {
   coupons: TeamCoupon[];
@@ -9,13 +9,14 @@ interface CouponsManagerProps {
   onSave: (coupon: TeamCoupon) => void;
   onUpdate: (coupon: TeamCoupon) => void;
   onDelete: (id: string) => void;
+  onToggleBlock?: (coupon: TeamCoupon) => void;
 }
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm";
 const selectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm [color-scheme:dark]";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, onSave, onUpdate, onDelete }) => {
+export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, onSave, onUpdate, onDelete, onToggleBlock }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -197,12 +198,23 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
       {/* Cards de cupons */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {coupons.map(coupon => (
-          <div key={coupon.id} className="bg-slate-900 p-5 rounded-xl border border-slate-800/60 hover:border-yellow-400/30 transition-all">
+          <div key={coupon.id} className={`bg-slate-900 p-5 rounded-xl border transition-all ${
+            coupon.blocked ? 'border-red-500/40 opacity-75' : 'border-slate-800/60 hover:border-yellow-400/30'
+          }`}>
             <div className="flex justify-between items-start mb-3">
               <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide flex items-center gap-1">
                 <Flag size={11} /> {coupon.teamName}
               </div>
               <div className="flex gap-1">
+                {onToggleBlock && (
+                  <button
+                    onClick={() => onToggleBlock(coupon)}
+                    className={`transition-colors p-1 ${coupon.blocked ? 'text-red-400 hover:text-emerald-400' : 'text-slate-600 hover:text-red-400'}`}
+                    title={coupon.blocked ? 'Desbloquear cupom' : 'Bloquear cupom'}
+                  >
+                    {coupon.blocked ? <Lock size={16} /> : <Unlock size={16} />}
+                  </button>
+                )}
                 <button
                   onClick={() => handleEdit(coupon)}
                   className="text-slate-600 hover:text-yellow-400 transition-colors p-1"
@@ -220,18 +232,26 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
               </div>
             </div>
 
-            <div className="bg-slate-800/60 border border-dashed border-slate-600 rounded-lg px-4 py-3 text-center mb-3">
-              <p className="font-mono font-black text-yellow-400 text-xl tracking-widest">{coupon.code}</p>
+            <div className={`border border-dashed rounded-lg px-4 py-3 text-center mb-3 ${
+              coupon.blocked ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-800/60 border-slate-600'
+            }`}>
+              <p className={`font-mono font-black text-xl tracking-widest ${coupon.blocked ? 'text-slate-500 line-through' : 'text-yellow-400'}`}>{coupon.code}</p>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                <BadgePercent size={15} /> {formatDiscount(coupon)} de desconto
-              </span>
-              <span className="text-slate-500 text-xs">
-                Inscrição: R$ {previewPrice(coupon)}
-              </span>
-            </div>
+            {coupon.blocked ? (
+              <div className="flex items-center gap-1.5 text-red-400 font-bold text-sm">
+                <Lock size={14} /> Cupom bloqueado (inativo)
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                  <BadgePercent size={15} /> {formatDiscount(coupon)} de desconto
+                </span>
+                <span className="text-slate-500 text-xs">
+                  Inscrição: R$ {previewPrice(coupon)}
+                </span>
+              </div>
+            )}
           </div>
         ))}
 

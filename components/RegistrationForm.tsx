@@ -13,6 +13,7 @@ interface RegistrationFormProps {
   officialTeams?: string[]; // Lista de equipes cadastradas (banco); sem isso, usa PREDEFINED_TEAMS
   isPublicView?: boolean;
   userSession?: UserSession | null;
+  coupons?: TeamCoupon[]; // Cupons disponíveis (área restrita): botão de aplicar direto
 }
 
 const PREDEFINED_CITIES = [
@@ -25,7 +26,7 @@ const PREDEFINED_CITIES = [
   'Tiete'
 ];
 
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, isPublicView = false, userSession }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, isPublicView = false, userSession, coupons }) => {
   // "Avulso" já tem opção própria no <select>: não repete aqui
   const teamOptions = (officialTeams && officialTeams.length > 0 ? officialTeams : PREDEFINED_TEAMS)
     .filter(t => t !== 'Avulso');
@@ -184,6 +185,21 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setCouponError('');
   };
 
+  // Aplica direto o cupom da equipe (botão), sem precisar digitar o código.
+  const applyCouponDirect = (coupon: TeamCoupon) => {
+    setCouponError('');
+    if (coupon.blocked) {
+      setCouponError('Este cupom está bloqueado pela organização.');
+      return;
+    }
+    if (isSeniorRegistrant) {
+      setCouponError(`Atletas 60+ já pagam meia inscrição (R$ ${REGISTRATION_PRICE_SENIOR.toFixed(2).replace('.', ',')}). O desconto não acumula com cupom.`);
+      return;
+    }
+    setAppliedCoupon(coupon);
+    setCouponInput(coupon.code);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -214,6 +230,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+  // Cupons da equipe selecionada (só na área restrita, quando App passa a lista).
+  // Servem para o botão de aplicar com um clique, sem digitar o código.
+  const teamCoupons = (coupons || []).filter(
+    c => formData.teamName && formData.teamName !== 'Avulso'
+      && c.teamName.toLowerCase() === formData.teamName.toLowerCase()
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -583,26 +606,58 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={couponInput}
-                      onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
-                      className={`${inputClass} uppercase font-mono flex-1`}
-                      placeholder="Ex: LUSO10"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyCoupon}
-                      disabled={couponChecking}
-                      className={`px-5 rounded-lg font-bold text-sm transition-all shrink-0 disabled:opacity-60 disabled:cursor-wait ${
-                        isPublicView
-                          ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
-                          : 'bg-slate-900 text-yellow-400 hover:bg-slate-800'
-                      }`}
-                    >
-                      {couponChecking ? 'Verificando...' : 'Aplicar'}
-                    </button>
+                  <div className="space-y-3">
+                    {/* Botões de cupom da equipe (aplica com 1 clique). Só na
+                        área restrita, quando a lista de cupons foi carregada. */}
+                    {teamCoupons.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {teamCoupons.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => applyCouponDirect(c)}
+                            disabled={c.blocked}
+                            title={c.blocked ? 'Cupom bloqueado pela organização' : 'Aplicar este cupom'}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm border transition-all ${
+                              c.blocked
+                                ? 'opacity-50 cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400 line-through [color-scheme:light]'
+                                : isPublicView
+                                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                                  : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <Ticket size={15} />
+                            <span className="font-mono">{c.code}</span>
+                            <span className="opacity-80">
+                              {c.discountType === 'percent' ? `${c.value}%` : `R$ ${fmt(c.value)}`}
+                            </span>
+                            {c.blocked && <span className="no-underline text-[10px] uppercase">bloqueado</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInput}
+                        onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                        className={`${inputClass} uppercase font-mono flex-1`}
+                        placeholder="Ex: LUSO10"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCoupon}
+                        disabled={couponChecking}
+                        className={`px-5 rounded-lg font-bold text-sm transition-all shrink-0 disabled:opacity-60 disabled:cursor-wait ${
+                          isPublicView
+                            ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300'
+                            : 'bg-slate-900 text-yellow-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        {couponChecking ? 'Verificando...' : 'Aplicar'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
