@@ -49,6 +49,7 @@ interface RunnerRow {
   coupon_discount: number | null;
   guardian_name?: string | null;
   authorization_doc?: string | null;
+  modality?: string | null;
 }
 
 const runnerFromRow = (r: RunnerRow): Runner => ({
@@ -72,6 +73,7 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   couponDiscount: r.coupon_discount != null ? Number(r.coupon_discount) : undefined,
   guardianName: r.guardian_name || undefined,
   authorizationDoc: r.authorization_doc || undefined,
+  modality: (r.modality as Runner['modality']) || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -101,7 +103,26 @@ const runnerToRow = (r: Runner) => {
   if (r.couponDiscount != null) row.coupon_discount = r.couponDiscount;
   if (r.guardianName) row.guardian_name = r.guardianName;
   if (r.authorizationDoc) row.authorization_doc = r.authorizationDoc;
+  if (r.modality) row.modality = r.modality;
   return row;
+};
+
+// Colunas adicionadas por migração: se o banco ainda não as tem, o insert/update
+// falha com "coluna não encontrada". Nesse caso removemos essas colunas e
+// tentamos de novo, para a inscrição continuar funcionando antes da migração.
+const MIGRATION_COLUMNS = [
+  'phone', 'modality', 'transferred_from', 'transferred_at',
+  'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
+];
+
+const isUnknownColumnError = (error: any): boolean =>
+  error?.code === 'PGRST204'
+  || /could not find the .* column|schema cache|column .* does not exist/i.test(error?.message || '');
+
+const stripMigrationColumns = (row: Record<string, unknown>): Record<string, unknown> => {
+  const base = { ...row };
+  for (const c of MIGRATION_COLUMNS) delete base[c];
+  return base;
 };
 
 export const getRunners = async (): Promise<Runner[]> => {
@@ -114,13 +135,20 @@ export const getRunners = async (): Promise<Runner[]> => {
 };
 
 export const saveRunner = async (runner: Runner): Promise<void> => {
-  const { error } = await supabase.from('runners').insert(runnerToRow(runner));
+  const row = runnerToRow(runner);
+  let { error } = await supabase.from('runners').insert(row);
+  if (error && isUnknownColumnError(error)) {
+    ({ error } = await supabase.from('runners').insert(stripMigrationColumns(row)));
+  }
   if (error) throw friendlyError(error, 'Erro ao salvar inscrição');
 };
 
 export const updateRunner = async (runner: Runner): Promise<void> => {
   const { id, ...row } = runnerToRow(runner);
-  const { error } = await supabase.from('runners').update(row).eq('id', id);
+  let { error } = await supabase.from('runners').update(row).eq('id', id);
+  if (error && isUnknownColumnError(error)) {
+    ({ error } = await supabase.from('runners').update(stripMigrationColumns(row)).eq('id', id));
+  }
   if (error) throw friendlyError(error, 'Erro ao atualizar inscrição');
 };
 

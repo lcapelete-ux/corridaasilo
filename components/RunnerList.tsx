@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getAgeCategory } from '../constants';
+import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel } from '../constants';
 import { prepareProofFile } from '../services/imageUtils';
 import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List, Lock, Settings, Ban } from 'lucide-react';
 
@@ -80,6 +80,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       'CPF', 
       'Data Nascimento', 
       'Idade',
+      'Modalidade',
       'Categoria',
       'Gênero',
       'Cidade',
@@ -103,7 +104,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         `"${runner.cpf}"`,
         `"${birthDateFormatted}"`,
         `"${runner.age}"`,
-        `"${getAgeCategory(runner.birthDate)}"`,
+        `"${modalityLabel(runner.modality)}"`,
+        `"${getRunnerCategory(runner.birthDate, runner.modality)}"`,
         `"${runner.gender}"`,
         `"${runner.city}"`,
         `"${runner.teamName}"`,
@@ -546,13 +548,18 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4 text-slate-300">
                       {runner.age} anos <br/>
                       <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">{runner.gender}</span>
-                      {getAgeCategory(runner.birthDate) && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded-full font-bold" title="Categoria (faixa etária)">
-                            🏅 {getAgeCategory(runner.birthDate)}
+                      <div className="mt-1 flex flex-col gap-1">
+                        <span className={`inline-flex w-fit items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          runner.modality === '3k' ? 'bg-sky-500/10 text-sky-300' : 'bg-emerald-500/10 text-emerald-300'
+                        }`} title="Modalidade">
+                          {runner.modality === '3k' ? '🚶 Caminhada 3 km' : '🏃 Corrida 5 km'}
+                        </span>
+                        {getRunnerCategory(runner.birthDate, runner.modality) && (
+                          <span className="inline-flex w-fit items-center gap-1 text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded-full font-bold" title="Categoria">
+                            🏅 {getRunnerCategory(runner.birthDate, runner.modality)}
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

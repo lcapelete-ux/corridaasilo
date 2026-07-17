@@ -1,4 +1,13 @@
-import { Runner, TeamCoupon, TransferSettings } from './types';
+import { Runner, TeamCoupon, TransferSettings, RaceModality } from './types';
+
+// Modalidades da prova (seleção no topo da inscrição)
+export const MODALITIES: { value: RaceModality; label: string; distance: string; emoji: string }[] = [
+  { value: '5k', label: 'Corrida', distance: '5 km', emoji: '🏃' },
+  { value: '3k', label: 'Caminhada', distance: '3 km', emoji: '🚶' },
+];
+
+export const modalityLabel = (m?: string): string =>
+  m === '3k' ? 'Caminhada 3 km' : 'Corrida 5 km';
 
 // Valores da inscrição da 2ª Corrida Noturna LSC
 export const REGISTRATION_PRICE = 69.90;
@@ -51,6 +60,13 @@ export const getFullCategory = (birthDate: string, gender?: string): string => {
   const faixa = getAgeCategory(birthDate);
   if (!faixa) return '';
   return gender ? `${gender} · ${faixa}` : faixa;
+};
+
+// Categoria conforme a modalidade: a corrida 5K tem faixas etárias (regulamento);
+// a caminhada 3K não disputa faixa, então mostra apenas "Caminhada 3 km".
+export const getRunnerCategory = (birthDate: string, modality?: string): string => {
+  if (modality === '3k') return 'Caminhada 3 km';
+  return getAgeCategory(birthDate);
 };
 
 // Formata "YYYY-MM-DD" (data do banco) como "DD/MM" sem sofrer com fuso horário.

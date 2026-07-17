@@ -27,6 +27,8 @@ alter table public.runners add column if not exists transferred_at timestamptz;
 alter table public.runners add column if not exists coupon_code text;
 alter table public.runners add column if not exists coupon_discount numeric(10, 2);
 alter table public.runners add column if not exists phone text;
+-- Modalidade: '5k' corrida (padrão) ou '3k' caminhada
+alter table public.runners add column if not exists modality text default '5k';
 -- Menor de 18: nome do responsável (na inscrição) e autorização assinada
 -- (anexada junto ao comprovante). Exigência do regulamento.
 alter table public.runners add column if not exists guardian_name text;
@@ -38,6 +40,8 @@ comment on column public.runners.coupon_discount is
   'Desconto em R$ aplicado pelo cupom da academia no momento da inscrição';
 comment on column public.runners.phone is
   'Telefone de contato do atleta';
+comment on column public.runners.modality is
+  'Modalidade: 5k (corrida) ou 3k (caminhada)';
 comment on column public.runners.guardian_name is
   'Nome do pai/mãe/responsável — obrigatório para atletas menores de 18 anos';
 comment on column public.runners.authorization_doc is

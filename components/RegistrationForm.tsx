@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
+import { Gender, Runner, ShirtSize, TeamCoupon, UserSession, RaceModality } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
 import { prepareProofFile } from '../services/imageUtils';
 import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket, ShieldAlert, UserCheck, Trophy } from 'lucide-react';
-import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS, MIN_AGE, MINOR_AGE, AGE_REF_DATE, ageOnDate, isMinorAtEvent, getAgeCategory } from '../constants';
+import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS, MIN_AGE, MINOR_AGE, AGE_REF_DATE, ageOnDate, isMinorAtEvent, getRunnerCategory, MODALITIES } from '../constants';
 import { RegulationModal } from './RegulationModal';
 
 interface RegistrationFormProps {
@@ -40,6 +40,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     gender: Gender.MALE,
     teamName: 'Avulso',
     shirtSize: ShirtSize.M,
+    modality: '5k' as RaceModality,
     guardianName: '',
     isPaid: false,
     paymentProof: ''
@@ -233,8 +234,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const isMinor = isMinorAtEvent(formData.birthDate);
   // Abaixo da idade mínima permitida (14): não pode se inscrever
   const isUnderMinAge = ageRef !== null && ageRef < MIN_AGE;
-  // Categoria de faixa etária (ex.: "30 a 34 anos")
-  const category = getAgeCategory(formData.birthDate);
+  // Categoria conforme a modalidade (corrida = faixa etária; caminhada = 3 km)
+  const category = getRunnerCategory(formData.birthDate, formData.modality);
   const baseFee = formData.birthDate ? getRegistrationFee(ageForFee) : REGISTRATION_PRICE;
   const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
@@ -300,6 +301,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       gender: formData.gender as Gender,
       teamName: formData.teamName || 'Avulso',
       shirtSize: formData.shirtSize as ShirtSize,
+      modality: formData.modality,
       registrationDate: new Date().toISOString(),
       isPaid: formData.isPaid,
       paymentProof: formData.paymentProof,
@@ -325,6 +327,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       gender: Gender.MALE,
       teamName: userSession?.role === 'team_leader' && userSession.teamAccess ? userSession.teamAccess : 'Avulso',
       shirtSize: ShirtSize.M,
+      modality: '5k' as RaceModality,
       guardianName: '',
       isPaid: false,
       paymentProof: ''
@@ -390,6 +393,52 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Seleção de modalidade — destaque no topo */}
+          <div>
+            <label className={`${labelClass} flex items-center gap-1 mb-2`}>
+              <Trophy size={14} /> Escolha sua modalidade
+            </label>
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              {MODALITIES.map(m => {
+                const selected = formData.modality === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, modality: m.value }))}
+                    aria-pressed={selected}
+                    className={`relative overflow-hidden rounded-2xl border-2 p-4 md:p-5 flex flex-col items-center gap-1.5 transition-all duration-200 ${
+                      selected
+                        ? isPublicView
+                          ? 'border-yellow-400 bg-yellow-400/10 shadow-[0_0_25px_rgba(250,204,21,0.25)] scale-[1.02]'
+                          : 'border-yellow-400 bg-yellow-50 shadow-md scale-[1.02]'
+                        : isPublicView
+                          ? 'border-slate-700 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-800/70'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {selected && (
+                      <span className={`absolute top-2 right-2 ${isPublicView ? 'text-yellow-400' : 'text-yellow-500'}`}>
+                        <CheckCircle size={18} />
+                      </span>
+                    )}
+                    <span className="text-3xl md:text-4xl leading-none" aria-hidden="true">{m.emoji}</span>
+                    <span className={`font-black italic uppercase tracking-wide text-base md:text-lg ${
+                      selected
+                        ? isPublicView ? 'text-white' : 'text-slate-900'
+                        : isPublicView ? 'text-slate-300' : 'text-slate-700'
+                    }`}>{m.label}</span>
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                      selected
+                        ? 'bg-yellow-400 text-slate-900'
+                        : isPublicView ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-500'
+                    }`}>{m.distance}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             {/* Nome Completo */}
@@ -461,7 +510,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   <div className="min-w-0">
                     <p className={`text-[10px] uppercase font-bold tracking-wide ${isPublicView ? 'text-slate-500' : 'text-slate-400'}`}>Categoria</p>
                     <p className={`text-sm font-bold truncate ${isPublicView ? 'text-white' : 'text-slate-800'}`}>
-                      {formData.gender} · {category}
+                      {formData.modality === '3k' ? category : `${formData.gender} · ${category}`}
                     </p>
                   </div>
                 </div>
