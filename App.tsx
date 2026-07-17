@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, getRaceGroupName, updateRaceGroupName } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -13,10 +13,11 @@ import { ExpensesManager } from './components/ExpensesManager';
 import { ExtraRevenueManager } from './components/ExtraRevenueManager';
 import { OrganizersManager } from './components/OrganizersManager';
 import { CouponsManager } from './components/CouponsManager';
+import { SettingsManager } from './components/SettingsManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   // Lista de equipes/academias: seed com a constante e some para a versão
   // ao vivo do banco assim que carrega — funciona até para visitante anônimo
   const [officialTeams, setOfficialTeams] = useState<string[]>(PREDEFINED_TEAMS);
+  const [raceGroupName, setRaceGroupName] = useState('2ª CORRIDA NOTURNA LSC');
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -121,7 +123,25 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshTeams();
+    refreshRaceGroupName();
   }, []);
+
+  const refreshRaceGroupName = async () => {
+    try {
+      setRaceGroupName(await getRaceGroupName());
+    } catch {
+      // Mantém o valor atual (padrão)
+    }
+  };
+
+  const handleUpdateRaceGroupName = async (name: string) => {
+    try {
+      await updateRaceGroupName(name);
+      await refreshRaceGroupName();
+    } catch (e: any) {
+      throw e;
+    }
+  };
 
   const handleCreateTeam = async (name: string) => {
     try {
@@ -416,10 +436,11 @@ const App: React.FC = () => {
   // RENDER: LANDING PAGE (NOVA TELA INICIAL)
   if (mode === 'landing') {
     return (
-      <LandingPage 
-        onStartRegistration={() => setMode('public')} 
-        onAdminLogin={() => setMode(userSession ? 'restricted_area' : 'auth_screen')} 
+      <LandingPage
+        onStartRegistration={() => setMode('public')}
+        onAdminLogin={() => setMode(userSession ? 'restricted_area' : 'auth_screen')}
         onOpenProofUpload={() => setMode('proof_upload')}
+        raceGroupName={raceGroupName}
       />
     );
   }
@@ -451,7 +472,7 @@ const App: React.FC = () => {
 
         <nav className="relative z-20 flex justify-between items-center p-6 max-w-5xl mx-auto w-full">
           <div className="flex items-center gap-2 font-black italic tracking-tighter text-lg md:text-xl">
-            <Timer size={22} className="text-yellow-400" aria-hidden="true" /> 2ª CORRIDA NOTURNA LSC
+            <Timer size={22} className="text-yellow-400" aria-hidden="true" /> {raceGroupName}
           </div>
           <button
             onClick={() => setMode('landing')}
@@ -511,7 +532,7 @@ const App: React.FC = () => {
             <Timer size={22} />
           </div>
           <div>
-            <h1 className="text-base font-black text-white italic tracking-tighter leading-tight">2ª CORRIDA<br />NOTURNA LSC</h1>
+            <h1 className="text-base font-black text-white italic tracking-tighter leading-tight">{raceGroupName}</h1>
             <p className="text-xs text-yellow-400/80 mt-0.5">
               {userSession?.role === 'admin' ? 'Painel Admin' : `Líder: ${userSession?.username}`}
             </p>
@@ -543,6 +564,10 @@ const App: React.FC = () => {
               </div>
               <NavItem target="organizers" icon={Shield} label="Organizadores" />
               <NavItem target="coupons" icon={Ticket} label="Cupons" />
+              <div className="py-3">
+                <div className="h-px bg-slate-800/80 w-full" />
+              </div>
+              <NavItem target="settings" icon={Settings} label="Configurações" />
             </>
           )}
         </nav>
@@ -562,7 +587,7 @@ const App: React.FC = () => {
         {/* Mobile Header */}
         <header className="md:hidden bg-slate-900 border-b border-slate-800/50 p-4 flex items-center justify-between">
           <div className="flex items-center gap-2 font-black text-white italic">
-            <Timer size={20} className="text-yellow-400"/> CORRIDA NOTURNA LSC
+            <Timer size={20} className="text-yellow-400"/> {raceGroupName}
           </div>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-400 hover:text-white transition-colors">
             <Menu size={24} />
@@ -655,6 +680,13 @@ const App: React.FC = () => {
                 onCreateLogin={handleCreateOrganizerLogin}
                 onUpdate={handleUpdateOrganizer}
                 onDelete={handleDeleteOrganizer}
+              />
+            )}
+
+            {currentView === 'settings' && (
+              <SettingsManager
+                raceGroupName={raceGroupName}
+                onUpdateRaceGroupName={handleUpdateRaceGroupName}
               />
             )}
           </div>
