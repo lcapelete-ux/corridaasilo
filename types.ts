@@ -12,6 +12,9 @@ export enum ShirtSize {
   XXL = 'EXG'
 }
 
+// Modalidade da prova: corrida de 5 km ou caminhada de 3 km
+export type RaceModality = '5k' | '3k';
+
 export interface Runner {
   id: string;
   fullName: string;
@@ -24,6 +27,7 @@ export interface Runner {
   gender: Gender;
   teamName: string;
   shirtSize: ShirtSize;
+  modality?: RaceModality; // '5k' corrida (padrão) ou '3k' caminhada
   registrationDate: string;
   isPaid?: boolean;
   paymentProof?: string; // Base64 image string
