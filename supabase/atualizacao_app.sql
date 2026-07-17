@@ -27,6 +27,10 @@ alter table public.runners add column if not exists transferred_at timestamptz;
 alter table public.runners add column if not exists coupon_code text;
 alter table public.runners add column if not exists coupon_discount numeric(10, 2);
 alter table public.runners add column if not exists phone text;
+-- Menor de 18: nome do responsável (na inscrição) e autorização assinada
+-- (anexada junto ao comprovante). Exigência do regulamento.
+alter table public.runners add column if not exists guardian_name text;
+alter table public.runners add column if not exists authorization_doc text;
 
 comment on column public.runners.transferred_from is
   'Nome do titular anterior quando a inscrição foi transferida';
@@ -34,6 +38,10 @@ comment on column public.runners.coupon_discount is
   'Desconto em R$ aplicado pelo cupom da academia no momento da inscrição';
 comment on column public.runners.phone is
   'Telefone de contato do atleta';
+comment on column public.runners.guardian_name is
+  'Nome do pai/mãe/responsável — obrigatório para atletas menores de 18 anos';
+comment on column public.runners.authorization_doc is
+  'Autorização assinada do responsável (base64), anexada junto ao comprovante';
 
 -- 3. Cupons de desconto por academia ----------------------------------------
 create table if not exists public.team_coupons (
@@ -86,8 +94,10 @@ $$;
 
 grant execute on function public.find_coupon_by_code(text) to anon, authenticated;
 
--- 5. find_runner_by_cpf com equipe e cidade ----------------------------------
+-- 5. find_runner_by_cpf com equipe, cidade e dados de menor de idade ---------
 -- (drop necessário porque o tipo de retorno mudou)
+-- Passa a retornar birth_date (para a tela de comprovante saber se é menor),
+-- guardian_name e se já existe autorização anexada.
 drop function if exists public.find_runner_by_cpf(text);
 create or replace function public.find_runner_by_cpf(p_cpf text)
 returns table (
@@ -97,19 +107,78 @@ returns table (
   team_name text,
   city text,
   is_paid boolean,
-  payment_proof text
+  payment_proof text,
+  birth_date date,
+  guardian_name text,
+  has_authorization boolean
 )
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select r.id, r.full_name, r.cpf, r.team_name, r.city, r.is_paid, r.payment_proof
+  select r.id, r.full_name, r.cpf, r.team_name, r.city, r.is_paid, r.payment_proof,
+         r.birth_date, r.guardian_name,
+         (r.authorization_doc is not null and r.authorization_doc <> '') as has_authorization
   from public.runners r
   where regexp_replace(r.cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
 $$;
 
 grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
+
+-- 5b. attach_payment_proof aceita a autorização do menor (3º parâmetro) e a
+--     EXIGE quando o atleta tem menos de 18 anos na data da prova. Defesa no
+--     banco: mesmo que a tela falhe, um menor não fica sem autorização.
+drop function if exists public.attach_payment_proof(text, text);
+drop function if exists public.attach_payment_proof(text, text, text);
+create or replace function public.attach_payment_proof(
+  p_cpf text,
+  p_proof text,
+  p_authorization text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_birth date;
+  v_has_auth boolean;
+  v_is_minor boolean;
+begin
+  if p_proof is null or p_proof = '' then
+    raise exception 'Comprovante vazio';
+  end if;
+
+  select birth_date,
+         (authorization_doc is not null and authorization_doc <> '')
+    into v_birth, v_has_auth
+  from public.runners
+  where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g')
+  limit 1;
+
+  if not found then
+    raise exception 'CPF não encontrado';
+  end if;
+
+  v_is_minor := v_birth is not null
+    and extract(year from age(date '2026-09-19', v_birth)) < 18;
+
+  -- Menor de 18: exige a autorização (a nova enviada agora ou uma já anexada)
+  if v_is_minor
+     and (p_authorization is null or p_authorization = '')
+     and not coalesce(v_has_auth, false) then
+    raise exception 'Atleta menor de 18 anos: é obrigatório anexar a autorização do responsável junto com o comprovante.';
+  end if;
+
+  update public.runners
+  set payment_proof = p_proof,
+      authorization_doc = coalesce(nullif(p_authorization, ''), authorization_doc)
+  where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+end;
+$$;
+
+grant execute on function public.attach_payment_proof(text, text, text) to anon, authenticated;
 
 -- 6. E-mail opcional: única restrição vale apenas para e-mails preenchidos ---
 drop index if exists public.runners_email_key;

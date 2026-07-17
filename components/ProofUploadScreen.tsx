@@ -1,8 +1,9 @@
 
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye } from 'lucide-react';
+import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { findRunnerByCpf, attachPaymentProof } from '../services/storageService';
 import { prepareProofFile } from '../services/imageUtils';
+import { isMinorAtEvent } from '../constants';
 import { Runner } from '../types';
 
 interface ProofUploadScreenProps {
@@ -20,6 +21,12 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
   const [error, setError] = useState('');
   const [showProofFull, setShowProofFull] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Menor de 18: autorização do responsável exigida junto com o comprovante
+  const [authFile, setAuthFile] = useState<string | null>(null);         // nova autorização escolhida
+  const [existingHasAuth, setExistingHasAuth] = useState(false);          // já enviou autorização antes?
+  const [preparingAuth, setPreparingAuth] = useState(false);
+  const authInputRef = useRef<HTMLInputElement>(null);
 
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
@@ -45,7 +52,9 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
       if (found) {
         setRunner(found);
         setExistingProof(found.paymentProof || null);
+        setExistingHasAuth(!!found.hasAuthorization);
         setProofFile(null);
+        setAuthFile(null);
         setStep('view');
       } else {
         setError('Inscrição não encontrada para este CPF.');
@@ -73,12 +82,36 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
     }
   };
 
+  const handleAuthFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPreparingAuth(true);
+    setError('');
+    try {
+      const prepared = await prepareProofFile(file);
+      setAuthFile(prepared);
+    } catch (err: any) {
+      setError(err?.message || 'Não foi possível preparar a autorização.');
+    } finally {
+      setPreparingAuth(false);
+      if (authInputRef.current) authInputRef.current.value = '';
+    }
+  };
+
+  const isMinor = isMinorAtEvent(runner?.birthDate || '');
+  // Menor sem autorização (nem nova nem já enviada) não pode enviar
+  const needsAuth = isMinor && !authFile && !existingHasAuth;
+
   const handleSubmitProof = async () => {
     if (!runner || !proofFile) return;
+    if (needsAuth) {
+      setError('Atleta menor de 18 anos: anexe também a autorização assinada do responsável para enviar.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      await attachPaymentProof(runner.cpf || cpf, proofFile);
+      await attachPaymentProof(runner.cpf || cpf, proofFile, authFile || undefined);
       setStep('success');
     } catch (err: any) {
       setError(err?.message || 'Erro ao enviar o comprovante. Tente novamente.');
@@ -251,20 +284,89 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
               )}
             </div>
 
+            {/* Autorização do responsável (menor de 18) */}
+            {isMinor && (
+              <div className="mb-4">
+                <div className="rounded-xl p-3 mb-3 border bg-amber-500/10 border-amber-500/30 flex items-start gap-2">
+                  <ShieldAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-200/90">
+                    <strong>Atleta menor de 18 anos.</strong> É obrigatório anexar a <strong>autorização assinada</strong> do pai, mãe ou responsável para validar a inscrição.
+                    {' '}
+                    <a
+                      href={`${import.meta.env.BASE_URL}autorizacao-menor.html`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-bold text-amber-100 hover:text-white"
+                    >
+                      Baixar modelo
+                    </a>.
+                  </p>
+                </div>
+
+                {existingHasAuth && !authFile && (
+                  <p className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold mb-2">
+                    <ShieldCheck size={14} /> Autorização já recebida. Reenvie apenas se precisar corrigir.
+                  </p>
+                )}
+
+                <input
+                  type="file"
+                  ref={authInputRef}
+                  accept="image/*,application/pdf"
+                  onChange={handleAuthFileChange}
+                  className="hidden"
+                />
+                <div
+                  onClick={() => !preparingAuth && authInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all group ${
+                    authFile
+                      ? 'border-emerald-500/50 bg-emerald-500/10'
+                      : 'border-amber-500/40 hover:border-amber-400 hover:bg-slate-800'
+                  } ${preparingAuth ? 'opacity-60 cursor-wait' : ''}`}
+                >
+                  {preparingAuth ? (
+                    <div className="flex flex-col items-center text-slate-400">
+                      <Upload size={28} className="mb-2 animate-pulse" />
+                      <span className="font-bold text-sm">Preparando...</span>
+                    </div>
+                  ) : authFile ? (
+                    <div className="flex flex-col items-center text-emerald-400">
+                      <CheckCircle size={28} className="mb-2" />
+                      <span className="font-bold text-sm">Autorização pronta para enviar</span>
+                      <span className="text-xs opacity-70 mt-1">Clique para trocar</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-amber-300 group-hover:text-amber-200">
+                      <ShieldAlert size={28} className="mb-2" />
+                      <span className="font-bold text-sm">{existingHasAuth ? 'Reenviar autorização' : 'Anexar autorização assinada'}</span>
+                      <span className="text-xs opacity-60 mt-1">Foto ou PDF do documento</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {error && <p className="text-red-400 text-xs mb-3 font-bold flex items-center gap-1"><AlertCircle size={12}/> {error}</p>}
 
             {proofFile && (
-              <button
-                onClick={handleSubmitProof}
-                disabled={busy}
-                className="w-full py-4 rounded-xl font-black italic uppercase tracking-wider transition-all shadow-lg bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-wait"
-              >
-                {busy ? 'Enviando...' : 'Confirmar Envio'}
-              </button>
+              <>
+                <button
+                  onClick={handleSubmitProof}
+                  disabled={busy || needsAuth}
+                  className="w-full py-4 rounded-xl font-black italic uppercase tracking-wider transition-all shadow-lg bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {busy ? 'Enviando...' : 'Confirmar Envio'}
+                </button>
+                {needsAuth && (
+                  <p className="text-amber-400 text-xs mt-2 text-center font-bold flex items-center justify-center gap-1">
+                    <ShieldAlert size={12} /> Anexe a autorização do responsável para liberar o envio.
+                  </p>
+                )}
+              </>
             )}
 
             <button
-              onClick={() => { setStep('search'); setRunner(null); setProofFile(null); setExistingProof(null); setCpf(''); }}
+              onClick={() => { setStep('search'); setRunner(null); setProofFile(null); setExistingProof(null); setAuthFile(null); setExistingHasAuth(false); setCpf(''); }}
               className="w-full mt-3 text-slate-500 hover:text-slate-300 text-sm font-bold transition-colors"
             >
               Buscar outro CPF

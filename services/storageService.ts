@@ -47,6 +47,8 @@ interface RunnerRow {
   transferred_at: string | null;
   coupon_code: string | null;
   coupon_discount: number | null;
+  guardian_name?: string | null;
+  authorization_doc?: string | null;
 }
 
 const runnerFromRow = (r: RunnerRow): Runner => ({
@@ -68,6 +70,8 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   transferredAt: r.transferred_at || undefined,
   couponCode: r.coupon_code || undefined,
   couponDiscount: r.coupon_discount != null ? Number(r.coupon_discount) : undefined,
+  guardianName: r.guardian_name || undefined,
+  authorizationDoc: r.authorization_doc || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -95,6 +99,8 @@ const runnerToRow = (r: Runner) => {
   if (r.transferredAt) row.transferred_at = r.transferredAt;
   if (r.couponCode) row.coupon_code = r.couponCode;
   if (r.couponDiscount != null) row.coupon_discount = r.couponDiscount;
+  if (r.guardianName) row.guardian_name = r.guardianName;
+  if (r.authorizationDoc) row.authorization_doc = r.authorizationDoc;
   return row;
 };
 
@@ -125,7 +131,11 @@ export const deleteRunner = async (id: string): Promise<void> => {
 
 // Busca/anexo de comprovante pelo CPF (telas públicas) — via RPC com
 // security definer, sem expor a tabela inteira a anônimos
-export const findRunnerByCpf = async (cpf: string): Promise<Partial<Runner> | null> => {
+// Retorno da busca por CPF: além dos dados do atleta, traz birth_date (para a
+// tela saber se é menor), o nome do responsável e se já há autorização anexada.
+export type RunnerLookup = Partial<Runner> & { hasAuthorization?: boolean };
+
+export const findRunnerByCpf = async (cpf: string): Promise<RunnerLookup | null> => {
   const { data, error } = await supabase.rpc('find_runner_by_cpf', { p_cpf: cpf });
   if (error) throw friendlyError(error, 'Erro ao buscar inscrição');
   const row = Array.isArray(data) ? data[0] : data;
@@ -138,12 +148,31 @@ export const findRunnerByCpf = async (cpf: string): Promise<Partial<Runner> | nu
     city: row.city ?? '',
     isPaid: row.is_paid,
     paymentProof: row.payment_proof || undefined,
+    birthDate: row.birth_date || undefined,   // pode não vir se a migração não rodou
+    guardianName: row.guardian_name || undefined,
+    hasAuthorization: row.has_authorization ?? undefined,
   };
 };
 
-export const attachPaymentProof = async (cpf: string, proof: string): Promise<void> => {
-  const { error } = await supabase.rpc('attach_payment_proof', { p_cpf: cpf, p_proof: proof });
-  if (error) throw friendlyError(error, 'Erro ao enviar comprovante');
+// Anexa o comprovante e, para menores de 18, também a autorização do responsável.
+export const attachPaymentProof = async (cpf: string, proof: string, authorization?: string): Promise<void> => {
+  const { error } = await supabase.rpc('attach_payment_proof', {
+    p_cpf: cpf,
+    p_proof: proof,
+    p_authorization: authorization || null,
+  });
+  if (!error) return;
+
+  // Se a migração ainda não rodou, o banco só tem a versão de 2 parâmetros.
+  // Faz o fallback (sem autorização) para não travar o envio dos demais.
+  const missingFn = error.code === 'PGRST202'
+    || /could not find the function|attach_payment_proof/i.test(error.message || '');
+  if (missingFn) {
+    const retry = await supabase.rpc('attach_payment_proof', { p_cpf: cpf, p_proof: proof });
+    if (retry.error) throw friendlyError(retry.error, 'Erro ao enviar comprovante');
+    return;
+  }
+  throw friendlyError(error, 'Erro ao enviar comprovante');
 };
 
 // --- Sponsors ---

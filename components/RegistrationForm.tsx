@@ -3,8 +3,8 @@ import { Gender, Runner, ShirtSize, TeamCoupon, UserSession } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
 import { prepareProofFile } from '../services/imageUtils';
-import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket } from 'lucide-react';
-import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS } from '../constants';
+import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket, ShieldAlert, UserCheck } from 'lucide-react';
+import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, PREDEFINED_TEAMS, MIN_AGE, MINOR_AGE, EVENT_DATE, ageOnDate, isMinorAtEvent } from '../constants';
 import { RegulationModal } from './RegulationModal';
 
 interface RegistrationFormProps {
@@ -40,6 +40,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     gender: Gender.MALE,
     teamName: 'Avulso',
     shirtSize: ShirtSize.M,
+    guardianName: '',
     isPaid: false,
     paymentProof: ''
   });
@@ -226,6 +227,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const ageForFee = formData.birthDate ? calculateAge(formData.birthDate) : 0;
   // 60+ já tem meia inscrição: cupom de academia não acumula
   const isSeniorRegistrant = !!formData.birthDate && ageForFee >= SENIOR_AGE;
+  // Idade na data da prova (regra do regulamento)
+  const ageAtEvent = formData.birthDate ? ageOnDate(formData.birthDate, EVENT_DATE) : null;
+  // Menor de 18 na data da prova: exige nome do responsável (autorização vem no comprovante)
+  const isMinor = isMinorAtEvent(formData.birthDate);
+  // Abaixo da idade mínima permitida (14): não pode se inscrever
+  const isUnderMinAge = ageAtEvent !== null && ageAtEvent < MIN_AGE;
   const baseFee = formData.birthDate ? getRegistrationFee(ageForFee) : REGISTRATION_PRICE;
   const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
@@ -261,8 +268,15 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     // se houver conflito, onSave retorna erro amigável.
     const ageCalculated = calculateAge(formData.birthDate);
 
-    if (ageCalculated < 10) {
-      alert("Idade mínima de 10 anos.");
+    if (isUnderMinAge) {
+      alert(`Idade mínima de ${MIN_AGE} anos para participar da prova (regra da Confederação Brasileira de Atletismo).`);
+      return;
+    }
+
+    // Menor de 18: precisa do nome do responsável (a autorização assinada é
+    // anexada depois, junto com o comprovante).
+    if (isMinor && !formData.guardianName.trim()) {
+      alert('Atleta menor de 18 anos: informe o nome do pai, mãe ou responsável. A autorização assinada deverá ser anexada junto com o comprovante.');
       return;
     }
 
@@ -287,6 +301,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       registrationDate: new Date().toISOString(),
       isPaid: formData.isPaid,
       paymentProof: formData.paymentProof,
+      ...(isMinor && formData.guardianName.trim() && { guardianName: formData.guardianName.trim() }),
       ...(appliedCoupon && ageCalculated < SENIOR_AGE && discountForRunner > 0 && {
         couponCode: appliedCoupon.code,
         couponDiscount: discountForRunner,
@@ -308,6 +323,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       gender: Gender.MALE,
       teamName: userSession?.role === 'team_leader' && userSession.teamAccess ? userSession.teamAccess : 'Avulso',
       shirtSize: ShirtSize.M,
+      guardianName: '',
       isPaid: false,
       paymentProof: ''
     });
@@ -432,6 +448,57 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 className={`${inputClass} ${isPublicView ? '[color-scheme:dark]' : ''}`}
               />
             </div>
+
+            {/* Aviso e campo do responsável (menor de 18 na data da prova) */}
+            {isUnderMinAge && (
+              <div className={`col-span-2 rounded-lg px-4 py-3 border text-sm flex items-start gap-2 animate-fade-in ${
+                isPublicView ? 'bg-red-500/10 border-red-500/40 text-red-300' : 'bg-red-50 border-red-300 text-red-700'
+              }`}>
+                <ShieldAlert size={18} className="shrink-0 mt-0.5" />
+                <span>
+                  A idade mínima para participar é de <strong>{MIN_AGE} anos</strong> (regra da Confederação Brasileira de Atletismo). Não é possível concluir esta inscrição.
+                </span>
+              </div>
+            )}
+
+            {isMinor && !isUnderMinAge && (
+              <>
+                <div className={`col-span-2 rounded-lg px-4 py-3 border text-sm flex items-start gap-2 animate-fade-in ${
+                  isPublicView ? 'bg-amber-500/10 border-amber-500/40 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-800'
+                }`}>
+                  <ShieldAlert size={18} className="shrink-0 mt-0.5 text-amber-500" />
+                  <span>
+                    <strong>Atleta menor de 18 anos.</strong> É obrigatória a autorização por escrito do pai, mãe ou responsável.
+                    Informe o nome do responsável abaixo e <strong>anexe a autorização assinada junto com o comprovante</strong> na área
+                    "Já me inscrevi, enviar comprovante". Sem a autorização, a inscrição do menor não é validada.
+                    {' '}
+                    <a
+                      href={`${import.meta.env.BASE_URL}autorizacao-menor.html`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`underline font-bold ${isPublicView ? 'text-amber-100 hover:text-white' : 'text-amber-900 hover:text-black'}`}
+                    >
+                      Baixar modelo de autorização
+                    </a>.
+                  </span>
+                </div>
+
+                <div className="col-span-2">
+                  <label className={`${labelClass} flex items-center gap-1`}>
+                    <UserCheck size={14} /> Nome do pai, mãe ou responsável <span className={isPublicView ? 'text-red-400' : 'text-red-500'}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="guardianName"
+                    value={formData.guardianName}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="Nome completo do responsável"
+                    required={isMinor}
+                  />
+                </div>
+              </>
+            )}
 
             {/* Cidade */}
             <div className="col-span-2 md:col-span-1">
@@ -814,7 +881,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
           <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || isUnderMinAge}
               className={isPublicView
                 ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden disabled:opacity-60 disabled:cursor-wait disabled:hover:scale-100"
                 : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase disabled:opacity-60 disabled:cursor-wait"
