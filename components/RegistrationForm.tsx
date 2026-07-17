@@ -32,6 +32,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    phone: '',
     cpf: '',
     city: '',
     birthDate: '',
@@ -252,6 +253,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       id: crypto.randomUUID(),
       fullName: formData.fullName,
       email: formData.email,
+      phone: formData.phone,
       cpf: formData.cpf,
       city: formData.city,
       birthDate: formData.birthDate,
@@ -276,6 +278,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setFormData({
       fullName: '',
       email: '',
+      phone: '',
       cpf: '',
       city: '',
       birthDate: '',
@@ -481,6 +484,19 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 onChange={handleChange}
                 className={inputClass}
                 placeholder="contato@email.com"
+              />
+            </div>
+
+            {/* Telefone */}
+            <div className="col-span-2 md:col-span-1">
+              <label className={labelClass}>Telefone</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className={inputClass}
+                placeholder="(15) 99999-9999"
               />
             </div>
 

@@ -33,6 +33,7 @@ interface RunnerRow {
   full_name: string;
   email: string;
   cpf: string;
+  phone?: string;
   city: string;
   birth_date: string;
   age: number;
@@ -52,6 +53,7 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   id: r.id,
   fullName: r.full_name,
   email: r.email,
+  phone: r.phone || undefined,
   cpf: r.cpf,
   city: r.city,
   birthDate: r.birth_date,
@@ -85,9 +87,10 @@ const runnerToRow = (r: Runner) => {
     is_paid: r.isPaid ?? false,
     payment_proof: r.paymentProof || null,
   };
-  // Colunas adicionadas pela migração (transferência/cupom): só são enviadas
+  // Colunas adicionadas pela migração (transferência/cupom/telefone): só são enviadas
   // quando realmente têm valor. Assim, cadastro e upload de comprovante
   // continuam funcionando mesmo que a migração ainda não tenha sido rodada.
+  if (r.phone) row.phone = r.phone;
   if (r.transferredFrom) row.transferred_from = r.transferredFrom;
   if (r.transferredAt) row.transferred_at = r.transferredAt;
   if (r.couponCode) row.coupon_code = r.couponCode;
