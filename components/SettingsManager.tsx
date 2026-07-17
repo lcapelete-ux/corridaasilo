@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban } from 'lucide-react';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag } from 'lucide-react';
 import { TransferSettings } from '../types';
+import { formatBrDate } from '../constants';
 
 interface SettingsManagerProps {
   raceGroupName: string;
   onUpdateRaceGroupName: (name: string) => Promise<void>;
   transferSettings?: TransferSettings | null;
   onUpdateTransferSettings?: (settings: TransferSettings) => Promise<void>;
+  promoDeadline?: string;
+  onUpdatePromoDeadline?: (date: string) => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  const [promoDraft, setPromoDraft] = useState(promoDeadline || '');
+  const [savingPromo, setSavingPromo] = useState(false);
+  const [promoError, setPromoError] = useState('');
+  const [promoSuccess, setPromoSuccess] = useState(false);
 
   const [transferDraft, setTransferDraft] = useState<TransferSettings>({
     transferDeadline: transferSettings?.transferDeadline,
@@ -63,6 +71,25 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
       setTransferError(err?.message || 'Erro ao salvar configurações de transferência.');
     } finally {
       setSavingTransfer(false);
+    }
+  };
+
+  const handleSavePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onUpdatePromoDeadline) return;
+
+    setSavingPromo(true);
+    setPromoError('');
+    setPromoSuccess(false);
+
+    try {
+      await onUpdatePromoDeadline(promoDraft);
+      setPromoSuccess(true);
+      setTimeout(() => setPromoSuccess(false), 3000);
+    } catch (err: any) {
+      setPromoError(err?.message || 'Erro ao salvar a data do lote promocional.');
+    } finally {
+      setSavingPromo(false);
     }
   };
 
@@ -122,6 +149,70 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
             className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           >
             <Save size={18} /> {saving ? 'Salvando...' : 'Salvar Configurações'}
+          </button>
+        </form>
+      </div>
+
+      {/* Lote Promocional */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="bg-emerald-100 p-3 rounded-lg">
+            <Tag size={24} className="text-emerald-600" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-800">Lote Promocional</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              {promoDraft
+                ? <>Desconto válido até <span className="font-bold text-emerald-600">{formatBrDate(promoDraft, true)}</span></>
+                : <span className="text-slate-500">Sem data definida</span>}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-slate-600 text-sm mb-6">
+          Defina até quando o valor promocional com desconto fica disponível. Esta data aparece na página inicial para os inscritos.
+        </p>
+
+        <form onSubmit={handleSavePromo} className="space-y-6">
+          <div className="max-w-xs">
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              <Tag size={16} className="inline mr-2" />
+              Data final do lote promocional
+            </label>
+            <input
+              type="date"
+              value={promoDraft}
+              onChange={(e) => {
+                setPromoDraft(e.target.value);
+                setPromoError('');
+                setPromoSuccess(false);
+              }}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all [color-scheme:light]"
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              Deixe vazio para não exibir data de validade do lote.
+            </p>
+          </div>
+
+          {promoError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-red-700 font-medium text-sm">{promoError}</p>
+            </div>
+          )}
+
+          {promoSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <p className="text-emerald-700 font-medium text-sm">✓ Data salva com sucesso! Já aparece na página inicial.</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={savingPromo || !onUpdatePromoDeadline || promoDraft === (promoDeadline || '')}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          >
+            <Save size={18} /> {savingPromo ? 'Salvando...' : 'Salvar Data'}
           </button>
         </form>
       </div>
