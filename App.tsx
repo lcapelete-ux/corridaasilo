@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -173,6 +173,17 @@ const App: React.FC = () => {
       await refreshTeams();
     } catch (e: any) {
       alert(e?.message || 'Erro ao remover equipe.');
+    }
+  };
+
+  const handleRenameTeam = async (oldName: string, newName: string) => {
+    try {
+      await renameTeam(oldName, newName);
+      // Atualiza a lista de equipes e os inscritos (que agora seguem o novo nome)
+      await refreshTeams();
+      await refreshRunners();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao renomear equipe.');
     }
   };
 
@@ -650,6 +661,7 @@ const App: React.FC = () => {
                 officialTeams={officialTeams}
                 onCreateTeam={handleCreateTeam}
                 onDeleteTeam={handleDeleteTeam}
+                onRenameTeam={handleRenameTeam}
               />
             )}
             

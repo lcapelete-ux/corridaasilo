@@ -510,3 +510,33 @@ export const deleteTeam = async (name: string): Promise<void> => {
   const { error } = await supabase.from('teams').delete().eq('name', name);
   if (error) throw friendlyError(error, 'Erro ao remover equipe');
 };
+
+// Renomeia uma equipe e leva junto quem depende do nome dela.
+// Como não há foreign key (team_name é texto livre), atualizamos manualmente:
+// corredores, líderes de equipe e cupons. Fazemos os "filhos" primeiro e a
+// tabela teams por último — assim, se algo falhar no meio, os inscritos já
+// ficam sob o novo nome (correto) e resta no máximo uma equipe vazia antiga.
+// Admin tem permissão (RLS) para atualizar todas essas tabelas, então não
+// depende de migração nova.
+export const renameTeam = async (oldName: string, newName: string): Promise<void> => {
+  const from = oldName;
+  const to = newName.trim();
+  if (!to) throw new Error('O novo nome da equipe não pode ser vazio.');
+  if (to === from) return;
+
+  // 1. Corredores dessa equipe passam a apontar para o novo nome
+  const r = await supabase.from('runners').update({ team_name: to }).eq('team_name', from);
+  if (r.error) throw friendlyError(r.error, 'Erro ao atualizar os inscritos da equipe');
+
+  // 2. Líder de equipe (organizador) ligado a essa academia
+  const o = await supabase.from('organizers').update({ team_name: to }).eq('team_name', from);
+  if (o.error) throw friendlyError(o.error, 'Erro ao atualizar o líder da equipe');
+
+  // 3. Cupons da academia — melhor esforço (tabela pode não existir se a
+  //    migração de cupons ainda não tiver sido rodada; nesse caso, ignoramos)
+  await supabase.from('team_coupons').update({ team_name: to }).eq('team_name', from);
+
+  // 4. Por fim, renomeia a equipe na lista oficial
+  const t = await supabase.from('teams').update({ name: to }).eq('name', from);
+  if (t.error) throw friendlyError(t.error, 'Erro ao renomear a equipe');
+};
