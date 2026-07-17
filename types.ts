@@ -41,11 +41,12 @@ export interface Runner {
 
 export interface TeamCoupon {
   id: string;
-  teamName: string;               // Academia/equipe dona do cupom
+  teamName: string;               // Academia/equipe dona do cupom ('Geral' quando isGlobal)
   code: string;                   // Ex: LUSO10
   discountType: 'fixed' | 'percent';
   value: number;                  // R$ (fixed) ou % (percent)
   blocked?: boolean;              // Bloqueado pelo admin: fica inativo na inscrição
+  isGlobal?: boolean;             // Vale para todos (independe da equipe selecionada)
 }
 
 export type SponsorType = 'Camiseta' | 'Medalha';

@@ -90,8 +90,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
-      // Mudou o nome da equipe digitado: cupom aplicado deixa de valer
-      if (name === 'teamName' && appliedCoupon) {
+      // Mudou a equipe: cupom de academia deixa de valer (o geral continua)
+      if (name === 'teamName' && appliedCoupon && !appliedCoupon.isGlobal) {
         setAppliedCoupon(null);
         setCouponError('');
       }
@@ -135,10 +135,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       setIsCustomTeam(false);
       setFormData(prev => ({ ...prev, teamName: value }));
     }
-    // Trocou de academia: o cupom precisa ser validado de novo
-    setAppliedCoupon(null);
-    setCouponInput('');
-    setCouponError('');
+    // Trocou de academia: cupom de academia precisa ser validado de novo.
+    // O cupom geral vale para qualquer equipe, então é mantido.
+    if (!appliedCoupon?.isGlobal) {
+      setAppliedCoupon(null);
+      setCouponInput('');
+      setCouponError('');
+    }
   };
 
   const handleApplyCoupon = async () => {
@@ -166,8 +169,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
         return;
       }
 
-      if (coupon.teamName.toLowerCase() !== formData.teamName.toLowerCase()) {
-        setCouponError(`Este cupom não pertence à academia selecionada (${formData.teamName || 'nenhuma'}).`);
+      // Cupom geral vale para qualquer um; cupom de academia precisa casar a equipe
+      if (!coupon.isGlobal && coupon.teamName.toLowerCase() !== formData.teamName.toLowerCase()) {
+        setCouponError(`Este cupom é exclusivo da academia ${coupon.teamName}. Selecione essa equipe para usá-lo.`);
         setAppliedCoupon(null);
         return;
       }
@@ -241,11 +245,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-  // Cupons da equipe selecionada (só na área restrita, quando App passa a lista).
-  // Servem para o botão de aplicar com um clique, sem digitar o código.
-  const teamCoupons = (coupons || []).filter(
-    c => formData.teamName && formData.teamName !== 'Avulso'
-      && c.teamName.toLowerCase() === formData.teamName.toLowerCase()
+  // Cupons para o botão de aplicar com um clique (área restrita): cupom geral
+  // (vale para todos) + cupom da equipe selecionada. Só os não bloqueados.
+  const teamCoupons = (coupons || []).filter(c =>
+    !c.blocked && (
+      c.isGlobal
+      || (formData.teamName && formData.teamName !== 'Avulso'
+        && c.teamName.toLowerCase() === formData.teamName.toLowerCase())
+    )
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -695,11 +702,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
               </div>
             </div>
 
-            {/* Cupom de Desconto da Academia */}
-            {formData.teamName && formData.teamName !== 'Avulso' && (
+            {/* Cupom de desconto (da academia ou geral) — disponível para todos */}
+            {(
               <div className="col-span-2 animate-fade-in">
                 <label className={`${labelClass} flex items-center gap-1`}>
-                  <Ticket size={14} /> Cupom da Academia <span className={isPublicView ? 'text-slate-500 font-normal' : 'text-slate-400 font-normal'}>(opcional)</span>
+                  <Ticket size={14} /> Cupom de desconto <span className={isPublicView ? 'text-slate-500 font-normal' : 'text-slate-400 font-normal'}>(opcional)</span>
                 </label>
 
                 {isSeniorRegistrant ? (
@@ -728,7 +735,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                         <p className={`text-xs ${isPublicView ? 'text-emerald-500/80' : 'text-emerald-600'}`}>
                           Desconto de {appliedCoupon.discountType === 'percent'
                             ? `${appliedCoupon.value}%`
-                            : `R$ ${fmt(appliedCoupon.value)}`} — Academia {appliedCoupon.teamName}
+                            : `R$ ${fmt(appliedCoupon.value)}`} — {appliedCoupon.isGlobal ? 'Cupom geral' : `Academia ${appliedCoupon.teamName}`}
                         </p>
                       </div>
                     </div>
