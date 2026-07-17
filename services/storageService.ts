@@ -419,6 +419,7 @@ interface CouponRow {
   discount_type: 'fixed' | 'percent';
   value: number;
   blocked?: boolean;
+  is_global?: boolean;
 }
 
 const couponFromRow = (c: CouponRow): TeamCoupon => ({
@@ -428,6 +429,7 @@ const couponFromRow = (c: CouponRow): TeamCoupon => ({
   discountType: c.discount_type,
   value: Number(c.value),
   blocked: c.blocked ?? false,
+  isGlobal: c.is_global ?? false,
 });
 
 export const getCoupons = async (): Promise<TeamCoupon[]> => {
@@ -437,26 +439,36 @@ export const getCoupons = async (): Promise<TeamCoupon[]> => {
 };
 
 export const saveCoupon = async (coupon: TeamCoupon): Promise<void> => {
-  const { error } = await supabase.from('team_coupons').insert({
+  const row: Record<string, unknown> = {
     id: coupon.id,
     team_name: coupon.teamName,
     code: coupon.code,
     discount_type: coupon.discountType,
     value: coupon.value,
-  });
+    is_global: coupon.isGlobal ?? false,
+  };
+  let { error } = await supabase.from('team_coupons').insert(row);
+  if (error && isUnknownColumnError(error)) {
+    // Migração do cupom geral ainda não rodou: salva sem is_global
+    const { is_global, ...base } = row;
+    ({ error } = await supabase.from('team_coupons').insert(base));
+  }
   if (error) throw friendlyError(error, 'Erro ao salvar cupom');
 };
 
 export const updateCoupon = async (coupon: TeamCoupon): Promise<void> => {
-  const { error } = await supabase
-    .from('team_coupons')
-    .update({
-      team_name: coupon.teamName,
-      code: coupon.code,
-      discount_type: coupon.discountType,
-      value: coupon.value,
-    })
-    .eq('id', coupon.id);
+  const row: Record<string, unknown> = {
+    team_name: coupon.teamName,
+    code: coupon.code,
+    discount_type: coupon.discountType,
+    value: coupon.value,
+    is_global: coupon.isGlobal ?? false,
+  };
+  let { error } = await supabase.from('team_coupons').update(row).eq('id', coupon.id);
+  if (error && isUnknownColumnError(error)) {
+    const { is_global, ...base } = row;
+    ({ error } = await supabase.from('team_coupons').update(base).eq('id', coupon.id));
+  }
   if (error) throw friendlyError(error, 'Erro ao atualizar cupom');
 };
 
@@ -486,6 +498,7 @@ export const findCouponByCode = async (code: string): Promise<TeamCoupon | null>
     code: row.code,
     discountType: row.discount_type,
     value: Number(row.value),
+    isGlobal: row.is_global ?? false,
   };
 };
 

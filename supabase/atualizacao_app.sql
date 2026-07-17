@@ -66,6 +66,11 @@ alter table public.team_coupons add column if not exists blocked boolean not nul
 comment on column public.team_coupons.blocked is
   'Quando true, o cupom fica inativo: não aparece para aplicar nem é aceito';
 
+-- Cupom geral: vale para qualquer pessoa que digitar, sem precisar de equipe.
+alter table public.team_coupons add column if not exists is_global boolean not null default false;
+comment on column public.team_coupons.is_global is
+  'Quando true, o cupom é válido para todos (independe da equipe selecionada)';
+
 alter table public.team_coupons enable row level security;
 
 -- Gestão dos cupons: somente admins (a tela Cupons é só de admin)
@@ -83,14 +88,17 @@ create policy "team_coupons_select_own_team" on public.team_coupons
 -- O formulário de inscrição busca o cupom pelo código digitado. security
 -- definer: funciona para visitantes anônimos sem abrir a tabela inteira.
 -- Cupom bloqueado não é retornado (equivale a "não encontrado").
+-- Retorna is_global: quando true, o cupom vale para qualquer equipe.
+-- (drop necessário porque o tipo de retorno mudou)
+drop function if exists public.find_coupon_by_code(text);
 create or replace function public.find_coupon_by_code(p_code text)
-returns table (id uuid, team_name text, code text, discount_type text, value numeric)
+returns table (id uuid, team_name text, code text, discount_type text, value numeric, is_global boolean)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select c.id, c.team_name, c.code, c.discount_type, c.value
+  select c.id, c.team_name, c.code, c.discount_type, c.value, coalesce(c.is_global, false)
   from public.team_coupons c
   where upper(c.code) = upper(btrim(p_code))
     and coalesce(c.blocked, false) = false;

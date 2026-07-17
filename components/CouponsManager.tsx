@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TeamCoupon } from '../types';
 import { REGISTRATION_PRICE, calcCouponDiscount } from '../constants';
-import { Plus, Trash2, Ticket, Pencil, Flag, BadgePercent, Lock, Unlock } from 'lucide-react';
+import { Plus, Trash2, Ticket, Pencil, Flag, BadgePercent, Lock, Unlock, Globe } from 'lucide-react';
 
 interface CouponsManagerProps {
   coupons: TeamCoupon[];
@@ -24,11 +24,12 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
     teamName: '',
     code: '',
     discountType: 'fixed' as TeamCoupon['discountType'],
-    value: ''
+    value: '',
+    isGlobal: false,
   });
 
   const resetForm = () => {
-    setFormData({ teamName: '', code: '', discountType: 'fixed', value: '' });
+    setFormData({ teamName: '', code: '', discountType: 'fixed', value: '', isGlobal: false });
     setEditingId(null);
   };
 
@@ -42,7 +43,8 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
       teamName: coupon.teamName,
       code: coupon.code,
       discountType: coupon.discountType,
-      value: String(coupon.value)
+      value: String(coupon.value),
+      isGlobal: !!coupon.isGlobal,
     });
     setEditingId(coupon.id);
     setIsFormVisible(true);
@@ -53,8 +55,12 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
     const code = formData.code.trim().toUpperCase().replace(/\s+/g, '');
     const value = parseFloat(formData.value);
 
-    if (!formData.teamName || !code || !value) {
-      alert("Preencha academia, código e valor do desconto.");
+    if (!formData.isGlobal && !formData.teamName) {
+      alert("Selecione a academia ou marque \"Cupom geral (vale para todos)\".");
+      return;
+    }
+    if (!code || !value) {
+      alert("Preencha código e valor do desconto.");
       return;
     }
     if (value <= 0) {
@@ -77,10 +83,14 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
       return;
     }
 
+    // Cupom geral guarda "Geral" como equipe (o vínculo é ignorado na aplicação)
+    const teamName = formData.isGlobal ? 'Geral' : formData.teamName;
+    const payload = { teamName, code, discountType: formData.discountType, value, isGlobal: formData.isGlobal };
+
     if (editingId) {
-      onUpdate({ id: editingId, teamName: formData.teamName, code, discountType: formData.discountType, value });
+      onUpdate({ id: editingId, ...payload });
     } else {
-      onSave({ id: crypto.randomUUID(), teamName: formData.teamName, code, discountType: formData.discountType, value });
+      onSave({ id: crypto.randomUUID(), ...payload });
     }
 
     resetForm();
@@ -123,16 +133,31 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 pb-3 border-b border-slate-800">
             {editingId ? 'Editar Cupom' : 'Novo Cupom'}
           </h3>
+          {/* Cupom geral: vale para todos, sem precisar de equipe */}
+          <label className="flex items-center gap-3 cursor-pointer bg-slate-800/60 border border-slate-700 rounded-lg p-3 mb-4">
+            <input
+              type="checkbox"
+              checked={formData.isGlobal}
+              onChange={e => setFormData({ ...formData, isGlobal: e.target.checked })}
+              className="w-5 h-5 rounded border-slate-600 accent-yellow-400"
+            />
+            <div>
+              <span className="text-sm font-bold text-white block">Cupom geral (vale para todos)</span>
+              <span className="text-xs text-slate-400">Qualquer pessoa que digitar o código ganha o desconto, sem precisar de equipe.</span>
+            </div>
+          </label>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className={labelCls}>Academia</label>
+              <label className={labelCls}>Academia {formData.isGlobal && <span className="text-slate-600 normal-case font-normal">(não usada no cupom geral)</span>}</label>
               <select
-                required
-                className={selectCls}
-                value={formData.teamName}
+                required={!formData.isGlobal}
+                disabled={formData.isGlobal}
+                className={`${selectCls} ${formData.isGlobal ? 'opacity-50 cursor-not-allowed' : ''}`}
+                value={formData.isGlobal ? '' : formData.teamName}
                 onChange={e => setFormData({ ...formData, teamName: e.target.value })}
               >
-                <option value="">Selecione...</option>
+                <option value="">{formData.isGlobal ? 'Todas as equipes' : 'Selecione...'}</option>
                 {teams.map(team => (
                   <option key={team} value={team}>{team}</option>
                 ))}
@@ -202,9 +227,15 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
             coupon.blocked ? 'border-red-500/40 opacity-75' : 'border-slate-800/60 hover:border-yellow-400/30'
           }`}>
             <div className="flex justify-between items-start mb-3">
-              <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide flex items-center gap-1">
-                <Flag size={11} /> {coupon.teamName}
-              </div>
+              {coupon.isGlobal ? (
+                <div className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide flex items-center gap-1">
+                  <Globe size={11} /> Geral · Todos
+                </div>
+              ) : (
+                <div className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide flex items-center gap-1">
+                  <Flag size={11} /> {coupon.teamName}
+                </div>
+              )}
               <div className="flex gap-1">
                 {onToggleBlock && (
                   <button
