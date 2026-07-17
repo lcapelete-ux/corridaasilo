@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Runner } from '../types';
-import { Flag, Users, Award, Plus, Trash2 } from 'lucide-react';
+import { Flag, Users, Award, Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { TeamDetailView } from './TeamDetailView';
 
 interface TeamViewProps {
@@ -8,12 +8,18 @@ interface TeamViewProps {
   officialTeams: string[];
   onCreateTeam: (name: string) => void;
   onDeleteTeam: (name: string) => void;
+  onRenameTeam?: (oldName: string, newName: string) => Promise<void>;
 }
 
-export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCreateTeam, onDeleteTeam }) => {
+export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCreateTeam, onDeleteTeam, onRenameTeam }) => {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Edição inline do nome de uma equipe
+  const [editingTeam, setEditingTeam] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
 
   const teams = useMemo(() => {
     const grouped: Record<string, Runner[]> = {};
@@ -66,6 +72,42 @@ export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCr
     if (confirm(warning)) {
       onDeleteTeam(teamName);
     }
+  };
+
+  const startEdit = (e: React.MouseEvent, teamName: string) => {
+    e.stopPropagation();
+    setEditingTeam(teamName);
+    setEditValue(teamName);
+  };
+
+  const cancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingTeam(null);
+    setEditValue('');
+  };
+
+  const saveEdit = async (e: React.MouseEvent | React.FormEvent, oldName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!onRenameTeam) return;
+    const name = editValue.trim();
+    if (!name || name === oldName) {
+      setEditingTeam(null);
+      return;
+    }
+    if (name.toLowerCase() === 'avulso') {
+      alert('"Avulso" é reservado para quem não tem equipe.');
+      return;
+    }
+    if (officialTeams.some(t => t.toLowerCase() === name.toLowerCase())) {
+      alert('Já existe uma equipe com este nome.');
+      return;
+    }
+    setSavingRename(true);
+    await onRenameTeam(oldName, name);
+    setSavingRename(false);
+    setEditingTeam(null);
+    setEditValue('');
   };
 
   if (selectedTeamName) {
@@ -124,27 +166,60 @@ export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCr
                   <Flag size={20} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-slate-800 truncate">{team.name}</h3>
-                  <p className="text-xs text-slate-500">
-                    {team.members.length > 0 ? `Média de idade: ${team.avgAge} anos` : 'Nenhum inscrito ainda'}
-                  </p>
+                  {editingTeam === team.name ? (
+                    <form onSubmit={(e) => saveEdit(e, team.name)} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        autoFocus
+                        disabled={savingRename}
+                        className="w-full min-w-0 px-2 py-1 bg-white border border-indigo-300 rounded text-slate-900 text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light]"
+                        placeholder="Novo nome"
+                      />
+                      <button type="submit" disabled={savingRename} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors shrink-0" title="Salvar">
+                        <Check size={16} />
+                      </button>
+                      <button type="button" onClick={cancelEdit} disabled={savingRename} className="p-1 rounded text-slate-400 hover:bg-slate-100 transition-colors shrink-0" title="Cancelar">
+                        <X size={16} />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-slate-800 truncate">{team.name}</h3>
+                      <p className="text-xs text-slate-500">
+                        {team.members.length > 0 ? `Média de idade: ${team.avgAge} anos` : 'Nenhum inscrito ainda'}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="bg-white px-2 py-1 rounded-full text-xs font-bold text-slate-600 shadow-sm border border-slate-100 flex items-center gap-1">
-                  <Users size={12} />
-                  {team.members.length}
+              {editingTeam !== team.name && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="bg-white px-2 py-1 rounded-full text-xs font-bold text-slate-600 shadow-sm border border-slate-100 flex items-center gap-1">
+                    <Users size={12} />
+                    {team.members.length}
+                  </div>
+                  {team.isOfficial && onRenameTeam && (
+                    <button
+                      onClick={(e) => startEdit(e, team.name)}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                      title="Editar nome da equipe"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                  {team.isOfficial && (
+                    <button
+                      onClick={(e) => handleDeleteTeam(e, team.name, team.members.length)}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="Remover equipe da lista"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
-                {team.isOfficial && (
-                  <button
-                    onClick={(e) => handleDeleteTeam(e, team.name, team.members.length)}
-                    className="p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    title="Remover equipe da lista"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
 
             <div className="p-4 flex-1 overflow-y-auto max-h-[300px] pointer-events-none">
