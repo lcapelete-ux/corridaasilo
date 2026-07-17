@@ -31,6 +31,8 @@ export interface Runner {
   transferredAt?: string;   // Data ISO da transferência
   couponCode?: string;      // Cupom de desconto aplicado na inscrição
   couponDiscount?: number;  // Valor do desconto em R$ efetivamente aplicado
+  guardianName?: string;    // Nome do pai/mãe/responsável (obrigatório p/ menor de 18)
+  authorizationDoc?: string; // Autorização assinada (base64), anexada junto ao comprovante
 }
 
 export interface TeamCoupon {
