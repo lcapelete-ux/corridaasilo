@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { getRegistrationFee, getRunnerPaidValue, canTransferNow } from '../constants';
+import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getAgeCategory } from '../constants';
 import { prepareProofFile } from '../services/imageUtils';
 import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List, Lock, Settings, Ban } from 'lucide-react';
 
@@ -79,12 +79,13 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       'Nome Completo', 
       'CPF', 
       'Data Nascimento', 
-      'Idade', 
-      'Gênero', 
-      'Cidade', 
-      'Equipe', 
-      'Tamanho Camiseta', 
-      'Email', 
+      'Idade',
+      'Categoria',
+      'Gênero',
+      'Cidade',
+      'Equipe',
+      'Tamanho Camiseta',
+      'Email',
       'Data Inscrição',
       'Pagamento Confirmado'
     ];
@@ -102,6 +103,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         `"${runner.cpf}"`,
         `"${birthDateFormatted}"`,
         `"${runner.age}"`,
+        `"${getAgeCategory(runner.birthDate)}"`,
         `"${runner.gender}"`,
         `"${runner.city}"`,
         `"${runner.teamName}"`,
@@ -544,6 +546,13 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4 text-slate-300">
                       {runner.age} anos <br/>
                       <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">{runner.gender}</span>
+                      {getAgeCategory(runner.birthDate) && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded-full font-bold" title="Categoria (faixa etária)">
+                            🏅 {getAgeCategory(runner.birthDate)}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

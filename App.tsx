@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [officialTeams, setOfficialTeams] = useState<string[]>(PREDEFINED_TEAMS);
   const [raceGroupName, setRaceGroupName] = useState('2ª CORRIDA NOTURNA LSC');
   const [promoDeadline, setPromoDeadline] = useState('2026-08-23');
+  const [registrationDeadline, setRegistrationDeadline] = useState('2026-09-05');
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -133,7 +134,21 @@ const App: React.FC = () => {
     refreshTeams();
     refreshRaceGroupName();
     refreshPromoDeadline();
+    refreshRegistrationDeadline();
   }, []);
+
+  const refreshRegistrationDeadline = async () => {
+    try {
+      setRegistrationDeadline(await getRegistrationDeadline());
+    } catch {
+      // Mantém o valor atual (padrão)
+    }
+  };
+
+  const handleUpdateRegistrationDeadline = async (date: string) => {
+    await updateRegistrationDeadline(date);
+    await refreshRegistrationDeadline();
+  };
 
   const refreshRaceGroupName = async () => {
     try {
@@ -458,6 +473,14 @@ const App: React.FC = () => {
   // Grand Total Revenue (Inscrições + Sponsors + Extra)
   const grandTotalRevenue = totalRegistrationRevenue + totalSponsorRevenue + totalExtraRevenue;
 
+  // Inscrições encerradas? (prazo definido pelo admin já passou) — só afeta o
+  // formulário público; admin/líder continuam podendo cadastrar.
+  const todayIso = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  })();
+  const registrationsClosed = !!registrationDeadline && todayIso > registrationDeadline;
+
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState; icon: any; label: string }) => (
     <button
       onClick={() => {
@@ -526,12 +549,30 @@ const App: React.FC = () => {
         </nav>
 
         <main className="flex-1 p-4 md:p-8 relative z-10">
-           <RegistrationForm
-             onSave={handleSaveRunner}
-             existingTeams={getExistingTeams()}
-             officialTeams={officialTeams}
-             isPublicView={true}
-           />
+           {registrationsClosed ? (
+             <div className="max-w-xl mx-auto my-12 bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-8 text-center">
+               <div className="w-16 h-16 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-5">
+                 <Timer size={30} className="text-red-400" />
+               </div>
+               <h2 className="text-2xl font-black italic text-white mb-2">Inscrições Encerradas</h2>
+               <p className="text-slate-400 text-sm">
+                 O prazo de inscrição para a {raceGroupName} foi encerrado. Para mais informações, procure a organização do evento.
+               </p>
+               <button
+                 onClick={() => setMode('landing')}
+                 className="mt-6 bg-slate-800 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-700 transition-colors"
+               >
+                 Voltar ao Início
+               </button>
+             </div>
+           ) : (
+             <RegistrationForm
+               onSave={handleSaveRunner}
+               existingTeams={getExistingTeams()}
+               officialTeams={officialTeams}
+               isPublicView={true}
+             />
+           )}
 
            <div className="max-w-3xl mx-auto mt-4 mb-8 text-center text-slate-500 text-sm">
              <p className="font-bold text-slate-300">Laranjal Paulista</p>
@@ -737,6 +778,9 @@ const App: React.FC = () => {
                 onUpdateTransferSettings={handleUpdateTransferSettings}
                 promoDeadline={promoDeadline}
                 onUpdatePromoDeadline={handleUpdatePromoDeadline}
+                registrationDeadline={registrationDeadline}
+                onUpdateRegistrationDeadline={handleUpdateRegistrationDeadline}
+                totalRunners={runners.length}
               />
             )}
           </div>

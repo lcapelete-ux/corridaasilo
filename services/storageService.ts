@@ -531,6 +531,26 @@ export const updatePromoDeadline = async (date: string): Promise<void> => {
   if (error) throw friendlyError(error, 'Erro ao salvar data do lote promocional');
 };
 
+// --- Prazo de inscrição: data final definida pelo admin (fecha o formulário público) ---
+
+export const getRegistrationDeadline = async (): Promise<string> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('registration_deadline')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar prazo de inscrição');
+  return (data as { registration_deadline: string | null } | null)?.registration_deadline || '';
+};
+
+export const updateRegistrationDeadline = async (date: string): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ registration_deadline: date || null })
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar prazo de inscrição');
+};
+
 // --- Equipes/Academias oficiais (lista usada pelos formulários) ---
 // Tabela pública de leitura livre (RLS: select para todos, escrita só admin)
 
