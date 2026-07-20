@@ -1,4 +1,4 @@
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo } from '../types';
 import { supabase } from './supabaseClient';
 
 // Todos os dados agora vivem no Supabase (banco central), não mais no
@@ -680,4 +680,42 @@ export const renameTeam = async (oldName: string, newName: string): Promise<void
   // 4. Por fim, renomeia a equipe na lista oficial
   const t = await supabase.from('teams').update({ name: to }).eq('name', from);
   if (t.error) throw friendlyError(t.error, 'Erro ao renomear a equipe');
+};
+
+// --- Logos de patrocinadores do rodapé (leitura pública, escrita só admin) ---
+
+interface SponsorLogoRow {
+  id: string;
+  name: string | null;
+  image_data: string;
+  sort_order: number | null;
+}
+
+const sponsorLogoFromRow = (l: SponsorLogoRow): SponsorLogo => ({
+  id: l.id,
+  name: l.name || undefined,
+  imageData: l.image_data,
+  sortOrder: l.sort_order ?? 0,
+});
+
+export const getSponsorLogos = async (): Promise<SponsorLogo[]> => {
+  const { data, error } = await supabase
+    .from('sponsor_logos')
+    .select('*')
+    .order('sort_order')
+    .order('created_at');
+  if (error) throw friendlyError(error, 'Erro ao carregar logos de patrocinadores');
+  return (data as SponsorLogoRow[]).map(sponsorLogoFromRow);
+};
+
+export const addSponsorLogo = async (imageData: string, name?: string): Promise<void> => {
+  const { error } = await supabase
+    .from('sponsor_logos')
+    .insert({ image_data: imageData, name: name?.trim() || null });
+  if (error) throw friendlyError(error, 'Erro ao salvar o logo');
+};
+
+export const deleteSponsorLogo = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('sponsor_logos').delete().eq('id', id);
+  if (error) throw friendlyError(error, 'Erro ao remover o logo');
 };
