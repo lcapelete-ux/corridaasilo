@@ -637,6 +637,16 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   <option key={s} value={s} className={optionClass}>{s}</option>
                 ))}
               </select>
+              <div className={`mt-2 flex items-start gap-2 rounded-lg px-3 py-2 border text-xs ${
+                isPublicView
+                  ? 'bg-slate-800/60 border-slate-700 text-slate-400'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                <AlertCircle size={14} className={`shrink-0 mt-0.5 ${isPublicView ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                <span>
+                  O tamanho aqui é apenas uma <strong>estimativa</strong>. A camiseta é entregue <strong>por ordem de retirada do kit</strong>, conforme a disponibilidade dos tamanhos no dia.
+                </span>
+              </div>
             </div>
 
             {/* Email */}
