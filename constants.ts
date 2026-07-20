@@ -9,6 +9,12 @@ export const MODALITIES: { value: RaceModality; label: string; distance: string;
 export const modalityLabel = (m?: string): string =>
   m === '3k' ? 'Caminhada 3 km' : 'Corrida 5 km';
 
+// Telas da área restrita que o admin pode "liberar" para um organizador.
+// (chave = ViewState). Extensível: basta acrescentar itens aqui.
+export const GRANTABLE_VIEWS: { key: string; label: string }[] = [
+  { key: 'kits', label: 'Entrega de Kits' },
+];
+
 // Valores da inscrição da 2ª Corrida Noturna LSC
 export const REGISTRATION_PRICE = 69.90;
 export const REGISTRATION_PRICE_SENIOR = 35.00; // Desconto 60+

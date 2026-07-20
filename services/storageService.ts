@@ -74,6 +74,8 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   guardianName: r.guardian_name || undefined,
   authorizationDoc: r.authorization_doc || undefined,
   modality: (r.modality as Runner['modality']) || undefined,
+  kitDelivered: (r as any).kit_delivered ?? undefined,
+  kitDeliveredAt: (r as any).kit_delivered_at || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -155,6 +157,40 @@ export const updateRunner = async (runner: Runner): Promise<void> => {
 export const deleteRunner = async (id: string): Promise<void> => {
   const { error } = await supabase.from('runners').delete().eq('id', id);
   if (error) throw friendlyError(error, 'Erro ao remover inscrição');
+};
+
+// --- Entrega de Kits (via RPC: admin ou quem tem a permissão 'kits') ---
+export interface KitRunner {
+  id: string;
+  fullName: string;
+  cpf: string;
+  teamName: string;
+  modality?: string;
+  shirtSize: string;
+  isPaid: boolean;
+  kitDelivered: boolean;
+  kitDeliveredAt?: string;
+}
+
+export const listKitRunners = async (): Promise<KitRunner[]> => {
+  const { data, error } = await supabase.rpc('list_kit_runners');
+  if (error) throw friendlyError(error, 'Erro ao carregar atletas para entrega de kits');
+  return ((data as any[]) || []).map(r => ({
+    id: r.id,
+    fullName: r.full_name,
+    cpf: r.cpf,
+    teamName: r.team_name,
+    modality: r.modality || undefined,
+    shirtSize: r.shirt_size,
+    isPaid: r.is_paid,
+    kitDelivered: r.kit_delivered ?? false,
+    kitDeliveredAt: r.kit_delivered_at || undefined,
+  }));
+};
+
+export const setKitDelivered = async (runnerId: string, delivered: boolean): Promise<void> => {
+  const { error } = await supabase.rpc('set_kit_delivered', { p_runner_id: runnerId, p_delivered: delivered });
+  if (error) throw friendlyError(error, 'Erro ao registrar a entrega do kit');
 };
 
 // Busca/anexo de comprovante pelo CPF (telas públicas) — via RPC com
@@ -357,6 +393,7 @@ const organizerFromRow = (o: OrganizerRow): Organizer => ({
   username: o.username,
   role: o.role,
   phone: o.phone || undefined,
+  permissions: (o as any).permissions ?? [],
 });
 
 export const getOrganizers = async (): Promise<Organizer[]> => {
@@ -366,15 +403,19 @@ export const getOrganizers = async (): Promise<Organizer[]> => {
 };
 
 export const updateOrganizer = async (organizer: Organizer): Promise<void> => {
-  const { error } = await supabase
-    .from('organizers')
-    .update({
-      name: organizer.name,
-      team_name: organizer.teamName,
-      username: organizer.username,
-      phone: organizer.phone || null,
-    })
-    .eq('id', organizer.id);
+  const row: Record<string, unknown> = {
+    name: organizer.name,
+    team_name: organizer.teamName,
+    username: organizer.username,
+    phone: organizer.phone || null,
+  };
+  if (organizer.permissions) row.permissions = organizer.permissions;
+  let { error } = await supabase.from('organizers').update(row).eq('id', organizer.id);
+  if (error && isUnknownColumnError(error)) {
+    // Coluna permissions ainda não existe (migração pendente): salva sem ela
+    const { permissions, ...base } = row;
+    ({ error } = await supabase.from('organizers').update(base).eq('id', organizer.id));
+  }
   if (error) throw friendlyError(error, 'Erro ao atualizar organizador');
 };
 

@@ -14,10 +14,11 @@ import { ExtraRevenueManager } from './components/ExtraRevenueManager';
 import { OrganizersManager } from './components/OrganizersManager';
 import { CouponsManager } from './components/CouponsManager';
 import { SettingsManager } from './components/SettingsManager';
+import { KitDelivery } from './components/KitDelivery';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -98,11 +99,26 @@ const App: React.FC = () => {
         const user = data.session?.user;
         if (!user) return;
 
-        const { data: profile } = await supabase
-          .from('organizers')
-          .select('name, username, role, team_name')
-          .eq('id', user.id)
-          .single();
+        // permissions pode não existir se a migração de kits não rodou → busca
+        // resiliente: tenta com permissions e cai para sem ela se der erro.
+        let profile: any = null;
+        {
+          const withPerms = await supabase
+            .from('organizers')
+            .select('name, username, role, team_name, permissions')
+            .eq('id', user.id)
+            .single();
+          if (withPerms.error) {
+            const fallback = await supabase
+              .from('organizers')
+              .select('name, username, role, team_name')
+              .eq('id', user.id)
+              .single();
+            profile = fallback.data;
+          } else {
+            profile = withPerms.data;
+          }
+        }
 
         if (!profile) return;
 
@@ -110,6 +126,7 @@ const App: React.FC = () => {
           username: profile.name || profile.username,
           role: profile.role,
           teamAccess: profile.role === 'team_leader' ? profile.team_name : undefined,
+          permissions: profile.permissions || [],
         };
         setUserSession(session);
         loadDataForSession(session);
@@ -632,6 +649,11 @@ const App: React.FC = () => {
 
           <NavItem target="registration" icon={UserPlus} label="Novo Cadastro" />
 
+          {/* Entrega de Kits: admin sempre; organizador só se o admin liberou */}
+          {(userSession?.role === 'admin' || userSession?.permissions?.includes('kits')) && (
+            <NavItem target="kits" icon={Package} label="Entrega de Kits" />
+          )}
+
           {userSession?.role === 'admin' && (
             <>
               <NavItem target="teams" icon={Flag} label="Equipes" />
@@ -700,6 +722,10 @@ const App: React.FC = () => {
                 userSession={userSession}
                 coupons={coupons}
               />
+            )}
+
+            {currentView === 'kits' && (userSession?.role === 'admin' || userSession?.permissions?.includes('kits')) && (
+              <KitDelivery />
             )}
             
             {currentView === 'runners' && (
