@@ -63,6 +63,14 @@ export interface Sponsor {
   receiptImage?: string; // Base64 string for demo purposes
 }
 
+// Logo de patrocinador exibido no rodapé do site (só imagem, leitura pública)
+export interface SponsorLogo {
+  id: string;
+  name?: string;        // rótulo/alt (opcional)
+  imageData: string;    // data URL base64 do logo
+  sortOrder?: number;
+}
+
 export interface Expense {
   id: string;
   description: string;
@@ -108,4 +116,4 @@ export interface TransferSettings {
   transfersBlocked: boolean; // Bloqueio manual imediato definido pelo admin
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits';
+export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos';

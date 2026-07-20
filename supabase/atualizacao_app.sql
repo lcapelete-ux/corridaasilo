@@ -501,6 +501,27 @@ end;
 $$;
 grant execute on function public.set_kit_delivered(uuid, boolean) to authenticated;
 
+-- 11. Logos de patrocinadores exibidos no rodapé do site --------------------
+-- Leitura pública (o rodapé é visto por visitante anônimo) e escrita só admin,
+-- mesmo padrão de teams/app_settings. Imagem em base64 (data URL), como os
+-- demais uploads do app.
+create table if not exists public.sponsor_logos (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  image_data text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.sponsor_logos enable row level security;
+
+drop policy if exists "sponsor_logos_select_all" on public.sponsor_logos;
+create policy "sponsor_logos_select_all" on public.sponsor_logos
+  for select using (true);
+drop policy if exists "sponsor_logos_admin_write" on public.sponsor_logos;
+create policy "sponsor_logos_admin_write" on public.sponsor_logos
+  for all using (public.is_admin()) with check (public.is_admin());
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

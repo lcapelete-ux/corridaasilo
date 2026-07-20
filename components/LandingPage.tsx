@@ -5,6 +5,7 @@ import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 import { formatBrDate } from '../constants';
+import { SponsorLogo } from '../types';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -12,9 +13,10 @@ interface LandingPageProps {
   onOpenProofUpload: () => void;
   raceGroupName?: string;
   promoDeadline?: string;
+  sponsorLogos?: SponsorLogo[];
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [] }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
   // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
@@ -214,12 +216,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Logos/Footer */}
       <footer className="relative z-10 py-6 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center px-6 gap-4">
-           <div className="flex items-center gap-6">
+           {/* Sicredi + logos dos patrocinadores (quebram em 2-3 linhas se houver muitos) */}
+           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
               <div className="bg-white rounded px-3 py-1.5 flex items-center">
                 <img src={sicrediLogo} alt="Sicredi" className="h-8 md:h-10 w-auto object-contain" />
               </div>
+              {sponsorLogos.map(logo => (
+                <div key={logo.id} className="bg-white rounded px-3 py-1.5 flex items-center">
+                  <img src={logo.imageData} alt={logo.name || 'Patrocinador'} className="h-8 md:h-10 w-auto object-contain" />
+                </div>
+              ))}
            </div>
-           <div className="text-slate-600 text-xs font-bold uppercase tracking-widest">
+           <div className="text-slate-600 text-xs font-bold uppercase tracking-widest shrink-0">
              Realização: Lar São Cristóvão
            </div>
         </div>

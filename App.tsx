@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline } from './services/storageService';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -15,10 +15,11 @@ import { OrganizersManager } from './components/OrganizersManager';
 import { CouponsManager } from './components/CouponsManager';
 import { SettingsManager } from './components/SettingsManager';
 import { KitDelivery } from './components/KitDelivery';
+import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -42,6 +43,7 @@ const App: React.FC = () => {
   const [raceGroupName, setRaceGroupName] = useState('2ª CORRIDA NOTURNA LSC');
   const [promoDeadline, setPromoDeadline] = useState('2026-08-23');
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-09-05');
+  const [sponsorLogos, setSponsorLogos] = useState<SponsorLogo[]>([]);
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -152,7 +154,32 @@ const App: React.FC = () => {
     refreshRaceGroupName();
     refreshPromoDeadline();
     refreshRegistrationDeadline();
+    refreshSponsorLogos();
   }, []);
+
+  // Logos do rodapé: leitura pública. Se a migração ainda não rodou, engole o
+  // erro e o rodapé segue só com o Sicredi.
+  const refreshSponsorLogos = async () => {
+    try {
+      setSponsorLogos(await getSponsorLogos());
+    } catch {
+      // Mantém vazio (rodapé só com Sicredi)
+    }
+  };
+
+  const handleAddSponsorLogo = async (imageData: string, name?: string) => {
+    await addSponsorLogo(imageData, name); // erro propaga para o manager avisar
+    await refreshSponsorLogos();
+  };
+
+  const handleDeleteSponsorLogo = async (id: string) => {
+    try {
+      await deleteSponsorLogo(id);
+      await refreshSponsorLogos();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao remover o logo.');
+    }
+  };
 
   const refreshRegistrationDeadline = async () => {
     try {
@@ -524,6 +551,7 @@ const App: React.FC = () => {
         onOpenProofUpload={() => setMode('proof_upload')}
         raceGroupName={raceGroupName}
         promoDeadline={promoDeadline}
+        sponsorLogos={sponsorLogos}
       />
     );
   }
@@ -673,6 +701,7 @@ const App: React.FC = () => {
               <div className="py-3">
                 <div className="h-px bg-slate-800/80 w-full" />
               </div>
+              <NavItem target="sponsor_logos" icon={ImageIcon} label="Logos do Site" />
               <NavItem target="settings" icon={Settings} label="Configurações" />
             </>
           )}
@@ -807,6 +836,14 @@ const App: React.FC = () => {
                 registrationDeadline={registrationDeadline}
                 onUpdateRegistrationDeadline={handleUpdateRegistrationDeadline}
                 totalRunners={runners.length}
+              />
+            )}
+
+            {currentView === 'sponsor_logos' && (
+              <SponsorLogosManager
+                logos={sponsorLogos}
+                onAdd={handleAddSponsorLogo}
+                onDelete={handleDeleteSponsorLogo}
               />
             )}
           </div>
