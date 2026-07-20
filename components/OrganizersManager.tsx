@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Organizer } from '../types';
-import { Shield, Plus, Trash2, User, Key, Flag, Phone, Pencil, Mail, CheckCircle, Copy, Check, X } from 'lucide-react';
+import { GRANTABLE_VIEWS } from '../constants';
+import { Shield, Plus, Trash2, User, Key, Flag, Phone, Pencil, Mail, CheckCircle, Copy, Check, X, Monitor } from 'lucide-react';
 
 interface OrganizersManagerProps {
   organizers: Organizer[];
@@ -34,7 +35,7 @@ const emptyCreateForm = {
   role: 'team_leader' as 'admin' | 'team_leader',
 };
 
-const emptyEditForm = { name: '', teamName: '', username: '', phone: '' };
+const emptyEditForm = { name: '', teamName: '', username: '', phone: '', permissions: [] as string[] };
 
 export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers, teams, onCreateLogin, onUpdate, onDelete }) => {
   // --- Criar novo login ---
@@ -50,9 +51,18 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
   const [editForm, setEditForm] = useState(emptyEditForm);
 
   const handleEdit = (org: Organizer) => {
-    setEditForm({ name: org.name, teamName: org.teamName, username: org.username, phone: org.phone || '' });
+    setEditForm({ name: org.name, teamName: org.teamName, username: org.username, phone: org.phone || '', permissions: org.permissions || [] });
     setEditingId(org.id);
     setIsCreateVisible(false);
+  };
+
+  const togglePermission = (key: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      permissions: prev.permissions.includes(key)
+        ? prev.permissions.filter(p => p !== key)
+        : [...prev.permissions, key],
+    }));
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -363,6 +373,35 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} className={inputIconCls} />
               </div>
             </div>
+
+            {/* Telas liberadas (para líderes; admin já tem acesso total) */}
+            {organizers.find(o => o.id === editingId)?.role !== 'admin' && (
+              <div className="col-span-1 md:col-span-2">
+                <label className={`${labelCls} flex items-center gap-1.5`}>
+                  <Monitor size={13} /> Telas liberadas na área restrita
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {GRANTABLE_VIEWS.map(v => {
+                    const on = editForm.permissions.includes(v.key);
+                    return (
+                      <label
+                        key={v.key}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                          on ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <input type="checkbox" checked={on} onChange={() => togglePermission(v.key)} className="w-4 h-4 rounded border-slate-600 accent-emerald-500" />
+                        <span className="text-sm font-bold">{v.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">
+                  O líder já vê "Corredores" e "Novo Cadastro". Marque telas extras para liberar (ex.: Entrega de Kits).
+                </p>
+              </div>
+            )}
+
             <div className="col-span-1 md:col-span-2 pt-4 flex justify-end gap-3 border-t border-slate-800">
               <button type="button" onClick={() => { setEditingId(null); setEditForm(emptyEditForm); }} className="px-4 py-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg text-sm font-medium transition-all">
                 Cancelar
@@ -413,6 +452,18 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                   <Phone size={12} /> {org.phone}
                 </p>
+              )}
+              {org.role !== 'admin' && org.permissions && org.permissions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {org.permissions.map(p => {
+                    const v = GRANTABLE_VIEWS.find(g => g.key === p);
+                    return (
+                      <span key={p} className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                        <Monitor size={10} /> {v?.label || p}
+                      </span>
+                    );
+                  })}
+                </div>
               )}
               <div className="mt-4 pt-3 border-t border-slate-800">
                 <p className="text-xs text-slate-600 font-bold uppercase tracking-wider mb-2">Login</p>

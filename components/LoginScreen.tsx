@@ -47,14 +47,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
         return;
       }
 
-      // 3. Busca o perfil (papel + equipe) na tabela organizers
-      const { data: profile, error: profileError } = await supabase
+      // 3. Busca o perfil (papel + equipe + telas liberadas) na tabela organizers.
+      //    Resiliente: se a coluna permissions ainda não existe, busca sem ela.
+      let profile: any = null;
+      const withPerms = await supabase
         .from('organizers')
-        .select('name, username, role, team_name')
+        .select('name, username, role, team_name, permissions')
         .eq('id', authData.user.id)
         .single();
+      if (withPerms.error) {
+        const fallback = await supabase
+          .from('organizers')
+          .select('name, username, role, team_name')
+          .eq('id', authData.user.id)
+          .single();
+        profile = fallback.data;
+      } else {
+        profile = withPerms.data;
+      }
 
-      if (profileError || !profile) {
+      if (!profile) {
         await supabase.auth.signOut();
         setError('Login sem perfil de organizador. Fale com o administrador.');
         setLoading(false);
@@ -65,6 +77,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
         username: profile.name || profile.username,
         role: profile.role,
         teamAccess: profile.role === 'team_leader' ? profile.team_name : undefined,
+        permissions: profile.permissions || [],
       });
     } catch {
       setError('Falha na conexão. Verifique sua internet e tente novamente.');

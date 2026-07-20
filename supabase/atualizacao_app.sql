@@ -429,6 +429,78 @@ create trigger trg_enforce_runner_update_rules
   before update on public.runners
   for each row execute function public.enforce_runner_update_rules();
 
+-- 10. Permissões de tela + Entrega de Kits ----------------------------------
+-- O admin pode "liberar telas" da área restrita para um organizador, gravando
+-- as chaves das telas em organizers.permissions (ex.: {'kits'}).
+alter table public.organizers add column if not exists permissions text[] not null default '{}';
+comment on column public.organizers.permissions is
+  'Telas da área restrita liberadas pelo admin para este usuário (ex.: kits)';
+
+-- Controle de entrega do kit por atleta
+alter table public.runners add column if not exists kit_delivered boolean not null default false;
+alter table public.runners add column if not exists kit_delivered_at timestamptz;
+comment on column public.runners.kit_delivered is
+  'Kit já entregue ao atleta (baixa feita na tela de Entrega de Kits)';
+
+-- Caller tem permissão para uma tela? Admin sempre; ou consta em permissions.
+create or replace function public.has_view_permission(p_view text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.is_admin() or exists (
+    select 1 from public.organizers o
+    where o.id = auth.uid() and p_view = any(o.permissions)
+  );
+$$;
+grant execute on function public.has_view_permission(text) to authenticated;
+
+-- Lista os atletas para a tela de kits (admin ou quem tem a permissão 'kits').
+-- security definer: enxerga todos os atletas, não só os da própria equipe.
+create or replace function public.list_kit_runners()
+returns table (
+  id uuid, full_name text, cpf text, team_name text,
+  modality text, shirt_size text, is_paid boolean,
+  kit_delivered boolean, kit_delivered_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.id, r.full_name, r.cpf, r.team_name,
+         r.modality, r.shirt_size, r.is_paid,
+         r.kit_delivered, r.kit_delivered_at
+  from public.runners r
+  where public.has_view_permission('kits')
+  order by r.full_name;
+$$;
+grant execute on function public.list_kit_runners() to authenticated;
+
+-- Dá baixa (ou desfaz) na entrega do kit de um atleta.
+create or replace function public.set_kit_delivered(p_runner_id uuid, p_delivered boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.has_view_permission('kits') then
+    raise exception 'Sem permissão para dar baixa em kits.';
+  end if;
+  update public.runners
+     set kit_delivered = p_delivered,
+         kit_delivered_at = case when p_delivered then now() else null end
+   where id = p_runner_id;
+  if not found then
+    raise exception 'Atleta não encontrado.';
+  end if;
+end;
+$$;
+grant execute on function public.set_kit_delivered(uuid, boolean) to authenticated;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

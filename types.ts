@@ -37,6 +37,8 @@ export interface Runner {
   couponDiscount?: number;  // Valor do desconto em R$ efetivamente aplicado
   guardianName?: string;    // Nome do pai/mãe/responsável (obrigatório p/ menor de 18)
   authorizationDoc?: string; // Autorização assinada (base64), anexada junto ao comprovante
+  kitDelivered?: boolean;   // Kit já entregue ao atleta
+  kitDeliveredAt?: string;  // Quando o kit foi entregue (ISO)
 }
 
 export interface TeamCoupon {
@@ -85,6 +87,7 @@ export interface Organizer {
   role?: 'admin' | 'team_leader';
   password?: string; // Legado (autenticação agora é pelo Supabase Auth)
   phone?: string;    // Contato
+  permissions?: string[]; // Telas extras liberadas pelo admin (ex.: ['kits'])
 }
 
 export interface TeamStats {
@@ -97,6 +100,7 @@ export interface UserSession {
   username: string;
   role: 'admin' | 'team_leader';
   teamAccess?: string; // Se for team_leader, qual equipe ele gerencia
+  permissions?: string[]; // Telas extras liberadas pelo admin (ex.: ['kits'])
 }
 
 export interface TransferSettings {
@@ -104,4 +108,4 @@ export interface TransferSettings {
   transfersBlocked: boolean; // Bloqueio manual imediato definido pelo admin
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings';
+export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits';
