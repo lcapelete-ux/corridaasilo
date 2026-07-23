@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { findRunnerByCpf, attachPaymentProof } from '../services/storageService';
-import { prepareProofFile } from '../services/imageUtils';
+import { prepareProofFile, isPdfProof } from '../services/imageUtils';
 import { isMinorAtEvent } from '../constants';
 import { Runner } from '../types';
 
@@ -223,7 +223,7 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
                   onClick={() => setShowProofFull(true)}
                   className="block w-full group relative rounded-xl overflow-hidden border border-slate-700"
                 >
-                  {existingProof.startsWith('data:application/pdf') ? (
+                  {isPdfProof(existingProof) ? (
                     <div className="bg-slate-800 py-8 flex flex-col items-center text-slate-300">
                       <FileText size={36} />
                       <span className="text-sm font-bold mt-2">Ver comprovante (PDF)</span>
@@ -400,7 +400,7 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setShowProofFull(false)}
         >
-          {existingProof.startsWith('data:application/pdf') ? (
+          {isPdfProof(existingProof) ? (
             <iframe src={existingProof} title="Comprovante" className="w-full max-w-2xl h-[80vh] rounded-lg bg-white" onClick={e => e.stopPropagation()} />
           ) : (
             <img src={existingProof} alt="Comprovante" className="max-w-full max-h-[85vh] rounded-lg object-contain" onClick={e => e.stopPropagation()} />
