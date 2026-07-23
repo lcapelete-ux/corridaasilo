@@ -594,6 +594,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           </span>
                         )}
 
+                        {runner.paidNoProof && !runner.isPaid && (
+                          <span
+                            className="inline-flex items-center gap-1 w-fit bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                            title={runner.paidNoProofAt ? `Avisado em ${new Date(runner.paidNoProofAt).toLocaleString('pt-BR')}` : undefined}
+                          >
+                            <AlertCircle size={10} /> Alega ter pago
+                          </span>
+                        )}
+
                         {runner.paymentProof ? (
                           <button
                             onClick={() => setSelectedRunner(runner)}
@@ -885,10 +894,18 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                       <div>
                         <p className="text-xs text-slate-500 font-bold">Status Atual</p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className={`text-lg font-bold ${selectedRunner.isPaid ? 'text-emerald-600' : 'text-amber-500'}`}>
                             {selectedRunner.isPaid ? 'PAGAMENTO CONFIRMADO' : 'AGUARDANDO CONFIRMAÇÃO'}
                           </p>
+                          {selectedRunner.paidNoProof && !selectedRunner.isPaid && (
+                            <span
+                              className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-amber-300"
+                              title={selectedRunner.paidNoProofAt ? `Avisado em ${new Date(selectedRunner.paidNoProofAt).toLocaleString('pt-BR')}` : undefined}
+                            >
+                              <AlertCircle size={10} /> Alega ter pago
+                            </span>
+                          )}
                           {canEditFinancials && (
                             <button 
                               onClick={() => {
@@ -934,6 +951,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     ) : (
                       <div className="text-center py-8 border-2 border-dashed border-slate-300 rounded-lg text-slate-400 text-sm bg-slate-50/50">
                         Nenhum comprovante foi anexado ainda.
+                        {selectedRunner.paidNoProof && (
+                          <p className="text-amber-600 font-semibold mt-1">
+                            O atleta avisou que já pagou e não conseguiu enviar o comprovante. Confira manualmente.
+                          </p>
+                        )}
                       </div>
                     )}
                  </div>
