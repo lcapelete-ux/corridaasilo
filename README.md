@@ -44,6 +44,24 @@ GEMINI_API_KEY=sua_chave_aqui
 
 Sem a chave, o app funciona normalmente com sugestões pré-definidas.
 
+### Upload de comprovantes (Cloudinary)
+
+Comprovantes de pagamento (e autorização de menores) são enviados para o
+Cloudinary — não ficam no Supabase, para não estourar a cota gratuita do
+banco com centenas de arquivos. Sem estas variáveis, o envio de comprovante
+fica indisponível. No `.env` (ou `.env.local`) na raiz:
+
+```
+VITE_CLOUDINARY_CLOUD_NAME=gdvxqrfr
+VITE_CLOUDINARY_UPLOAD_PRESET=runners_payment_proof_unsigned
+```
+
+O preset precisa existir no Cloudinary (Settings → Upload → Upload presets)
+marcado como **Unsigned** — é o que permite o navegador enviar o arquivo
+direto, sem expor a API secret. Os mesmos valores já estão configurados no
+`netlify.toml` e no workflow do GitHub Pages (`.github/workflows/deploy.yml`);
+não são segredos (o preset unsigned é feito para ficar público no bundle).
+
 ## Deploy (Netlify)
 
 O `netlify.toml` já está configurado: build com `npm run build` e publicação da

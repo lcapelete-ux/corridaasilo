@@ -2,6 +2,10 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  VITE_CLOUDINARY_CLOUD_NAME = "gdvxqrfr"
+  VITE_CLOUDINARY_UPLOAD_PRESET = "runners_payment_proof_unsigned"
+
 # SPA: qualquer rota cai no index.html
 [[redirects]]
   from = "/*"

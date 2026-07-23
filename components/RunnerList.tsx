@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel } from '../constants';
-import { prepareProofFile } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, List, Lock, Settings, Ban } from 'lucide-react';
+import { prepareProofFile, isPdfProof } from '../services/imageUtils';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban } from 'lucide-react';
 
 interface RunnerListProps {
   runners: Runner[];
@@ -493,13 +493,24 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
                   {/* Proof Image */}
                   <div className="p-3 bg-slate-950/40">
-                    <img
-                      src={runner.paymentProof}
-                      alt={`Comprovante de ${runner.fullName}`}
-                      className="w-full rounded-lg border border-slate-800 object-contain max-h-64 bg-slate-950 cursor-zoom-in"
-                      onClick={() => setSelectedRunner(runner)}
-                      title="Clique para ver a ficha completa"
-                    />
+                    {isPdfProof(runner.paymentProof) ? (
+                      <div
+                        onClick={() => setSelectedRunner(runner)}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 py-8 flex flex-col items-center text-slate-300 cursor-zoom-in"
+                        title="Clique para ver a ficha completa"
+                      >
+                        <FileText size={32} />
+                        <span className="text-xs font-bold mt-2">Comprovante (PDF)</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={runner.paymentProof}
+                        alt={`Comprovante de ${runner.fullName}`}
+                        className="w-full rounded-lg border border-slate-800 object-contain max-h-64 bg-slate-950 cursor-zoom-in"
+                        onClick={() => setSelectedRunner(runner)}
+                        title="Clique para ver a ficha completa"
+                      />
+                    )}
                   </div>
                 </div>
               ))}
@@ -906,7 +917,19 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         <p className="text-xs text-slate-500 font-bold mb-2 flex items-center gap-1">
                           <AlertCircle size={12} className="text-indigo-500"/> Comprovante Anexado:
                         </p>
-                        <img src={selectedRunner.paymentProof} alt="Comprovante" className="max-w-full h-auto max-h-[300px] rounded border border-slate-200 object-contain mx-auto bg-white" />
+                        {isPdfProof(selectedRunner.paymentProof) ? (
+                          <a
+                            href={selectedRunner.paymentProof}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col items-center justify-center gap-2 py-8 rounded border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors"
+                          >
+                            <FileText size={28} />
+                            <span className="text-sm font-bold">Abrir comprovante (PDF)</span>
+                          </a>
+                        ) : (
+                          <img src={selectedRunner.paymentProof} alt="Comprovante" className="max-w-full h-auto max-h-[300px] rounded border border-slate-200 object-contain mx-auto bg-white" />
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8 border-2 border-dashed border-slate-300 rounded-lg text-slate-400 text-sm bg-slate-50/50">

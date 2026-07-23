@@ -30,13 +30,13 @@ export interface Runner {
   modality?: RaceModality; // '5k' corrida (padrão) ou '3k' caminhada
   registrationDate: string;
   isPaid?: boolean;
-  paymentProof?: string; // Base64 image string
+  paymentProof?: string; // URL do arquivo no Cloudinary (ou base64 legado, em registros antigos)
   transferredFrom?: string; // Nome do titular anterior (inscrição transferida)
   transferredAt?: string;   // Data ISO da transferência
   couponCode?: string;      // Cupom de desconto aplicado na inscrição
   couponDiscount?: number;  // Valor do desconto em R$ efetivamente aplicado
   guardianName?: string;    // Nome do pai/mãe/responsável (obrigatório p/ menor de 18)
-  authorizationDoc?: string; // Autorização assinada (base64), anexada junto ao comprovante
+  authorizationDoc?: string; // Autorização assinada (URL no Cloudinary), anexada junto ao comprovante
   kitDelivered?: boolean;   // Kit já entregue ao atleta
   kitDeliveredAt?: string;  // Quando o kit foi entregue (ISO)
 }
@@ -60,7 +60,7 @@ export interface Sponsor {
   type: SponsorType;
   position?: string; // Ex: Costas, Manga, Peito
   isPaid: boolean;
-  receiptImage?: string; // Base64 string for demo purposes
+  receiptImage?: string; // URL do arquivo no Cloudinary
 }
 
 // Logo de patrocinador exibido no rodapé do site (só imagem, leitura pública)
