@@ -51,6 +51,7 @@ interface RunnerRow {
   authorization_doc?: string | null;
   modality?: string | null;
   senior_full_price?: boolean | null;
+  extra_donation?: number | null;
 }
 
 const runnerFromRow = (r: RunnerRow): Runner => ({
@@ -76,6 +77,7 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   authorizationDoc: r.authorization_doc || undefined,
   modality: (r.modality as Runner['modality']) || undefined,
   seniorFullPrice: r.senior_full_price ?? undefined,
+  extraDonation: r.extra_donation != null ? Number(r.extra_donation) : undefined,
   kitDelivered: (r as any).kit_delivered ?? undefined,
   kitDeliveredAt: (r as any).kit_delivered_at || undefined,
   paidNoProof: (r as any).paid_no_proof ?? undefined,
@@ -111,6 +113,7 @@ const runnerToRow = (r: Runner) => {
   if (r.authorizationDoc) row.authorization_doc = r.authorizationDoc;
   if (r.modality) row.modality = r.modality;
   if (r.seniorFullPrice) row.senior_full_price = true;
+  if (r.extraDonation != null) row.extra_donation = r.extraDonation;
   return row;
 };
 
@@ -120,7 +123,7 @@ const runnerToRow = (r: Runner) => {
 const MIGRATION_COLUMNS = [
   'phone', 'modality', 'transferred_from', 'transferred_at',
   'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
-  'senior_full_price',
+  'senior_full_price', 'extra_donation',
 ];
 
 const isUnknownColumnError = (error: any): boolean =>

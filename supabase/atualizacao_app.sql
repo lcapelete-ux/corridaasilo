@@ -779,6 +779,12 @@ alter table public.runners add column if not exists senior_full_price boolean no
 comment on column public.runners.senior_full_price is
   'Atleta 60+ que optou por pagar o valor cheio (com desconto de apoiador) em vez da meia-inscrição automática, para ajudar o Lar São Cristóvão';
 
+-- 15. Contribuição extra opcional (ex.: 60+ que escolheu a meia-inscrição mas
+--     quis ajudar com um valor à parte, antes de ir pro Pix) ----------------
+alter table public.runners add column if not exists extra_donation numeric(10, 2);
+comment on column public.runners.extra_donation is
+  'Contribuição extra opcional somada à inscrição (ex.: 60+ que pagou meia mas quis ajudar com um valor à parte)';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

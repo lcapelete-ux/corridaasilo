@@ -111,10 +111,11 @@ export const calcCouponDiscount = (fee: number, coupon: Pick<TeamCoupon, 'discou
   return Math.min(fee, Math.round(raw * 100) / 100);
 };
 
-// Valor efetivamente devido pelo inscrito (inscrição - cupom/desconto de apoiador)
-export const getRunnerPaidValue = (runner: Pick<Runner, 'age' | 'couponDiscount' | 'seniorFullPrice'>): number => {
+// Valor efetivamente devido pelo inscrito (inscrição - cupom/desconto de apoiador + contribuição extra)
+export const getRunnerPaidValue = (runner: Pick<Runner, 'age' | 'couponDiscount' | 'seniorFullPrice' | 'extraDonation'>): number => {
   const fee = getRegistrationFee(runner.age, runner.seniorFullPrice);
-  return Math.max(0, Math.round((fee - (runner.couponDiscount || 0)) * 100) / 100);
+  const afterDiscount = Math.max(0, fee - (runner.couponDiscount || 0));
+  return Math.round((afterDiscount + (runner.extraDonation || 0)) * 100) / 100;
 };
 
 // Se, agora, um líder de equipe pode transferir inscrições (admin sempre pode,

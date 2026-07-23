@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [lastRegisteredAge, setLastRegisteredAge] = useState<number>(0);
   const [lastRegisteredDiscount, setLastRegisteredDiscount] = useState<number>(0);
   const [lastRegisteredSeniorFullPrice, setLastRegisteredSeniorFullPrice] = useState<boolean>(false);
+  const [lastRegisteredExtraDonation, setLastRegisteredExtraDonation] = useState<number>(0);
   
   // Auth State
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -274,6 +275,7 @@ const App: React.FC = () => {
     setLastRegisteredAge(runner.age);
     setLastRegisteredDiscount(runner.couponDiscount || 0);
     setLastRegisteredSeniorFullPrice(!!runner.seniorFullPrice);
+    setLastRegisteredExtraDonation(runner.extraDonation || 0);
 
     if (mode === 'public') {
       setMode('registration_success');
@@ -571,7 +573,7 @@ const App: React.FC = () => {
 
   // RENDER: TELA DE SUCESSO DO PIX
   if (mode === 'registration_success') {
-    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} />;
+    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} />;
   }
 
   // RENDER: FORMULÁRIO PÚBLICO
