@@ -47,6 +47,16 @@ const uploadToCloudinary = async (blob: Blob, filename: string): Promise<string>
 export const isPdfProof = (url?: string | null): boolean =>
   !!url && (url.startsWith('data:application/pdf') || /\.pdf(\?|#|$)/i.test(url));
 
+// Migra um valor antigo (base64 salvo direto no banco) para o Cloudinary,
+// devolvendo a URL. Se já for URL (ou estiver vazio), devolve como está —
+// seguro de chamar de novo em cima de algo já migrado.
+export const migrateBase64ToCloudinary = async (value?: string | null): Promise<string | null> => {
+  if (!value || !value.startsWith('data:')) return value ?? null;
+  const blob = await (await fetch(value)).blob();
+  const filename = blob.type === 'application/pdf' ? 'migrado.pdf' : 'migrado.jpg';
+  return uploadToCloudinary(blob, filename);
+};
+
 const readAsDataURL = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
