@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel } from '../constants';
+import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter } from 'lucide-react';
 
 interface RunnerListProps {
   runners: Runner[];
@@ -16,6 +16,9 @@ interface RunnerListProps {
 // Modal de transferência tem fundo branco: cores explícitas + color-scheme light
 // para o texto não sumir quando o celular está em modo escuro
 const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 outline-none [color-scheme:light]";
+
+// Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
+const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
 export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, userSession, transferSettings, onUpdateTransferSettings }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,12 +36,72 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
-  const filteredRunners = runners.filter(r => 
-    r.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.cpf.includes(searchTerm) ||
-    r.city.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- Filtros e ordenação da Lista ---
+  const [teamFilter, setTeamFilter] = useState('');       // '' = todas as academias
+  const [categoryFilter, setCategoryFilter] = useState(''); // '' = todas as categorias
+  const [modalityFilter, setModalityFilter] = useState<'' | '5k' | '3k'>('');
+  const [paymentFilter, setPaymentFilter] = useState<'todos' | 'meia' | 'inteira' | 'apoiador' | 'pago' | 'pendente'>('todos');
+  const [sortBy, setSortBy] = useState<'padrao' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
+
+  // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
+  const isHalfPrice = (r: Runner) => r.age >= SENIOR_AGE && !r.seniorFullPrice;
+
+  // Ordena categorias: faixas por idade inicial, "70+" na sequência, caminhada por último
+  const categoryOrder = (c: string): number => {
+    if (!c) return 100000;
+    if (c.toLowerCase().startsWith('caminhada')) return 99999;
+    const m = c.match(/^(\d+)/);
+    return m ? parseInt(m[1], 10) : 99998;
+  };
+
+  // Listas para os menus de filtro (só o que realmente existe entre os inscritos)
+  const teamsPresent = Array.from(new Set(runners.map(r => r.teamName).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const categoriesPresent = Array.from(new Set(
+    runners.map(r => getRunnerCategory(r.birthDate, r.modality)).filter(Boolean)
+  )).sort((a, b) => categoryOrder(a) - categoryOrder(b));
+
+  const filteredRunners = runners
+    .filter(r => {
+      const q = searchTerm.toLowerCase();
+      const matchesSearch = !q ||
+        r.fullName.toLowerCase().includes(q) ||
+        r.teamName.toLowerCase().includes(q) ||
+        r.cpf.includes(searchTerm) ||
+        r.city.toLowerCase().includes(q);
+      const matchesTeam = !teamFilter || r.teamName === teamFilter;
+      const matchesCategory = !categoryFilter || getRunnerCategory(r.birthDate, r.modality) === categoryFilter;
+      const matchesModality = !modalityFilter || (r.modality || '5k') === modalityFilter;
+      const matchesPayment =
+        paymentFilter === 'todos' ? true :
+        paymentFilter === 'meia' ? isHalfPrice(r) :
+        paymentFilter === 'apoiador' ? (r.age >= SENIOR_AGE && !!r.seniorFullPrice) :
+        paymentFilter === 'inteira' ? (r.age < SENIOR_AGE) :
+        paymentFilter === 'pago' ? !!r.isPaid :
+        paymentFilter === 'pendente' ? !r.isPaid : true;
+      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'idade_asc': return a.age - b.age;
+        case 'idade_desc': return b.age - a.age;
+        case 'nome': return a.fullName.localeCompare(b.fullName, 'pt-BR');
+        case 'equipe': return a.teamName.localeCompare(b.teamName, 'pt-BR') || a.fullName.localeCompare(b.fullName, 'pt-BR');
+        case 'categoria':
+          return (categoryOrder(getRunnerCategory(a.birthDate, a.modality)) - categoryOrder(getRunnerCategory(b.birthDate, b.modality)))
+            || a.fullName.localeCompare(b.fullName, 'pt-BR');
+        default: return 0;
+      }
+    });
+
+  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sortBy !== 'padrao');
+  const clearFilters = () => {
+    setTeamFilter('');
+    setCategoryFilter('');
+    setModalityFilter('');
+    setPaymentFilter('todos');
+    setSortBy('padrao');
+  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
@@ -521,6 +584,72 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
       {/* Table */}
       {activeTab === 'lista' && (
+      <>
+      {/* Barra de filtros / ordenação */}
+      <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={15} className="text-indigo-400" />
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filtrar e ordenar</span>
+          <span className="text-xs text-slate-500">— mostrando <strong className="text-white">{filteredRunners.length}</strong> de {runners.length}</span>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="ml-auto text-xs font-bold text-slate-500 hover:text-white flex items-center gap-1">
+              <X size={12} /> Limpar filtros
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* Academia */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Academia</label>
+            <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className={filterSelectCls}>
+              <option value="">Todas</option>
+              {teamsPresent.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          {/* Categoria */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Categoria</label>
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={filterSelectCls}>
+              <option value="">Todas</option>
+              {categoriesPresent.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          {/* Modalidade */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Modalidade</label>
+            <select value={modalityFilter} onChange={e => setModalityFilter(e.target.value as '' | '5k' | '3k')} className={filterSelectCls}>
+              <option value="">Todas</option>
+              <option value="5k">🏃 Corrida 5 km</option>
+              <option value="3k">🚶 Caminhada 3 km</option>
+            </select>
+          </div>
+          {/* Tipo de inscrição / pagamento */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Inscrição</label>
+            <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value as typeof paymentFilter)} className={filterSelectCls}>
+              <option value="todos">Todas</option>
+              <option value="meia">Meia inscrição (60+)</option>
+              <option value="apoiador">Apoiador (60+ valor cheio)</option>
+              <option value="inteira">Inteira (abaixo de 60)</option>
+              <option value="pago">Pagamento confirmado</option>
+              <option value="pendente">Pagamento pendente</option>
+            </select>
+          </div>
+          {/* Ordenar */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Ordenar por</label>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className={filterSelectCls}>
+              <option value="padrao">Ordem de inscrição</option>
+              <option value="idade_asc">Idade (menor → maior)</option>
+              <option value="idade_desc">Idade (maior → menor)</option>
+              <option value="categoria">Categoria</option>
+              <option value="nome">Nome (A → Z)</option>
+              <option value="equipe">Academia</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -684,6 +813,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           </table>
         </div>
       </div>
+      </>
       )}
 
       {/* MODAL DE TRANSFERÊNCIA DE INSCRIÇÃO */}
