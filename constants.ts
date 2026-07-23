@@ -16,8 +16,8 @@ export const GRANTABLE_VIEWS: { key: string; label: string }[] = [
 ];
 
 // Valores da inscrição da 2ª Corrida Noturna LSC
-export const REGISTRATION_PRICE = 69.90;
-export const REGISTRATION_PRICE_SENIOR = 35.00; // Desconto 60+
+export const REGISTRATION_PRICE = 74.90;
+export const REGISTRATION_PRICE_SENIOR = 37.45; // Idoso 60+: metade de 74,90 (não acumula cupom)
 export const SENIOR_AGE = 60;
 
 // Regras de idade do regulamento (2ª Corrida Night Run – Asilo São Cristóvão)

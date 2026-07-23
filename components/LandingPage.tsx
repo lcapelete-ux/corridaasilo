@@ -148,7 +148,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
              <span className="text-slate-400 text-xs font-bold uppercase mb-1">Inscrição Individual</span>
              <div className="flex items-start gap-1">
                <span className="text-sm font-bold mt-2">R$</span>
-               <span className="text-5xl font-black text-white group-hover:text-emerald-400 transition-colors">69,90</span>
+               <span className="text-5xl font-black text-white group-hover:text-emerald-400 transition-colors">74,90</span>
              </div>
              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded mt-2 uppercase font-bold tracking-wide border border-emerald-500/20">
                Lote Promocional
