@@ -57,9 +57,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const [couponChecking, setCouponChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Idoso 60+ que abre mão da meia-inscrição para ajudar o Lar São Cristóvão
-  const [seniorFullPrice, setSeniorFullPrice] = useState(false);
-
   // --- Regulamento da prova (obrigatório na inscrição pública) ---
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -103,10 +100,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
         setAppliedCoupon(null);
         setCouponInput('');
         setCouponError('Cupom removido: atletas 60+ já pagam meia inscrição e o desconto não acumula.');
-      }
-      // Nascimento mudou: a escolha de pagar valor de apoiador precisa ser refeita
-      if (name === 'birthDate') {
-        setSeniorFullPrice(false);
       }
     }
   };
@@ -247,10 +240,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const isUnderMinAge = ageRef !== null && ageRef < MIN_AGE;
   // Categoria conforme a modalidade (corrida = faixa etária; caminhada = 3 km)
   const category = getRunnerCategory(formData.birthDate, formData.modality);
-  const baseFee = formData.birthDate ? getRegistrationFee(ageForFee, isSeniorRegistrant && seniorFullPrice) : REGISTRATION_PRICE;
-  const couponDiscountValue = appliedCoupon
-    ? calcCouponDiscount(baseFee, appliedCoupon)
-    : (isSeniorRegistrant && seniorFullPrice ? SENIOR_SUPPORTER_DISCOUNT : 0);
+  const baseFee = formData.birthDate ? getRegistrationFee(ageForFee) : REGISTRATION_PRICE;
+  const couponDiscountValue = appliedCoupon ? calcCouponDiscount(baseFee, appliedCoupon) : 0;
   const finalFee = Math.max(0, baseFee - couponDiscountValue);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
@@ -264,7 +255,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     )
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // seniorSupporterChoice: só é relevante para 60+, vem direto do botão
+  // clicado (Apoiar o Lar x Pagar meia) — evita depender de estado assíncrono.
+  const handleSubmit = async (e: React.SyntheticEvent, seniorSupporterChoice = false) => {
     e.preventDefault();
     if (!formData.fullName || !formData.cpf || !formData.birthDate || !formData.city) {
       alert("Por favor, preencha todos os campos obrigatórios.");
@@ -301,10 +294,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
     // Desconto do cupom sobre o valor da inscrição — 60+ já tem meia inscrição, não acumula cupom
     const isSeniorAtSubmit = ageCalculated >= SENIOR_AGE;
-    const feeForRunner = getRegistrationFee(ageCalculated, isSeniorAtSubmit && seniorFullPrice);
+    const seniorFullPrice = isSeniorAtSubmit && seniorSupporterChoice;
+    const feeForRunner = getRegistrationFee(ageCalculated, seniorFullPrice);
     const discountForRunner = appliedCoupon && !isSeniorAtSubmit
       ? calcCouponDiscount(feeForRunner, appliedCoupon)
-      : (isSeniorAtSubmit && seniorFullPrice ? SENIOR_SUPPORTER_DISCOUNT : 0);
+      : (seniorFullPrice ? SENIOR_SUPPORTER_DISCOUNT : 0);
 
     const newRunner: Runner = {
       id: crypto.randomUUID(),
@@ -323,7 +317,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       isPaid: formData.isPaid,
       paymentProof: formData.paymentProof,
       ...(isMinor && formData.guardianName.trim() && { guardianName: formData.guardianName.trim() }),
-      ...(isSeniorAtSubmit && seniorFullPrice && discountForRunner > 0
+      ...(seniorFullPrice && discountForRunner > 0
         ? { seniorFullPrice: true, couponDiscount: discountForRunner }
         : appliedCoupon && !isSeniorAtSubmit && discountForRunner > 0
           ? { couponCode: appliedCoupon.code, couponDiscount: discountForRunner }
@@ -356,7 +350,6 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setAppliedCoupon(null);
     setCouponInput('');
     setCouponError('');
-    setSeniorFullPrice(false);
     setAgreedToRules(false);
     setRulesError(false);
 
@@ -738,26 +731,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                       : 'bg-slate-50 border-slate-200 text-slate-600'
                   }`}>
                     <AlertCircle size={16} className={`mt-0.5 shrink-0 ${isPublicView ? 'text-yellow-400' : 'text-yellow-600'}`} />
-                    <div className="flex-1">
-                      <span>
-                        {seniorFullPrice ? (
-                          <>Você optou por ajudar o Lar São Cristóvão: <strong>inscrição de apoiador (R$ {fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})</strong>.</>
-                        ) : (
-                          <>Atletas 60+ já pagam <strong>meia inscrição (R$ {fmt(REGISTRATION_PRICE_SENIOR)})</strong> — cupom de academia não se aplica.</>
-                        )}
-                      </span>
-                      <label className={`mt-2 flex items-start gap-2 cursor-pointer select-none ${isPublicView ? 'hover:text-slate-300' : 'hover:text-slate-800'}`}>
-                        <input
-                          type="checkbox"
-                          checked={seniorFullPrice}
-                          onChange={e => setSeniorFullPrice(e.target.checked)}
-                          className="mt-0.5 w-4 h-4 rounded border-slate-500 accent-yellow-400 shrink-0"
-                        />
-                        <span className="text-xs">
-                          Prefiro não usar a meia-inscrição e pagar o valor de apoiador (R$ {fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)}) para ajudar o Lar São Cristóvão.
-                        </span>
-                      </label>
-                    </div>
+                    <span>
+                      Atletas 60+ têm direito à <strong>meia inscrição (R$ {fmt(REGISTRATION_PRICE_SENIOR)})</strong> — cupom de academia não se aplica.
+                      Se preferir, no final do formulário dá pra optar por pagar o valor de apoiador (R$ {fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)}) para ajudar o Lar São Cristóvão.
+                    </span>
                   </div>
                 ) : appliedCoupon ? (
                   <div className={`flex items-center justify-between rounded-lg px-4 py-3 border ${
@@ -852,7 +829,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
           </div>
 
           {/* Resumo do Valor da Inscrição */}
-          {(appliedCoupon || (isSeniorRegistrant && seniorFullPrice)) && (
+          {appliedCoupon && (
             <div className={`mt-6 rounded-xl p-5 border animate-fade-in ${
               isPublicView
                 ? 'bg-slate-800/60 border-slate-700'
@@ -870,7 +847,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 </div>
                 <div className="flex justify-between">
                   <span className={isPublicView ? 'text-emerald-400' : 'text-emerald-600'}>
-                    {appliedCoupon ? `Cupom ${appliedCoupon.code}` : 'Desconto de apoiador (60+)'}
+                    Cupom {appliedCoupon.code}
                   </span>
                   <span className={`font-mono font-bold ${isPublicView ? 'text-emerald-400' : 'text-emerald-600'}`}>− R$ {fmt(couponDiscountValue)}</span>
                 </div>
@@ -992,27 +969,67 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
             </div>
           )}
 
-          <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
-            <button
-              type="submit"
-              disabled={submitting || isUnderMinAge}
-              className={isPublicView
-                ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden disabled:opacity-60 disabled:cursor-wait disabled:hover:scale-100"
-                : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase disabled:opacity-60 disabled:cursor-wait"
-              }
-            >
-              {isPublicView ? (
-                <>
-                  <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
-                  <span className="relative z-10 flex items-center gap-2">
-                    <Save size={20} aria-hidden="true" /> {submitting ? 'Enviando...' : 'Confirmar Inscrição'}
-                  </span>
-                </>
-              ) : (
-                submitting ? 'Salvando...' : 'Confirmar Inscrição'
-              )}
-            </button>
-          </div>
+          {isSeniorRegistrant ? (
+            <div className={`pt-6 flex flex-col items-stretch md:items-end gap-3 ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
+              {/* Opção em destaque: apoiar o Lar São Cristóvão (maior, cor original do site) */}
+              <button
+                type="button"
+                onClick={e => handleSubmit(e, true)}
+                disabled={submitting || isUnderMinAge}
+                className={isPublicView
+                  ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden disabled:opacity-60 disabled:cursor-wait disabled:hover:scale-100"
+                  : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase disabled:opacity-60 disabled:cursor-wait"
+                }
+              >
+                {isPublicView ? (
+                  <>
+                    <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
+                    <span className="relative z-10 flex items-center gap-2">
+                      <Save size={20} aria-hidden="true" /> {submitting ? 'Enviando...' : `Confirmar Inscrição Apoiando o Lar (R$ ${fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})`}
+                    </span>
+                  </>
+                ) : (
+                  <span className="flex items-center gap-2"><Save size={18} aria-hidden="true" /> {submitting ? 'Enviando...' : `Confirmar Inscrição Apoiando o Lar (R$ ${fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})`}</span>
+                )}
+              </button>
+
+              {/* Opção secundária: usar a meia-inscrição (menor, cor diferente) */}
+              <button
+                type="button"
+                onClick={e => handleSubmit(e, false)}
+                disabled={submitting || isUnderMinAge}
+                className={`w-full md:w-auto px-6 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-60 disabled:cursor-wait ${
+                  isPublicView
+                    ? "bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white"
+                    : "bg-white text-slate-600 border border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                {submitting ? 'Enviando...' : `Confirmar Inscrição Pagando Meia (R$ ${fmt(REGISTRATION_PRICE_SENIOR)})`}
+              </button>
+            </div>
+          ) : (
+            <div className={`pt-6 flex justify-end ${isPublicView ? 'border-t border-slate-800' : 'border-t border-slate-100'}`}>
+              <button
+                type="submit"
+                disabled={submitting || isUnderMinAge}
+                className={isPublicView
+                  ? "group relative w-full md:w-auto inline-flex items-center justify-center gap-3 bg-yellow-400 text-slate-900 px-8 py-5 rounded-xl font-black italic tracking-wider uppercase text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(250,204,21,0.4)] hover:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden disabled:opacity-60 disabled:cursor-wait disabled:hover:scale-100"
+                  : "w-full md:w-auto bg-slate-900 text-yellow-400 px-8 py-4 rounded-xl font-black italic tracking-wider hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-lg flex justify-center items-center gap-2 uppercase disabled:opacity-60 disabled:cursor-wait"
+                }
+              >
+                {isPublicView ? (
+                  <>
+                    <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
+                    <span className="relative z-10 flex items-center gap-2">
+                      <Save size={20} aria-hidden="true" /> {submitting ? 'Enviando...' : 'Confirmar Inscrição'}
+                    </span>
+                  </>
+                ) : (
+                  submitting ? 'Salvando...' : 'Confirmar Inscrição'
+                )}
+              </button>
+            </div>
+          )}
         </form>
       </div>
 

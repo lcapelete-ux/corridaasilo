@@ -6,13 +6,14 @@ import { REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR } from '../constants';
 interface RegistrationSuccessProps {
   onBack: () => void;
   isSenior: boolean;
-  discount?: number; // Desconto do cupom da academia (R$)
+  discount?: number; // Desconto do cupom da academia (R$) ou de apoiador (60+)
+  seniorFullPrice?: boolean; // 60+ que optou por não usar a meia-inscrição (ajuda o Lar São Cristóvão)
 }
 
-export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0 }) => {
+export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false }) => {
   const [copied, setCopied] = useState(false);
   const pixKey = "corridaasilo@gmail.com";
-  const basePrice = isSenior ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
+  const basePrice = isSenior && !seniorFullPrice ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
   const finalPrice = Math.max(0, basePrice - discount);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
   const price = fmt(finalPrice);
@@ -51,7 +52,7 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
             )}
             
             <p className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-2">
-              {isSenior ? "Valor com Desconto (60+)" : "Valor da Inscrição"}
+              {seniorFullPrice ? "Inscrição de Apoiador (60+)" : isSenior ? "Valor com Desconto (60+)" : "Valor da Inscrição"}
             </p>
             <div className="flex items-center justify-center gap-1 text-slate-900">
               <span className="text-xl font-medium">R$</span>
@@ -59,7 +60,7 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
             </div>
             {discount > 0 && (
               <p className="mt-2 text-xs font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <Tag size={11} /> Cupom aplicado: R$ {fmt(basePrice)} − R$ {fmt(discount)} de desconto
+                <Tag size={11} /> {seniorFullPrice ? 'Desconto de apoiador' : 'Cupom aplicado'}: R$ {fmt(basePrice)} − R$ {fmt(discount)} de desconto
               </p>
             )}
           </div>
