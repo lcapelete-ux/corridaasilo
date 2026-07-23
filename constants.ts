@@ -19,6 +19,9 @@ export const GRANTABLE_VIEWS: { key: string; label: string }[] = [
 export const REGISTRATION_PRICE = 74.90;
 export const REGISTRATION_PRICE_SENIOR = 37.45; // Idoso 60+: metade de 74,90 (não acumula cupom)
 export const SENIOR_AGE = 60;
+// Idoso 60+ pode abrir mão da meia-inscrição e pagar o valor cheio (menos este
+// desconto de apoiador) para ajudar o Lar São Cristóvão: 74,90 − 10 = 64,90.
+export const SENIOR_SUPPORTER_DISCOUNT = 10;
 
 // Regras de idade do regulamento (2ª Corrida Night Run – Asilo São Cristóvão)
 export const EVENT_DATE = '2026-09-19';   // data da prova
@@ -84,8 +87,10 @@ export const formatBrDate = (isoDate?: string | null, withYear = false): string 
   return withYear ? `${d}/${m}/${y}` : `${d}/${m}`;
 };
 
-export const getRegistrationFee = (age: number): number =>
-  age >= SENIOR_AGE ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
+// seniorFullPrice: idoso 60+ que optou por não usar a meia-inscrição (paga o
+// valor cheio, com o desconto de apoiador aplicado à parte, como um cupom).
+export const getRegistrationFee = (age: number, seniorFullPrice?: boolean): number =>
+  (age >= SENIOR_AGE && !seniorFullPrice) ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
 
 // Academias/equipes oficiais do evento
 export const PREDEFINED_TEAMS = [
@@ -106,9 +111,9 @@ export const calcCouponDiscount = (fee: number, coupon: Pick<TeamCoupon, 'discou
   return Math.min(fee, Math.round(raw * 100) / 100);
 };
 
-// Valor efetivamente devido pelo inscrito (inscrição - cupom)
-export const getRunnerPaidValue = (runner: Pick<Runner, 'age' | 'couponDiscount'>): number => {
-  const fee = getRegistrationFee(runner.age);
+// Valor efetivamente devido pelo inscrito (inscrição - cupom/desconto de apoiador)
+export const getRunnerPaidValue = (runner: Pick<Runner, 'age' | 'couponDiscount' | 'seniorFullPrice'>): number => {
+  const fee = getRegistrationFee(runner.age, runner.seniorFullPrice);
   return Math.max(0, Math.round((fee - (runner.couponDiscount || 0)) * 100) / 100);
 };
 

@@ -772,6 +772,13 @@ revoke all on function public.admin_create_login(text, text, text, text, text, t
 grant execute on function public.admin_create_login(text, text, text, text, text, text, text, text[])
   to authenticated, service_role;
 
+-- 14. Idoso 60+ pode abrir mão da meia-inscrição para ajudar o Lar São
+--     Cristóvão (paga o valor cheio com um desconto de apoiador, em vez da
+--     meia-inscrição automática) -------------------------------------------
+alter table public.runners add column if not exists senior_full_price boolean not null default false;
+comment on column public.runners.senior_full_price is
+  'Atleta 60+ que optou por pagar o valor cheio (com desconto de apoiador) em vez da meia-inscrição automática, para ajudar o Lar São Cristóvão';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

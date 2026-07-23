@@ -41,6 +41,7 @@ export interface Runner {
   kitDeliveredAt?: string;  // Quando o kit foi entregue (ISO)
   paidNoProof?: boolean;    // Atleta avisou que pagou mas não conseguiu enviar o comprovante
   paidNoProofAt?: string;   // Quando esse aviso foi registrado (ISO)
+  seniorFullPrice?: boolean; // Atleta 60+ que abriu mão da meia-inscrição para ajudar o Lar São Cristóvão
 }
 
 export interface TeamCoupon {
