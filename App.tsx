@@ -383,6 +383,7 @@ const App: React.FC = () => {
     teamName: string;
     role: 'admin' | 'team_leader';
     phone?: string;
+    permissions?: string[];
   }) => {
     await createOrganizerLogin(params); // erros propagam para o formulário tratar
     setOrganizers(await getOrganizers());
