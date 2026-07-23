@@ -638,6 +638,140 @@ $$;
 
 grant execute on function public.attach_payment_proof(text, text, text) to anon, authenticated;
 
+-- 13. Telas liberadas já na criação do login (antes só dava pra liberar
+--     editando o organizador depois de criado) --------------------------------
+
+-- Gatilho que cria o registro em organizers passa a ler "permissions" do
+-- metadata também (fica '{}' se não vier nada, igual antes).
+create or replace function public.handle_new_organizer()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.organizers (id, name, team_name, username, role, phone, permissions)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'team_name', 'Avulso'),
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    coalesce((new.raw_user_meta_data->>'role')::public.organizer_role, 'team_leader'),
+    new.raw_user_meta_data->>'phone',
+    coalesce(
+      (select array_agg(v) from jsonb_array_elements_text(coalesce(new.raw_user_meta_data->'permissions', '[]'::jsonb)) as v),
+      '{}'
+    )
+  )
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+-- admin_create_login passa a receber as telas liberadas (8º parâmetro).
+-- (drop necessário: mudou a lista de parâmetros)
+drop function if exists public.admin_create_login(text, text, text, text, text, text, text);
+create or replace function public.admin_create_login(
+  p_email text,
+  p_password text,
+  p_name text,
+  p_username text,
+  p_team_name text default 'Avulso',
+  p_role text default 'team_leader',
+  p_phone text default null,
+  p_permissions text[] default '{}'
+)
+returns text
+language plpgsql
+security definer
+set search_path = extensions, public
+as $$
+declare
+  v_user_id uuid;
+begin
+  if auth.uid() is not null and not public.is_admin() then
+    raise exception 'Apenas administradores podem criar logins de acesso.';
+  end if;
+
+  if p_email is null or position('@' in p_email) = 0 then
+    raise exception 'E-mail inválido: "%"', coalesce(p_email, '(vazio)');
+  end if;
+
+  if p_password is null
+     or btrim(p_password) = 'TROQUE-ESTA-SENHA'
+     or length(btrim(p_password)) < 4 then
+    raise exception 'Senha inválida: use no mínimo 4 caracteres.';
+  end if;
+
+  if p_role not in ('admin', 'team_leader') then
+    raise exception 'Papel inválido: "%" (use admin ou team_leader)', p_role;
+  end if;
+
+  -- Já existe? Não mexe (não troca senha nem papel por aqui).
+  select u.id into v_user_id
+  from auth.users u
+  where lower(u.email) = lower(p_email);
+
+  if v_user_id is not null then
+    return 'Já existia, nada alterado: ' || p_email;
+  end if;
+
+  v_user_id := gen_random_uuid();
+
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change, email_change_token_new, email_change_token_current,
+    phone_change, phone_change_token, reauthentication_token
+  ) values (
+    '00000000-0000-0000-0000-000000000000',
+    v_user_id,
+    'authenticated',
+    'authenticated',
+    lower(p_email),
+    crypt(p_password, gen_salt('bf')),
+    now(),
+    '{"provider": "email", "providers": ["email"]}'::jsonb,
+    jsonb_build_object(
+      'name', p_name,
+      'username', p_username,
+      'team_name', coalesce(p_team_name, 'Avulso'),
+      'role', p_role,
+      'phone', p_phone,
+      'permissions', coalesce(to_jsonb(p_permissions), '[]'::jsonb)
+    ),
+    now(), now(),
+    '', '', '', '', '', '', '', ''
+  );
+
+  insert into auth.identities (
+    id, user_id, identity_data, provider, provider_id,
+    last_sign_in_at, created_at, updated_at
+  ) values (
+    gen_random_uuid(),
+    v_user_id,
+    jsonb_build_object(
+      'sub', v_user_id::text,
+      'email', lower(p_email),
+      'email_verified', true,
+      'phone_verified', false
+    ),
+    'email',
+    v_user_id::text,
+    now(), now(), now()
+  );
+
+  return 'Criado: ' || p_email || ' (' || p_role || ')';
+end;
+$$;
+
+revoke all on function public.admin_create_login(text, text, text, text, text, text, text, text[])
+  from public, anon;
+grant execute on function public.admin_create_login(text, text, text, text, text, text, text, text[])
+  to authenticated, service_role;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

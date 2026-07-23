@@ -14,6 +14,7 @@ interface OrganizersManagerProps {
     teamName: string;
     role: 'admin' | 'team_leader';
     phone?: string;
+    permissions?: string[];
   }) => Promise<void>;
   onUpdate: (organizer: Organizer) => void;
   onDelete: (id: string) => void;
@@ -33,6 +34,7 @@ const emptyCreateForm = {
   password: '',
   phone: '',
   role: 'team_leader' as 'admin' | 'team_leader',
+  permissions: [] as string[],
 };
 
 const emptyEditForm = { name: '', teamName: '', username: '', phone: '', permissions: [] as string[] };
@@ -58,6 +60,15 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
 
   const togglePermission = (key: string) => {
     setEditForm(prev => ({
+      ...prev,
+      permissions: prev.permissions.includes(key)
+        ? prev.permissions.filter(p => p !== key)
+        : [...prev.permissions, key],
+    }));
+  };
+
+  const toggleCreatePermission = (key: string) => {
+    setCreateForm(prev => ({
       ...prev,
       permissions: prev.permissions.includes(key)
         ? prev.permissions.filter(p => p !== key)
@@ -101,6 +112,7 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
         teamName: createForm.teamName,
         role: createForm.role,
         phone: createForm.phone || undefined,
+        permissions: createForm.role === 'team_leader' ? createForm.permissions : undefined,
       });
       setJustCreated({
         name: createForm.name,
@@ -314,6 +326,34 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                 </label>
               </div>
             </div>
+
+            {/* Telas liberadas (só faz sentido para líder; admin já tem acesso total) */}
+            {createForm.role === 'team_leader' && (
+              <div className="col-span-1 md:col-span-2">
+                <label className={`${labelCls} flex items-center gap-1.5`}>
+                  <Monitor size={13} /> Telas extras liberadas na área restrita
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {GRANTABLE_VIEWS.map(v => {
+                    const on = createForm.permissions.includes(v.key);
+                    return (
+                      <label
+                        key={v.key}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                          on ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <input type="checkbox" checked={on} onChange={() => toggleCreatePermission(v.key)} className="w-4 h-4 rounded border-slate-600 accent-emerald-500" />
+                        <span className="text-sm font-bold">{v.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">
+                  O líder já vê "Corredores" e "Novo Cadastro" por padrão. Marque telas extras para liberar (ex.: Entrega de Kits). Pode ajustar depois editando o organizador.
+                </p>
+              </div>
+            )}
 
             {createError && (
               <div className="col-span-1 md:col-span-2 text-red-400 text-sm font-bold bg-red-500/10 border border-red-500/20 rounded-lg p-3">

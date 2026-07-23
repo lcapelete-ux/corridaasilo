@@ -446,8 +446,9 @@ export const createOrganizerLogin = async (params: {
   teamName: string;
   role: 'admin' | 'team_leader';
   phone?: string;
+  permissions?: string[];
 }): Promise<void> => {
-  const { data, error } = await supabase.rpc('admin_create_login', {
+  let { data, error } = await supabase.rpc('admin_create_login', {
     p_email: params.email,
     p_password: params.password,
     p_name: params.name,
@@ -455,7 +456,24 @@ export const createOrganizerLogin = async (params: {
     p_team_name: params.teamName,
     p_role: params.role,
     p_phone: params.phone || null,
+    p_permissions: params.permissions || [],
   });
+  // Migração ainda não rodou: banco só tem a versão sem o 8º parâmetro.
+  // Repete sem ele — o login sai sem telas extras liberadas (dá pra liberar
+  // depois, editando).
+  const missingFn = error?.code === 'PGRST202'
+    || /could not find the function|admin_create_login/i.test(error?.message || '');
+  if (error && missingFn) {
+    ({ data, error } = await supabase.rpc('admin_create_login', {
+      p_email: params.email,
+      p_password: params.password,
+      p_name: params.name,
+      p_username: params.username,
+      p_team_name: params.teamName,
+      p_role: params.role,
+      p_phone: params.phone || null,
+    }));
+  }
   if (error) throw friendlyError(error, 'Erro ao criar login');
   if (typeof data === 'string' && data.startsWith('Já existia')) {
     throw new Error('Já existe um login cadastrado com este e-mail.');
