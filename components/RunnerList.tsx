@@ -894,6 +894,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           Atleta 60+ optou por não usar a meia-inscrição (apoiador): R$ {getRegistrationFee(selectedRunner.age, true).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} − R$ {(selectedRunner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       ) : null}
+                      {!!selectedRunner.extraDonation && (
+                        <p className="text-xs text-indigo-600 font-bold mt-0.5">
+                          Contribuição extra: + R$ {selectedRunner.extraDonation.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                       <div>

@@ -57,6 +57,11 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   const [couponChecking, setCouponChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // --- Contribuição extra (60+ que escolheu pagar meia) ---
+  const [pendingDonationRunner, setPendingDonationRunner] = useState<Runner | null>(null);
+  const [donationAmount, setDonationAmount] = useState(0);
+  const [customDonationInput, setCustomDonationInput] = useState('');
+
   // --- Regulamento da prova (obrigatório na inscrição pública) ---
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -255,25 +260,26 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     )
   );
 
-  // seniorSupporterChoice: só é relevante para 60+, vem direto do botão
-  // clicado (Apoiar o Lar x Pagar meia) — evita depender de estado assíncrono.
-  const handleSubmit = async (e: React.SyntheticEvent, seniorSupporterChoice = false) => {
-    e.preventDefault();
+  // Monta e valida a inscrição, mas não salva ainda — devolve null se algo
+  // estiver errado (o próprio alert já foi disparado). Separado de
+  // finalizeSubmit porque o caminho "pagar meia" precisa parar aqui e
+  // perguntar sobre contribuição extra antes de salvar de fato.
+  const buildRunner = (seniorSupporterChoice: boolean): Runner | null => {
     if (!formData.fullName || !formData.cpf || !formData.birthDate || !formData.city) {
       alert("Por favor, preencha todos os campos obrigatórios.");
-      return;
+      return null;
     }
 
     if (isPublicView && !agreedToRules) {
       setRulesError(true);
       alert("Para confirmar a inscrição é preciso concordar com o regulamento da prova.");
-      return;
+      return null;
     }
 
     if (formData.cpf.length !== 14) {
       setErrors(prev => ({ ...prev, cpf: 'CPF inválido ou incompleto.' }));
       alert("Por favor, corrija o CPF antes de continuar.");
-      return;
+      return null;
     }
 
     // Duplicidade de CPF/e-mail é garantida pelo banco (índices únicos);
@@ -282,14 +288,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
 
     if (isUnderMinAge) {
       alert(`Idade mínima de ${MIN_AGE} anos para participar da prova (regra da Confederação Brasileira de Atletismo).`);
-      return;
+      return null;
     }
 
     // Menor de 18: precisa do nome do responsável (a autorização assinada é
     // anexada depois, junto com o comprovante).
     if (isMinor && !formData.guardianName.trim()) {
       alert('Atleta menor de 18 anos: informe o nome do pai, mãe ou responsável. A autorização assinada deverá ser anexada junto com o comprovante.');
-      return;
+      return null;
     }
 
     // Desconto do cupom sobre o valor da inscrição — 60+ já tem meia inscrição, não acumula cupom
@@ -300,7 +306,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
       ? calcCouponDiscount(feeForRunner, appliedCoupon)
       : (seniorFullPrice ? SENIOR_SUPPORTER_DISCOUNT : 0);
 
-    const newRunner: Runner = {
+    return {
       id: crypto.randomUUID(),
       fullName: formData.fullName,
       email: formData.email,
@@ -323,12 +329,18 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
           ? { couponCode: appliedCoupon.code, couponDiscount: discountForRunner }
           : {}),
     };
+  };
 
+  // Salva de fato e reseta o formulário. Usado tanto pelo caminho direto
+  // (apoiar / cupom / cadastro comum) quanto depois da tela de contribuição
+  // extra (caminho "pagar meia").
+  const finalizeSubmit = async (runner: Runner) => {
     setSubmitting(true);
-    const saved = await onSave(newRunner);
+    const saved = await onSave(runner);
     setSubmitting(false);
     if (!saved) return;
 
+    setPendingDonationRunner(null);
     setFormData({
       fullName: '',
       email: '',
@@ -352,10 +364,31 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     setCouponError('');
     setAgreedToRules(false);
     setRulesError(false);
+    setDonationAmount(0);
+    setCustomDonationInput('');
 
     if (!isPublicView) {
        alert("Cadastrado com sucesso!");
     }
+  };
+
+  // seniorSupporterChoice: só é relevante para 60+, vem direto do botão
+  // clicado (Apoiar o Lar x Pagar meia) — evita depender de estado assíncrono.
+  const handleSubmit = async (e: React.SyntheticEvent, seniorSupporterChoice = false) => {
+    e.preventDefault();
+    const runner = buildRunner(seniorSupporterChoice);
+    if (!runner) return;
+    await finalizeSubmit(runner);
+  };
+
+  // "Pagando Meia": não salva direto — abre a tela de contribuição extra
+  // (a pessoa já está economizando na meia-inscrição, pode querer ajudar
+  // com um valor à parte antes de ir pro Pix).
+  const handleSeniorHalfPriceClick = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    const runner = buildRunner(false);
+    if (!runner) return;
+    setPendingDonationRunner(runner);
   };
 
   const inputClass = isPublicView
@@ -371,6 +404,99 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     : "block text-sm font-bold text-slate-800 mb-1";
 
   const optionClass = "text-slate-900 bg-white";
+
+  // "Pagando Meia": antes de salvar, pergunta se quer somar uma contribuição
+  // extra (opcional) pro Lar São Cristóvão.
+  if (pendingDonationRunner) {
+    const quickAmounts = [5, 10, 20, 25];
+    return (
+      <div className={isPublicView
+        ? "max-w-lg mx-auto bg-slate-900/60 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-800 overflow-hidden my-8 relative z-10"
+        : "max-w-lg mx-auto bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden"
+      }>
+        <div className="p-8 text-center">
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isPublicView ? 'bg-yellow-400/10' : 'bg-yellow-100'}`}>
+            <Ticket size={26} className={isPublicView ? 'text-yellow-400' : 'text-yellow-600'} />
+          </div>
+          <h2 className={`text-2xl font-black italic mb-2 ${isPublicView ? 'text-white' : 'text-slate-900'}`}>
+            Quer ajudar mais um pouco?
+          </h2>
+          <p className={`text-sm mb-6 ${isPublicView ? 'text-slate-400' : 'text-slate-500'}`}>
+            Sua meia-inscrição (R$ {fmt(REGISTRATION_PRICE_SENIOR)}) já está garantida. Se quiser, pode somar uma
+            contribuição extra, de qualquer valor, para ajudar o Lar São Cristóvão — é totalmente opcional.
+          </p>
+
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {quickAmounts.map(v => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => { setDonationAmount(v); setCustomDonationInput(''); }}
+                className={`py-3 rounded-lg font-bold text-sm border transition-all ${
+                  donationAmount === v && !customDonationInput
+                    ? 'bg-yellow-400 border-yellow-400 text-slate-900'
+                    : isPublicView
+                      ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-yellow-400/50'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-yellow-400'
+                }`}
+              >
+                R$ {v}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-6">
+            <label className={`${labelClass} text-left`}>Outro valor</label>
+            <div className="relative">
+              <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-bold ${isPublicView ? 'text-slate-500' : 'text-slate-400'}`}>R$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={customDonationInput}
+                onChange={e => {
+                  setCustomDonationInput(e.target.value);
+                  setDonationAmount(parseFloat(e.target.value) || 0);
+                }}
+                placeholder="0,00"
+                className={`${inputClass} pl-10`}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => finalizeSubmit({ ...pendingDonationRunner, ...(donationAmount > 0 && { extraDonation: donationAmount }) })}
+            disabled={submitting}
+            className="w-full bg-yellow-400 text-slate-900 px-6 py-4 rounded-xl font-black italic uppercase tracking-wider hover:bg-yellow-300 transition-all shadow-lg disabled:opacity-60 disabled:cursor-wait mb-3"
+          >
+            {submitting ? 'Enviando...' : donationAmount > 0 ? `Continuar — Contribuir R$ ${fmt(donationAmount)}` : 'Continuar'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setDonationAmount(0); setCustomDonationInput(''); finalizeSubmit(pendingDonationRunner); }}
+            disabled={submitting}
+            className={`w-full text-sm font-bold underline underline-offset-2 disabled:opacity-60 disabled:cursor-wait ${
+              isPublicView ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Prosseguir sem contribuir
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPendingDonationRunner(null)}
+            disabled={submitting}
+            className={`block mx-auto mt-4 text-xs disabled:opacity-60 ${isPublicView ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            Voltar para a inscrição
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={isPublicView
@@ -996,7 +1122,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
               {/* Opção secundária: usar a meia-inscrição (menor, cor diferente) */}
               <button
                 type="button"
-                onClick={e => handleSubmit(e, false)}
+                onClick={handleSeniorHalfPriceClick}
                 disabled={submitting || isUnderMinAge}
                 className={`w-full md:w-auto px-6 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-60 disabled:cursor-wait ${
                   isPublicView

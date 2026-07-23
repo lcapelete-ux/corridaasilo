@@ -42,6 +42,7 @@ export interface Runner {
   paidNoProof?: boolean;    // Atleta avisou que pagou mas não conseguiu enviar o comprovante
   paidNoProofAt?: string;   // Quando esse aviso foi registrado (ISO)
   seniorFullPrice?: boolean; // Atleta 60+ que abriu mão da meia-inscrição para ajudar o Lar São Cristóvão
+  extraDonation?: number;    // Contribuição extra opcional (ex.: 60+ que optou pela meia mas quis ajudar um valor à parte)
 }
 
 export interface TeamCoupon {

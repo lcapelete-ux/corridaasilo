@@ -8,13 +8,14 @@ interface RegistrationSuccessProps {
   isSenior: boolean;
   discount?: number; // Desconto do cupom da academia (R$) ou de apoiador (60+)
   seniorFullPrice?: boolean; // 60+ que optou por não usar a meia-inscrição (ajuda o Lar São Cristóvão)
+  extraDonation?: number; // Contribuição extra opcional somada à inscrição
 }
 
-export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false }) => {
+export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false, extraDonation = 0 }) => {
   const [copied, setCopied] = useState(false);
   const pixKey = "corridaasilo@gmail.com";
   const basePrice = isSenior && !seniorFullPrice ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
-  const finalPrice = Math.max(0, basePrice - discount);
+  const finalPrice = Math.max(0, basePrice - discount) + extraDonation;
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
   const price = fmt(finalPrice);
 
@@ -61,6 +62,11 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
             {discount > 0 && (
               <p className="mt-2 text-xs font-bold text-emerald-600 flex items-center justify-center gap-1">
                 <Tag size={11} /> {seniorFullPrice ? 'Desconto de apoiador' : 'Cupom aplicado'}: R$ {fmt(basePrice)} − R$ {fmt(discount)} de desconto
+              </p>
+            )}
+            {extraDonation > 0 && (
+              <p className="mt-2 text-xs font-bold text-indigo-600 flex items-center justify-center gap-1">
+                <Tag size={11} /> Contribuição extra: + R$ {fmt(extraDonation)}
               </p>
             )}
           </div>
