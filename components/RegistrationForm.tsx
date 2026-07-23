@@ -1110,12 +1110,22 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                 {isPublicView ? (
                   <>
                     <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
-                    <span className="relative z-10 flex items-center gap-2">
-                      <Save size={20} aria-hidden="true" /> {submitting ? 'Enviando...' : `Confirmar Inscrição Apoiando o Lar (R$ ${fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})`}
-                    </span>
+                    {submitting ? (
+                      <span className="relative z-10">Enviando...</span>
+                    ) : (
+                      <span className="relative z-10 flex flex-col items-center gap-1">
+                        <span className="flex items-center gap-2"><Save size={20} aria-hidden="true" /> Confirmar Inscrição Apoiando o Lar</span>
+                        <span>(R$ {fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})</span>
+                      </span>
+                    )}
                   </>
+                ) : submitting ? (
+                  <span className="flex items-center gap-2"><Save size={18} aria-hidden="true" /> Enviando...</span>
                 ) : (
-                  <span className="flex items-center gap-2"><Save size={18} aria-hidden="true" /> {submitting ? 'Enviando...' : `Confirmar Inscrição Apoiando o Lar (R$ ${fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})`}</span>
+                  <span className="flex flex-col items-center gap-1">
+                    <span className="flex items-center gap-2"><Save size={18} aria-hidden="true" /> Confirmar Inscrição Apoiando o Lar</span>
+                    <span>(R$ {fmt(REGISTRATION_PRICE - SENIOR_SUPPORTER_DISCOUNT)})</span>
+                  </span>
                 )}
               </button>
 
@@ -1130,7 +1140,12 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                     : "bg-white text-slate-600 border border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                {submitting ? 'Enviando...' : `Confirmar Inscrição Pagando Meia (R$ ${fmt(REGISTRATION_PRICE_SENIOR)})`}
+                {submitting ? 'Enviando...' : (
+                  <span className="flex flex-col items-center gap-0.5">
+                    <span>Confirmar Inscrição Pagando Meia</span>
+                    <span>(R$ {fmt(REGISTRATION_PRICE_SENIOR)})</span>
+                  </span>
+                )}
               </button>
             </div>
           ) : (
