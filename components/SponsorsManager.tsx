@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Sponsor, SponsorType } from '../types';
-import { prepareProofFile } from '../services/imageUtils';
+import { prepareProofFile, migrateBase64ToCloudinary } from '../services/imageUtils';
 import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase } from 'lucide-react';
 
 interface SponsorsManagerProps {
@@ -28,6 +28,29 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
   });
 
   const [isFormVisible, setIsFormVisible] = useState(false);
+
+  // Recibos antigos (salvos como base64 direto no banco, antes do Cloudinary)
+  const [migrating, setMigrating] = useState(false);
+  const [migratedCount, setMigratedCount] = useState(0);
+  const legacyReceipts = sponsors.filter(s => s.receiptImage?.startsWith('data:'));
+
+  const handleMigrateLegacyReceipts = async () => {
+    setMigrating(true);
+    setMigratedCount(0);
+    try {
+      for (const sponsor of legacyReceipts) {
+        const newUrl = await migrateBase64ToCloudinary(sponsor.receiptImage);
+        if (newUrl && newUrl !== sponsor.receiptImage) {
+          await onUpdate({ ...sponsor, receiptImage: newUrl });
+        }
+        setMigratedCount(c => c + 1);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao migrar um recibo. Os já migrados foram salvos; clique novamente para tentar os restantes.');
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,6 +126,23 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
           <Plus size={18} /> Novo Patrocinador
         </button>
       </div>
+
+      {/* Recibos antigos: aviso + migração pro Cloudinary */}
+      {legacyReceipts.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-amber-300 text-sm">
+            <strong>{legacyReceipts.length}</strong> {legacyReceipts.length === 1 ? 'recibo ainda está salvo' : 'recibos ainda estão salvos'} no formato antigo (direto no banco). Migre pro Cloudinary para liberar espaço no Supabase.
+          </p>
+          <button
+            onClick={handleMigrateLegacyReceipts}
+            disabled={migrating}
+            className="bg-amber-500 text-slate-900 px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-amber-400 disabled:opacity-60 disabled:cursor-wait shrink-0"
+          >
+            <Upload size={16} />
+            {migrating ? `Migrando... (${migratedCount}/${legacyReceipts.length})` : 'Migrar agora'}
+          </button>
+        </div>
+      )}
 
       {/* Form */}
       {isFormVisible && (
