@@ -39,6 +39,8 @@ export interface Runner {
   authorizationDoc?: string; // Autorização assinada (URL no Cloudinary), anexada junto ao comprovante
   kitDelivered?: boolean;   // Kit já entregue ao atleta
   kitDeliveredAt?: string;  // Quando o kit foi entregue (ISO)
+  paidNoProof?: boolean;    // Atleta avisou que pagou mas não conseguiu enviar o comprovante
+  paidNoProofAt?: string;   // Quando esse aviso foi registrado (ISO)
 }
 
 export interface TeamCoupon {

@@ -76,6 +76,8 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   modality: (r.modality as Runner['modality']) || undefined,
   kitDelivered: (r as any).kit_delivered ?? undefined,
   kitDeliveredAt: (r as any).kit_delivered_at || undefined,
+  paidNoProof: (r as any).paid_no_proof ?? undefined,
+  paidNoProofAt: (r as any).paid_no_proof_at || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -215,7 +217,16 @@ export const findRunnerByCpf = async (cpf: string): Promise<RunnerLookup | null>
     birthDate: row.birth_date || undefined,   // pode não vir se a migração não rodou
     guardianName: row.guardian_name || undefined,
     hasAuthorization: row.has_authorization ?? undefined,
+    paidNoProof: row.paid_no_proof ?? undefined,
   };
+};
+
+// Registra o aviso "já paguei, mas não consigo enviar o comprovante agora"
+// (tela pública, por CPF). Não confirma o pagamento — só sinaliza pro admin
+// checar manualmente.
+export const reportPaidWithoutProof = async (cpf: string): Promise<void> => {
+  const { error } = await supabase.rpc('report_paid_without_proof', { p_cpf: cpf });
+  if (error) throw friendlyError(error, 'Erro ao registrar o aviso');
 };
 
 // Anexa o comprovante e, para menores de 18, também a autorização do responsável.

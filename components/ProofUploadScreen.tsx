@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { findRunnerByCpf, attachPaymentProof } from '../services/storageService';
+import { findRunnerByCpf, attachPaymentProof, reportPaidWithoutProof } from '../services/storageService';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
 import { isMinorAtEvent } from '../constants';
 import { Runner } from '../types';
@@ -12,6 +12,7 @@ interface ProofUploadScreenProps {
 
 export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) => {
   const [step, setStep] = useState<'search' | 'view' | 'success'>('search');
+  const [successKind, setSuccessKind] = useState<'proof' | 'notice'>('proof');
   const [cpf, setCpf] = useState('');
   const [runner, setRunner] = useState<Partial<Runner> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,6 +22,10 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
   const [error, setError] = useState('');
   const [showProofFull, setShowProofFull] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // "Já paguei, mas não consigo enviar o comprovante agora"
+  const [reportNoProof, setReportNoProof] = useState(false);           // caixinha marcada
+  const [alreadyReportedNoProof, setAlreadyReportedNoProof] = useState(false); // já tinha avisado antes
 
   // Menor de 18: autorização do responsável exigida junto com o comprovante
   const [authFile, setAuthFile] = useState<string | null>(null);         // nova autorização escolhida
@@ -53,8 +58,10 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
         setRunner(found);
         setExistingProof(found.paymentProof || null);
         setExistingHasAuth(!!found.hasAuthorization);
+        setAlreadyReportedNoProof(!!found.paidNoProof);
         setProofFile(null);
         setAuthFile(null);
+        setReportNoProof(false);
         setStep('view');
       } else {
         setError('Inscrição não encontrada para este CPF.');
@@ -112,9 +119,25 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
     setError('');
     try {
       await attachPaymentProof(runner.cpf || cpf, proofFile, authFile || undefined);
+      setSuccessKind('proof');
       setStep('success');
     } catch (err: any) {
       setError(err?.message || 'Erro ao enviar o comprovante. Tente novamente.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReportNoProof = async () => {
+    if (!runner) return;
+    setBusy(true);
+    setError('');
+    try {
+      await reportPaidWithoutProof(runner.cpf || cpf);
+      setSuccessKind('notice');
+      setStep('success');
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao registrar o aviso. Tente novamente.');
     } finally {
       setBusy(false);
     }
@@ -284,6 +307,27 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
               )}
             </div>
 
+            {/* "Já paguei, mas não consigo enviar o comprovante agora" */}
+            {!isPaid && !proofFile && (
+              <div className="mb-4">
+                {alreadyReportedNoProof ? (
+                  <p className="flex items-center gap-1.5 text-amber-400 text-xs font-bold bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                    <AlertCircle size={14} className="shrink-0" /> Você avisou que já pagou. A organização vai conferir manualmente.
+                  </p>
+                ) : (
+                  <label className="flex items-start gap-2 text-slate-400 text-xs cursor-pointer select-none hover:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={reportNoProof}
+                      onChange={(e) => setReportNoProof(e.target.checked)}
+                      className="mt-0.5 accent-yellow-400 w-4 h-4 shrink-0"
+                    />
+                    Já paguei, mas não consigo enviar o comprovante agora
+                  </label>
+                )}
+              </div>
+            )}
+
             {/* Autorização do responsável (menor de 18) */}
             {isMinor && (
               <div className="mb-4">
@@ -365,8 +409,18 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
               </>
             )}
 
+            {!proofFile && reportNoProof && !alreadyReportedNoProof && (
+              <button
+                onClick={handleReportNoProof}
+                disabled={busy}
+                className="w-full py-4 rounded-xl font-black italic uppercase tracking-wider transition-all shadow-lg bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-60 disabled:cursor-wait"
+              >
+                {busy ? 'Enviando aviso...' : 'Avisar que já paguei'}
+              </button>
+            )}
+
             <button
-              onClick={() => { setStep('search'); setRunner(null); setProofFile(null); setExistingProof(null); setAuthFile(null); setExistingHasAuth(false); setCpf(''); }}
+              onClick={() => { setStep('search'); setRunner(null); setProofFile(null); setExistingProof(null); setAuthFile(null); setExistingHasAuth(false); setReportNoProof(false); setAlreadyReportedNoProof(false); setCpf(''); }}
               className="w-full mt-3 text-slate-500 hover:text-slate-300 text-sm font-bold transition-colors"
             >
               Buscar outro CPF
@@ -380,9 +434,13 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
             <div className="bg-emerald-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/30">
               <CheckCircle size={40} className="text-white" />
             </div>
-            <h2 className="text-2xl font-black italic text-white mb-2">Recebido!</h2>
+            <h2 className="text-2xl font-black italic text-white mb-2">
+              {successKind === 'notice' ? 'Aviso registrado!' : 'Recebido!'}
+            </h2>
             <p className="text-slate-400 mb-8 max-w-xs mx-auto">
-              Seu comprovante foi enviado com sucesso. Aguarde a confirmação do pagamento no sistema.
+              {successKind === 'notice'
+                ? 'A organização vai conferir seu pagamento manualmente. Se conseguir o comprovante depois, volte aqui pelo mesmo CPF e envie.'
+                : 'Seu comprovante foi enviado com sucesso. Aguarde a confirmação do pagamento no sistema.'}
             </p>
             <button
               onClick={onBack}

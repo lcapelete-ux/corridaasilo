@@ -522,6 +522,122 @@ drop policy if exists "sponsor_logos_admin_write" on public.sponsor_logos;
 create policy "sponsor_logos_admin_write" on public.sponsor_logos
   for all using (public.is_admin()) with check (public.is_admin());
 
+-- 12. "Já paguei, mas não consigo enviar o comprovante agora" ---------------
+-- Aviso que o próprio atleta registra na tela de comprovante quando não tem
+-- como anexar o arquivo agora. NÃO confirma o pagamento sozinho — só sinaliza
+-- pro admin checar manualmente. Some automaticamente se um comprovante de
+-- verdade for enviado depois.
+alter table public.runners add column if not exists paid_no_proof boolean not null default false;
+alter table public.runners add column if not exists paid_no_proof_at timestamptz;
+comment on column public.runners.paid_no_proof is
+  'Atleta avisou que já pagou mas não conseguiu enviar o comprovante agora (aguarda checagem manual do admin)';
+
+-- find_runner_by_cpf passa a informar também esse aviso (a tela usa isso pra
+-- mostrar "você já avisou" e não deixar avisar de novo à toa).
+drop function if exists public.find_runner_by_cpf(text);
+create or replace function public.find_runner_by_cpf(p_cpf text)
+returns table (
+  id uuid,
+  full_name text,
+  cpf text,
+  team_name text,
+  city text,
+  is_paid boolean,
+  payment_proof text,
+  birth_date date,
+  guardian_name text,
+  has_authorization boolean,
+  paid_no_proof boolean
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.id, r.full_name, r.cpf, r.team_name, r.city, r.is_paid, r.payment_proof,
+         r.birth_date, r.guardian_name,
+         (r.authorization_doc is not null and r.authorization_doc <> '') as has_authorization,
+         r.paid_no_proof
+  from public.runners r
+  where regexp_replace(r.cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+$$;
+
+grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
+
+-- Registra o aviso. security definer + validação do CPF, mesmo padrão de
+-- attach_payment_proof (tela pública, sem login).
+create or replace function public.report_paid_without_proof(p_cpf text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.runners
+     set paid_no_proof = true,
+         paid_no_proof_at = now()
+   where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+  if not found then
+    raise exception 'CPF não encontrado';
+  end if;
+end;
+$$;
+
+grant execute on function public.report_paid_without_proof(text) to anon, authenticated;
+
+-- attach_payment_proof passa a limpar o aviso quando um comprovante de
+-- verdade é enviado (o atleta resolveu o problema sozinho).
+drop function if exists public.attach_payment_proof(text, text);
+drop function if exists public.attach_payment_proof(text, text, text);
+create or replace function public.attach_payment_proof(
+  p_cpf text,
+  p_proof text,
+  p_authorization text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_birth date;
+  v_has_auth boolean;
+  v_is_minor boolean;
+begin
+  if p_proof is null or p_proof = '' then
+    raise exception 'Comprovante vazio';
+  end if;
+
+  select birth_date,
+         (authorization_doc is not null and authorization_doc <> '')
+    into v_birth, v_has_auth
+  from public.runners
+  where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g')
+  limit 1;
+
+  if not found then
+    raise exception 'CPF não encontrado';
+  end if;
+
+  v_is_minor := v_birth is not null
+    and extract(year from age(date '2026-09-19', v_birth)) < 18;
+
+  if v_is_minor
+     and (p_authorization is null or p_authorization = '')
+     and not coalesce(v_has_auth, false) then
+    raise exception 'Atleta menor de 18 anos: é obrigatório anexar a autorização do responsável junto com o comprovante.';
+  end if;
+
+  update public.runners
+     set payment_proof = p_proof,
+         authorization_doc = coalesce(nullif(p_authorization, ''), authorization_doc),
+         paid_no_proof = false
+  where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+end;
+$$;
+
+grant execute on function public.attach_payment_proof(text, text, text) to anon, authenticated;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
