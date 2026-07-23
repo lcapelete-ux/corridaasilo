@@ -885,11 +885,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                       <p className="text-slate-800 font-black text-2xl">
                         R$ {getRunnerPaidValue(selectedRunner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
-                      {selectedRunner.couponCode && (
+                      {selectedRunner.couponCode ? (
                         <p className="text-xs text-emerald-600 font-bold mt-0.5">
                           Cupom {selectedRunner.couponCode} aplicado: R$ {getRegistrationFee(selectedRunner.age).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} − R$ {(selectedRunner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
-                      )}
+                      ) : selectedRunner.seniorFullPrice ? (
+                        <p className="text-xs text-amber-600 font-bold mt-0.5">
+                          Atleta 60+ optou por não usar a meia-inscrição (apoiador): R$ {getRegistrationFee(selectedRunner.age, true).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} − R$ {(selectedRunner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                       <div>
