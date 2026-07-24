@@ -47,6 +47,52 @@ const uploadToCloudinary = async (blob: Blob, filename: string): Promise<string>
 export const isPdfProof = (url?: string | null): boolean =>
   !!url && (url.startsWith('data:application/pdf') || /\.pdf(\?|#|$)/i.test(url));
 
+// Deixa um logo consistente na exibição: se a imagem está no Cloudinary,
+// insere transformações que APARAM a borda uniforme (branco/transparente) com
+// e_trim e ajustam a altura — assim logos com moldura branca ou muito
+// espaçamento passam a preencher o espaço igual aos demais, SEM re-enviar.
+// URLs que não são do Cloudinary (base64 legado, assets do site) voltam iguais.
+export const cloudinaryLogoUrl = (url?: string | null, height = 160): string => {
+  if (!url || !url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url || '';
+  // e_trim: remove borda de cor uniforme · c_fit,h_: normaliza a altura
+  return url.replace('/upload/', `/upload/e_trim/c_fit,h_${height}/`);
+};
+
+// Prepara um LOGO para envio ao Cloudinary preservando a transparência (PNG,
+// sem preencher com branco — diferente do comprovante). SVG passa direto.
+export const prepareLogoFile = async (file: File): Promise<string> => {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Envie um arquivo de imagem (PNG, JPG ou SVG).');
+  }
+  // SVG é vetorial (escala perfeito): envia como está
+  if (file.type === 'image/svg+xml') {
+    if (file.size > MAX_PASSTHROUGH_BYTES) throw new Error('Arquivo muito grande.');
+    return uploadToCloudinary(file, file.name);
+  }
+  const originalDataUrl = await readAsDataURL(file);
+  let img: HTMLImageElement;
+  try {
+    img = await loadImage(originalDataUrl);
+  } catch {
+    if (file.size > MAX_PASSTHROUGH_BYTES) throw new Error('Imagem muito grande.');
+    return uploadToCloudinary(file, file.name);
+  }
+  const scale = Math.min(1, 800 / Math.max(img.width, img.height)); // logos até 800px
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return uploadToCloudinary(file, file.name);
+  // NÃO preenche o fundo: preserva a transparência do logo
+  ctx.drawImage(img, 0, 0, w, h);
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Não foi possível processar o logo.'))), 'image/png');
+  });
+  return uploadToCloudinary(blob, 'logo.png');
+};
+
 // Migra um valor antigo (base64 salvo direto no banco) para o Cloudinary,
 // devolvendo a URL. Se já for URL (ou estiver vazio), devolve como está —
 // seguro de chamar de novo em cima de algo já migrado.

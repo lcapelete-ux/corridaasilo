@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { SponsorLogo } from '../types';
-import { prepareProofFile } from '../services/imageUtils';
+import { prepareLogoFile, cloudinaryLogoUrl } from '../services/imageUtils';
 import { Image as ImageIcon, Upload, Trash2, Plus } from 'lucide-react';
 
 interface SponsorLogosManagerProps {
@@ -19,7 +19,7 @@ export const SponsorLogosManager: React.FC<SponsorLogosManagerProps> = ({ logos,
     setUploading(true);
     try {
       for (const file of files) {
-        const dataUrl = await prepareProofFile(file);
+        const dataUrl = await prepareLogoFile(file);
         const name = file.name.replace(/\.[^.]+$/, '').trim();
         await onAdd(dataUrl, name);
       }
@@ -74,7 +74,7 @@ export const SponsorLogosManager: React.FC<SponsorLogosManagerProps> = ({ logos,
           {logos.map(logo => (
             <div key={logo.id} className="relative group bg-white rounded-xl p-4 flex items-center justify-center min-h-[96px] shadow-sm">
               <img
-                src={logo.imageData}
+                src={cloudinaryLogoUrl(logo.imageData)}
                 alt={logo.name || 'Patrocinador'}
                 className="max-h-16 w-auto max-w-full object-contain"
               />
