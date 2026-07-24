@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, X, Map as MapIcon, AlertTriangleIcon } from 'lucide-react';
 import { COURSE } from './courseData';
 import { fmtDistance, pointAtProgress } from './courseGeo';
-import { useMapboxCourse } from './useMapboxCourse';
+import { useCourseMap } from './useCourseMap';
 import { useRouteAnimation } from './useRouteAnimation';
 import { CourseHUD } from './CourseHUD';
 import { CourseTimeline } from './CourseTimeline';
@@ -15,8 +15,6 @@ interface CourseExperienceProps {
 
 type Phase = 'intro' | 'flying' | 'running' | 'finished';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
-
 // Experiência em tela cheia do percurso: intro → voo cinematográfico →
 // animação da linha com câmera seguindo → medalha e chamada de inscrição.
 export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onRegister }) => {
@@ -25,7 +23,7 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
   const [phase, setPhase] = useState<Phase>('intro');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const map = useMapboxCourse(mapContainerRef, MAPBOX_TOKEN);
+  const map = useCourseMap(mapContainerRef);
   const anim = useRouteAnimation({
     durationMs: 26000,
     onFinish: () => {
@@ -81,8 +79,8 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
   const distanceMeters = anim.progress * COURSE.totalMeters;
   const currentEle = pointAtProgress(anim.progress).ele;
 
-  // --- Sem token do Mapbox: mostra aviso claro em vez de mapa quebrado ---
-  if (!MAPBOX_TOKEN) {
+  // --- Mapa não carregou (ex.: sem internet): aviso claro em vez de tela vazia ---
+  if (map.failed) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center p-6 animate-fade-in">
         <button onClick={onClose} className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors"><X size={24} /></button>
@@ -90,10 +88,10 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
           <div className="w-16 h-16 rounded-full bg-yellow-400/10 flex items-center justify-center mx-auto mb-4">
             <AlertTriangleIcon size={30} className="text-yellow-400" />
           </div>
-          <h2 className="text-2xl font-black italic text-white mb-2">Mapa em configuração</h2>
+          <h2 className="text-2xl font-black italic text-white mb-2">Não foi possível carregar o mapa</h2>
           <p className="text-slate-400 text-sm mb-6">
-            O mapa 3D do percurso precisa de uma chave do Mapbox (variável <code className="text-yellow-400">VITE_MAPBOX_TOKEN</code>).
-            Enquanto isso, o percurso oficial tem <strong className="text-white">{fmtDistance(COURSE.totalMeters)}</strong> com
+            Verifique sua conexão e tente de novo. O percurso oficial tem
+            {' '}<strong className="text-white">{fmtDistance(COURSE.totalMeters)}</strong> com
             +{Math.round(COURSE.elevationGain)} m de elevação.
           </p>
           <button onClick={onRegister} className="w-full bg-yellow-400 text-slate-900 px-6 py-3.5 rounded-xl font-black italic uppercase tracking-wider hover:bg-white transition-all">
@@ -158,6 +156,8 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
             progress={anim.progress}
             isPlaying={anim.isPlaying}
             isFullscreen={isFullscreen}
+            speed={anim.speed}
+            onSpeed={anim.setSpeed}
             onToggle={anim.toggle}
             onReplay={handleReplay}
             onFullscreen={toggleFullscreen}

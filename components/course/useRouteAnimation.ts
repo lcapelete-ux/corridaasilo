@@ -10,13 +10,20 @@ interface Options {
 export function useRouteAnimation({ durationMs = 24000, onFinish }: Options = {}) {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeedState] = useState(1); // multiplicador: 1x, 2x, 4x, 8x
 
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
   const progressRef = useRef(0);
+  const speedRef = useRef(1);
   const finishedRef = useRef(false);
   const onFinishRef = useRef(onFinish);
   onFinishRef.current = onFinish;
+
+  const setSpeed = useCallback((s: number) => {
+    speedRef.current = s;
+    setSpeedState(s);
+  }, []);
 
   const stopRaf = () => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
@@ -29,7 +36,7 @@ export function useRouteAnimation({ durationMs = 24000, onFinish }: Options = {}
     const dt = ts - lastTsRef.current;
     lastTsRef.current = ts;
 
-    let next = progressRef.current + dt / durationMs;
+    let next = progressRef.current + (dt * speedRef.current) / durationMs;
     if (next >= 1) {
       next = 1;
       progressRef.current = 1;
@@ -88,5 +95,5 @@ export function useRouteAnimation({ durationMs = 24000, onFinish }: Options = {}
   // Limpa o RAF ao desmontar (sem vazamento de memória)
   useEffect(() => () => stopRaf(), []);
 
-  return { progress, isPlaying, play, pause, toggle, replay, seek };
+  return { progress, isPlaying, speed, setSpeed, play, pause, toggle, replay, seek };
 }
