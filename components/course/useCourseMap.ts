@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { COURSE } from './courseData';
 import {
   fullLineGeoJSON,
@@ -17,7 +17,29 @@ const FINISH: LngLat = [
   COURSE.coords[COURSE.coords.length - 1][1],
 ];
 
-// Cria um elemento DOM estilizado para um marcador (largada/chegada/km/ponta)
+// Estilo MapLibre com base escura da CARTO (raster "dark matter"): sem conta,
+// sem chave de API, sem cartão. Atribuição obrigatória de OSM/CARTO incluída.
+const DARK_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    'carto-dark': {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: '© OpenStreetMap · © CARTO',
+    },
+  },
+  layers: [
+    { id: 'bg', type: 'background', paint: { 'background-color': '#0b1120' } },
+    { id: 'carto-dark', type: 'raster', source: 'carto-dark', paint: { 'raster-opacity': 0.95 } },
+  ],
+};
+
 function makeMarkerEl(kind: 'start' | 'finish' | 'km' | 'tip', label?: string): HTMLDivElement {
   const el = document.createElement('div');
   el.className = `course-marker course-marker--${kind}`;
@@ -27,131 +49,114 @@ function makeMarkerEl(kind: 'start' | 'finish' | 'km' | 'tip', label?: string): 
 
 export interface CourseMapApi {
   ready: boolean;
+  failed: boolean;
   flyToStart: (onArrive?: () => void) => void;
   setProgress: (p: number, follow: boolean) => void;
   zoomOutFinish: () => void;
   showOverview: () => void;
 }
 
-// Encapsula toda a lógica do Mapbox: inicialização (dark + terreno + atmosfera),
-// camadas da rota, marcadores e movimentação de câmera. Devolve uma API
-// imperativa para o container conduzir a experiência.
-export function useMapboxCourse(
-  containerRef: React.RefObject<HTMLDivElement>,
-  token: string | undefined,
-): CourseMapApi {
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const tipMarkerRef = useRef<mapboxgl.Marker | null>(null);
+// Encapsula o mapa (MapLibre + CARTO dark): camadas da rota, marcadores e
+// câmera. Devolve uma API imperativa para o container conduzir a experiência.
+export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): CourseMapApi {
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const tipMarkerRef = useRef<maplibregl.Marker | null>(null);
   const smoothBearingRef = useRef<number>(0);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!token || !containerRef.current || mapRef.current) return;
+    if (!containerRef.current || mapRef.current) return;
 
-    mapboxgl.accessToken = token;
-    let map: mapboxgl.Map;
+    let map: maplibregl.Map;
     try {
-      map = new mapboxgl.Map({
+      map = new maplibregl.Map({
         container: containerRef.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
+        style: DARK_STYLE,
         center: COURSE.center,
         zoom: 13.5,
         pitch: 45,
         bearing: 0,
         antialias: true,
         attributionControl: false,
-        cooperativeGestures: false,
       });
     } catch {
-      setError(true);
+      setFailed(true);
       return;
     }
     mapRef.current = map;
+    map.addControl(
+      new maplibregl.AttributionControl({ compact: true, customAttribution: '© OpenStreetMap · CARTO' }),
+      'bottom-left',
+    );
 
-    map.on('error', () => {/* tiles/rede podem falhar — não derruba a UI */});
+    // Se os tiles/rede falharem por completo, sinaliza para o container
+    let loaded = false;
+    const failTimer = setTimeout(() => { if (!loaded) setFailed(true); }, 12000);
 
     map.on('load', () => {
+      loaded = true;
+      clearTimeout(failTimer);
       try {
-        // Terreno 3D (quando o DEM estiver disponível) + atmosfera
-        if (!map.getSource('mapbox-dem')) {
-          map.addSource('mapbox-dem', {
-            type: 'raster-dem',
-            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-            tileSize: 512,
-            maxzoom: 14,
+        // Atmosfera (céu) — dá profundidade ao pitch alto
+        try {
+          (map as any).setSky?.({
+            'sky-color': '#0b1226',
+            'horizon-color': '#1e293b',
+            'fog-color': '#0f172a',
+            'sky-horizon-blend': 0.6,
+            'horizon-fog-blend': 0.5,
+            'fog-ground-blend': 0.4,
           });
-        }
-        map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.4 });
-        map.setFog({
-          color: 'rgb(15, 23, 42)',
-          'high-color': 'rgb(30, 41, 90)',
-          'horizon-blend': 0.2,
-          'space-color': 'rgb(2, 6, 23)',
-          'star-intensity': 0.5,
-        });
+        } catch { /* setSky pode não existir em versões antigas */ }
 
-        // Fonte da rota completa + trecho percorrido
         map.addSource('route-full', { type: 'geojson', data: fullLineGeoJSON() });
         map.addSource('route-traveled', { type: 'geojson', data: traveledLineGeoJSON(0) });
 
-        // Rota completa: traço fino e apagado (contexto do trajeto)
         map.addLayer({
-          id: 'route-full-line',
-          type: 'line',
-          source: 'route-full',
+          id: 'route-full-line', type: 'line', source: 'route-full',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#334155', 'line-width': 3, 'line-opacity': 0.6 },
+          paint: { 'line-color': '#475569', 'line-width': 3, 'line-opacity': 0.7 },
         });
-        // Glow do trecho percorrido (linha larga e borrada por baixo)
         map.addLayer({
-          id: 'route-traveled-glow',
-          type: 'line',
-          source: 'route-traveled',
+          id: 'route-traveled-glow', type: 'line', source: 'route-traveled',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': '#22c55e', 'line-width': 14, 'line-opacity': 0.35, 'line-blur': 12 },
         });
-        // Trecho percorrido: linha nítida por cima
         map.addLayer({
-          id: 'route-traveled-line',
-          type: 'line',
-          source: 'route-traveled',
+          id: 'route-traveled-line', type: 'line', source: 'route-traveled',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: { 'line-color': '#4ade80', 'line-width': 5 },
         });
 
-        // Marcadores de largada e chegada (DOM)
-        new mapboxgl.Marker({ element: makeMarkerEl('start'), anchor: 'center' })
-          .setLngLat(START).addTo(map);
-        new mapboxgl.Marker({ element: makeMarkerEl('finish'), anchor: 'center' })
-          .setLngLat(FINISH).addTo(map);
-
-        // Marcadores de quilômetro
+        new maplibregl.Marker({ element: makeMarkerEl('start'), anchor: 'center' }).setLngLat(START).addTo(map);
+        new maplibregl.Marker({ element: makeMarkerEl('finish'), anchor: 'center' }).setLngLat(FINISH).addTo(map);
         kilometerMarkers().features.forEach(f => {
           const [lon, lat] = f.geometry.coordinates as [number, number];
-          new mapboxgl.Marker({ element: makeMarkerEl('km', String(f.properties?.label)), anchor: 'center' })
+          new maplibregl.Marker({ element: makeMarkerEl('km', String(f.properties?.label)), anchor: 'center' })
             .setLngLat([lon, lat]).addTo(map);
         });
-
-        // Ponta animada (marcador verde com glow)
-        tipMarkerRef.current = new mapboxgl.Marker({ element: makeMarkerEl('tip'), anchor: 'center' })
+        tipMarkerRef.current = new maplibregl.Marker({ element: makeMarkerEl('tip'), anchor: 'center' })
           .setLngLat(START).addTo(map);
 
         smoothBearingRef.current = bearingAhead(0);
         setReady(true);
       } catch {
-        setError(true);
+        setFailed(true);
       }
     });
 
+    map.on('error', () => {/* falhas de tile individuais não derrubam a UI */});
+
     return () => {
+      clearTimeout(failTimer);
       tipMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
       setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   // Voo cinematográfico até a largada: inclina ~60°, gira e para sobre o início
   const flyToStart = (onArrive?: () => void) => {
@@ -159,18 +164,9 @@ export function useMapboxCourse(
     if (!map) { onArrive?.(); return; }
     const startBearing = bearingAhead(0);
     smoothBearingRef.current = startBearing;
-    map.flyTo({
-      center: START,
-      zoom: 16,
-      pitch: 60,
-      bearing: startBearing,
-      duration: 4200,
-      curve: 1.6,
-      essential: true,
-    });
+    map.flyTo({ center: START, zoom: 16, pitch: 60, bearing: startBearing, duration: 4200, curve: 1.6, essential: true });
     map.once('moveend', () => onArrive?.());
-    // fallback caso o moveend não dispare (sem tiles/rede)
-    setTimeout(() => onArrive?.(), 4600);
+    setTimeout(() => onArrive?.(), 4600); // fallback caso o moveend não dispare
   };
 
   // Atualiza marcador + trecho percorrido; opcionalmente segue com a câmera
@@ -180,11 +176,10 @@ export function useMapboxCourse(
     const { lngLat } = pointAtProgress(p);
     tipMarkerRef.current?.setLngLat(lngLat);
 
-    const src = map.getSource('route-traveled') as mapboxgl.GeoJSONSource | undefined;
+    const src = map.getSource('route-traveled') as maplibregl.GeoJSONSource | undefined;
     src?.setData(traveledLineGeoJSON(p));
 
     if (follow && p < 1) {
-      // Suaviza o rumo para a câmera não "tremer" nas curvas
       const targetBearing = bearingAhead(p);
       let diff = targetBearing - smoothBearingRef.current;
       while (diff > 180) diff -= 360;
@@ -194,25 +189,19 @@ export function useMapboxCourse(
     }
   };
 
-  // Zoom out final para enquadrar o percurso inteiro
   const zoomOutFinish = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.fitBounds(
+    mapRef.current?.fitBounds(
       [[COURSE.bbox[0], COURSE.bbox[1]], [COURSE.bbox[2], COURSE.bbox[3]]],
-      { padding: 80, pitch: 40, bearing: 0, duration: 2600, essential: true },
+      { padding: 80, pitch: 40, bearing: 0, duration: 2600 },
     );
   };
 
-  // Visão geral inicial (rota inteira enquadrada, leve inclinação)
   const showOverview = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.fitBounds(
+    mapRef.current?.fitBounds(
       [[COURSE.bbox[0], COURSE.bbox[1]], [COURSE.bbox[2], COURSE.bbox[3]]],
       { padding: 70, pitch: 40, bearing: 0, duration: 0 },
     );
   };
 
-  return { ready: ready && !error, flyToStart, setProgress, zoomOutFinish, showOverview };
+  return { ready: ready && !failed, failed, flyToStart, setProgress, zoomOutFinish, showOverview };
 }

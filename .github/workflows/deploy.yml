@@ -39,10 +39,6 @@ jobs:
         env:
           VITE_CLOUDINARY_CLOUD_NAME: gdvxqrfr
           VITE_CLOUDINARY_UPLOAD_PRESET: runners_payment_proof_unsigned
-          # Token do mapa 3D do percurso — defina o secret VITE_MAPBOX_TOKEN no
-          # repositório (Settings → Secrets → Actions). Sem ele, a tela do mapa
-          # mostra o aviso "Mapa em configuração" (não quebra o site).
-          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

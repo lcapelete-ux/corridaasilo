@@ -9,14 +9,18 @@ interface CourseHUDProps {
   progress: number; // 0..1
   isPlaying: boolean;
   isFullscreen: boolean;
+  speed: number;
+  onSpeed: (s: number) => void;
   onToggle: () => void;
   onReplay: () => void;
   onFullscreen: () => void;
 }
 
+const SPEEDS = [1, 2, 4, 8];
+
 // Painel de informações (glassmorphism) com stats e controles de reprodução
 export const CourseHUD: React.FC<CourseHUDProps> = ({
-  distanceMeters, elevation, progress, isPlaying, isFullscreen, onToggle, onReplay, onFullscreen,
+  distanceMeters, elevation, progress, isPlaying, isFullscreen, speed, onSpeed, onToggle, onReplay, onFullscreen,
 }) => {
   const pct = Math.round(progress * 100);
   return (
@@ -61,6 +65,22 @@ export const CourseHUD: React.FC<CourseHUDProps> = ({
           <Stat icon={<MapPin size={13} />} label="Distância" value={fmtDistance(distanceMeters)} sub={`de ${fmtDistance(COURSE.totalMeters)}`} />
           <Stat icon={<TrendingUp size={13} />} label="Elevação" value={`${Math.round(elevation)} m`} sub={`+${Math.round(COURSE.elevationGain)} m no total`} />
           <Stat icon={<Flag size={13} />} label="Progresso" value={`${pct}%`} sub={pct >= 100 ? 'concluído!' : 'do percurso'} />
+        </div>
+
+        {/* Velocidade da animação */}
+        <div className="flex items-center justify-center gap-1.5 mt-3">
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-1">Velocidade</span>
+          {SPEEDS.map(s => (
+            <button
+              key={s}
+              onClick={() => onSpeed(s)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                speed === s ? 'bg-yellow-400 text-slate-900' : 'bg-white/10 text-slate-300 hover:bg-white/20 border border-white/10'
+              }`}
+            >
+              {s}x
+            </button>
+          ))}
         </div>
       </div>
     </div>
