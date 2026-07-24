@@ -4,32 +4,24 @@ import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
 import { prepareProofFile } from '../services/imageUtils';
 import { Save, Calendar, MapPin, CreditCard, Flag, Upload, CheckCircle, XCircle, DollarSign, FileText, AlertCircle, Ticket, ShieldAlert, UserCheck, Trophy } from 'lucide-react';
-import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, SENIOR_SUPPORTER_DISCOUNT, PREDEFINED_TEAMS, MIN_AGE, MINOR_AGE, AGE_REF_DATE, ageOnDate, isMinorAtEvent, getRunnerCategory, MODALITIES } from '../constants';
+import { getRegistrationFee, calcCouponDiscount, REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR, SENIOR_AGE, SENIOR_SUPPORTER_DISCOUNT, PREDEFINED_TEAMS, PREDEFINED_CITIES, MIN_AGE, MINOR_AGE, AGE_REF_DATE, ageOnDate, isMinorAtEvent, getRunnerCategory, MODALITIES } from '../constants';
 import { RegulationModal } from './RegulationModal';
 
 interface RegistrationFormProps {
   onSave: (runner: Runner) => Promise<boolean>;
   existingTeams: string[];
   officialTeams?: string[]; // Lista de equipes cadastradas (banco); sem isso, usa PREDEFINED_TEAMS
+  officialCities?: string[]; // Lista de cidades cadastradas (banco); sem isso, usa PREDEFINED_CITIES
   isPublicView?: boolean;
   userSession?: UserSession | null;
   coupons?: TeamCoupon[]; // Cupons disponíveis (área restrita): botão de aplicar direto
 }
 
-const PREDEFINED_CITIES = [
-  'Laranjal Paulista',
-  'Cerquilho',
-  'Cesário Lange',
-  'Conchas',
-  'Jumirim',
-  'Pereiras',
-  'Tiete'
-];
-
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, isPublicView = false, userSession, coupons }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, officialCities, isPublicView = false, userSession, coupons }) => {
   // "Avulso" já tem opção própria no <select>: não repete aqui
   const teamOptions = (officialTeams && officialTeams.length > 0 ? officialTeams : PREDEFINED_TEAMS)
     .filter(t => t !== 'Avulso');
+  const cityOptions = officialCities && officialCities.length > 0 ? officialCities : PREDEFINED_CITIES;
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -719,7 +711,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   className={selectClass}
                 >
                   <option value="" disabled className={optionClass}>Selecione uma cidade...</option>
-                  {PREDEFINED_CITIES.map(city => (
+                  {cityOptions.map(city => (
                     <option key={city} value={city} className={optionClass}>{city}</option>
                   ))}
                   <option value="Outra" className={optionClass}>Outra (Digitar nome)</option>

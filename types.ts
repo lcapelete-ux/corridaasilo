@@ -120,4 +120,4 @@ export interface TransferSettings {
   transfersBlocked: boolean; // Bloqueio manual imediato definido pelo admin
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos';
+export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos';

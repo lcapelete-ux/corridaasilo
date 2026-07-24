@@ -105,6 +105,18 @@ export const PREDEFINED_TEAMS = [
   'Tribo'
 ];
 
+// Cidades pré-cadastradas (seed inicial — usado até a lista do banco carregar,
+// ou como reserva se a tabela "cities" ainda estiver vazia)
+export const PREDEFINED_CITIES = [
+  'Laranjal Paulista',
+  'Cerquilho',
+  'Cesário Lange',
+  'Conchas',
+  'Jumirim',
+  'Pereiras',
+  'Tiete'
+];
+
 // Desconto do cupom em R$, limitado ao valor da inscrição
 export const calcCouponDiscount = (fee: number, coupon: Pick<TeamCoupon, 'discountType' | 'value'>): number => {
   const raw = coupon.discountType === 'percent' ? (fee * coupon.value) / 100 : coupon.value;
