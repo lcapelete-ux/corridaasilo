@@ -17,31 +17,32 @@ const FINISH: LngLat = [
   COURSE.coords[COURSE.coords.length - 1][1],
 ];
 
-// Estilo MapLibre com base escura da Esri ("Dark Gray Canvas"): mostra as ruas
-// e é gratuito, sem conta, sem chave de API, sem cartão. Duas camadas: a base
-// (ruas/quadras) e a de referência (nomes de ruas). Atribuição incluída.
-const ATTRIB = 'Esri · HERE · Garmin · © OpenStreetMap contributors';
+// Estilo MapLibre com base do OpenStreetMap padrão — o servidor de tiles mais
+// confiável e universal, gratuito, sem conta/chave/cartão. Um leve
+// escurecimento (raster paint) mantém o clima noturno sem esconder as ruas.
+const ATTRIB = '© OpenStreetMap contributors';
 const DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {
-    'esri-dark': {
+    'osm': {
       type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
+      tiles: [
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      ],
       tileSize: 256,
-      maxzoom: 16,
+      maxzoom: 19,
       attribution: ATTRIB,
-    },
-    'esri-dark-ref': {
-      type: 'raster',
-      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'],
-      tileSize: 256,
-      maxzoom: 16,
     },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#0b1120' } },
-    { id: 'esri-dark', type: 'raster', source: 'esri-dark' },
-    { id: 'esri-dark-ref', type: 'raster', source: 'esri-dark-ref' },
+    {
+      id: 'osm', type: 'raster', source: 'osm',
+      // escurece/dessatura um pouco pra harmonizar com a interface escura
+      paint: { 'raster-saturation': -0.55, 'raster-brightness-max': 0.75, 'raster-contrast': 0.05 },
+    },
   ],
 };
 
@@ -102,6 +103,8 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
     map.on('load', () => {
       loaded = true;
       clearTimeout(failTimer);
+      // Garante que o mapa preencha o container (caso tenha iniciado antes do layout)
+      try { map.resize(); } catch { /* noop */ }
       try {
         // Atmosfera (céu) — dá profundidade ao pitch alto
         try {
