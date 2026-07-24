@@ -56,6 +56,7 @@ function makeMarkerEl(kind: 'start' | 'finish' | 'km' | 'tip', label?: string): 
 export interface CourseMapApi {
   ready: boolean;
   failed: boolean;
+  tilesFailed: boolean;
   flyToStart: (onArrive?: () => void) => void;
   setProgress: (p: number, follow: boolean) => void;
   zoomOutFinish: () => void;
@@ -70,6 +71,7 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
   const smoothBearingRef = useRef<number>(0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [tilesFailed, setTilesFailed] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -154,7 +156,11 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
       }
     });
 
-    map.on('error', () => {/* falhas de tile individuais não derrubam a UI */});
+    // Se os tiles da base (OSM) falharem (CORS/rede/cache), sinaliza para a UI
+    // avisar — o traçado do percurso continua visível de qualquer forma.
+    map.on('error', (e: any) => {
+      if (e && e.sourceId === 'osm') setTilesFailed(true);
+    });
 
     return () => {
       clearTimeout(failTimer);
@@ -211,5 +217,5 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
     );
   };
 
-  return { ready: ready && !failed, failed, flyToStart, setProgress, zoomOutFinish, showOverview };
+  return { ready: ready && !failed, failed, tilesFailed, flyToStart, setProgress, zoomOutFinish, showOverview };
 }
