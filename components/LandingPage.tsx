@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink, Route } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
-import { SicrediMark } from './SicrediMark';
-import { RondonTexMark } from './RondonTexMark';
+import rondontexLogo from '../assets/rondontex-logo.png';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 import { formatBrDate } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
@@ -107,13 +106,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center text-center p-4 relative z-10 w-full max-w-4xl mx-auto mt-4 md:mt-0">
 
-        {/* Sponsor Header — patrocinadores master (Sicredi + RondonTex) */}
+        {/* Sponsor Header — patrocinadores master (Sicredi + RondonTex) em cards
+            brancos: o logo do RondonTex tem letras escuras, então precisa de
+            fundo claro para ficar legível no hero escuro. */}
         <div className="mb-6 animate-fade-in-up flex flex-col items-center gap-3">
            <p className="text-yellow-400/90 text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold">Patrocínio Master</p>
-           <div className="flex items-center justify-center gap-4 md:gap-6 text-2xl md:text-4xl">
-             <SicrediMark />
-             <span className="text-slate-600 text-lg md:text-xl">✕</span>
-             <RondonTexMark />
+           <div className="flex items-center justify-center gap-3 md:gap-4">
+             <div className="bg-white rounded-xl h-16 md:h-20 px-5 md:px-6 flex items-center justify-center shadow-lg">
+               <img src={sicrediLogo} alt="Sicredi" className="max-h-9 md:max-h-11 w-auto object-contain" />
+             </div>
+             <div className="bg-white rounded-xl h-16 md:h-20 px-5 md:px-6 flex items-center justify-center shadow-lg">
+               <img src={rondontexLogo} alt="RondonTex" className="max-h-9 md:max-h-11 w-auto object-contain" />
+             </div>
            </div>
            <span className="text-yellow-400 text-[10px] md:text-xs uppercase tracking-[0.25em] font-bold border border-yellow-400/60 px-3 py-1 rounded-full shadow-[0_0_10px_rgba(250,204,21,0.3)]">Apresentam</span>
         </div>

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Flag } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
-import { SicrediMark } from './SicrediMark';
-import { RondonTexMark } from './RondonTexMark';
+import sicrediLogo from '../assets/sicredi-logo.jpg';
+import rondontexLogo from '../assets/rondontex-logo.png';
 
 // A vinheta roda uma única vez por carregamento da página (voltar de outra tela não repete)
 let alreadyPlayed = false;
@@ -112,10 +112,14 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
           />
         )}
         {step === 'sicredi' && (
-          <SicrediMark key="sicredi" className="text-4xl md:text-6xl animate-count-stamp" />
+          <div key="sicredi" className="bg-white rounded-2xl px-8 py-5 md:px-12 md:py-7 shadow-2xl animate-count-stamp">
+            <img src={sicrediLogo} alt="Sicredi" className="h-12 md:h-16 w-auto object-contain" />
+          </div>
         )}
         {step === 'rondontex' && (
-          <RondonTexMark key="rondontex" className="text-4xl md:text-6xl animate-count-stamp" />
+          <div key="rondontex" className="bg-white rounded-2xl px-8 py-5 md:px-12 md:py-7 shadow-2xl animate-count-stamp">
+            <img src={rondontexLogo} alt="RondonTex" className="h-12 md:h-16 w-auto object-contain" />
+          </div>
         )}
         {step === 'apresentam' && (
           <span
