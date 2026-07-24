@@ -93,6 +93,44 @@
 .animate-runner-bob { animation: runner-bob 0.22s linear infinite; }
 .animate-intro-exit { animation: intro-exit 0.45s ease-out forwards; }
 
+/* ---- Marcadores do mapa de percurso (Mapbox) — elementos DOM puros ---- */
+.course-marker { box-sizing: border-box; }
+.course-marker--tip {
+  width: 20px; height: 20px; border-radius: 9999px;
+  background: #22c55e; border: 3px solid #ecfdf5;
+  box-shadow: 0 0 0 4px rgba(34,197,94,0.35), 0 0 22px 6px rgba(34,197,94,0.8);
+  animation: course-pulse 1.6s ease-in-out infinite;
+}
+.course-marker--start, .course-marker--finish {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 900; letter-spacing: .03em; color: #0b1120;
+  padding: 3px 8px; border-radius: 9999px; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.course-marker--start { background: #4ade80; }
+.course-marker--start::before { content: "LARGADA"; }
+.course-marker--finish { background: #facc15; }
+.course-marker--finish::before { content: "CHEGADA"; }
+.course-marker--km {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: rgba(15,23,42,0.85); border: 1.5px solid #64748b;
+  color: #e2e8f0; font-size: 10px; font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+@keyframes course-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(34,197,94,0.35), 0 0 22px 6px rgba(34,197,94,0.8); }
+  50% { box-shadow: 0 0 0 7px rgba(34,197,94,0.18), 0 0 30px 10px rgba(34,197,94,0.6); }
+}
+/* Medalha girando em 3D no final */
+@keyframes medal-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+.animate-medal-spin { animation: medal-spin 3.2s linear infinite; transform-style: preserve-3d; }
+/* Esconde a marca d'água do Mapbox de forma discreta (mantém atribuição via UI própria) */
+.course-map .mapboxgl-ctrl-logo { opacity: 0.5; }
+
 /* Desliga animações decorativas para quem prefere menos movimento */
 @media (prefers-reduced-motion: reduce) {
   *,

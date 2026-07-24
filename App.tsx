@@ -28,6 +28,12 @@ const Dashboard = lazy(() =>
   import('./components/Dashboard').then(m => ({ default: m.Dashboard }))
 );
 
+// Mapa 3D do percurso (Mapbox) carregado sob demanda: a lib do mapa só é
+// baixada por quem clica em "Ver mapa do percurso", mantendo a landing leve
+const CourseExperience = lazy(() =>
+  import('./components/course/CourseExperience').then(m => ({ default: m.CourseExperience }))
+);
+
 type AppMode = 'landing' | 'public' | 'registration_success' | 'auth_screen' | 'restricted_area' | 'proof_upload';
 
 const App: React.FC = () => {
@@ -56,6 +62,7 @@ const App: React.FC = () => {
   const [lastRegisteredDiscount, setLastRegisteredDiscount] = useState<number>(0);
   const [lastRegisteredSeniorFullPrice, setLastRegisteredSeniorFullPrice] = useState<boolean>(false);
   const [lastRegisteredExtraDonation, setLastRegisteredExtraDonation] = useState<number>(0);
+  const [showCourse, setShowCourse] = useState(false); // overlay do mapa 3D do percurso
   
   // Auth State
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -581,14 +588,25 @@ const App: React.FC = () => {
   // RENDER: LANDING PAGE (NOVA TELA INICIAL)
   if (mode === 'landing') {
     return (
-      <LandingPage
-        onStartRegistration={() => setMode('public')}
-        onAdminLogin={() => setMode(userSession ? 'restricted_area' : 'auth_screen')}
-        onOpenProofUpload={() => setMode('proof_upload')}
-        raceGroupName={raceGroupName}
-        promoDeadline={promoDeadline}
-        sponsorLogos={sponsorLogos}
-      />
+      <>
+        <LandingPage
+          onStartRegistration={() => setMode('public')}
+          onAdminLogin={() => setMode(userSession ? 'restricted_area' : 'auth_screen')}
+          onOpenProofUpload={() => setMode('proof_upload')}
+          onOpenCourse={() => setShowCourse(true)}
+          raceGroupName={raceGroupName}
+          promoDeadline={promoDeadline}
+          sponsorLogos={sponsorLogos}
+        />
+        {showCourse && (
+          <Suspense fallback={<div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center text-slate-400 font-bold animate-pulse">Carregando percurso...</div>}>
+            <CourseExperience
+              onClose={() => setShowCourse(false)}
+              onRegister={() => { setShowCourse(false); setMode('public'); }}
+            />
+          </Suspense>
+        )}
+      </>
     );
   }
 

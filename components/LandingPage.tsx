@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink } from 'lucide-react';
+import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink, Route } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
@@ -11,12 +11,13 @@ interface LandingPageProps {
   onStartRegistration: () => void;
   onAdminLogin: () => void;
   onOpenProofUpload: () => void;
+  onOpenCourse: () => void;
   raceGroupName?: string;
   promoDeadline?: string;
   sponsorLogos?: SponsorLogo[];
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [] }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [] }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
   // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
@@ -172,6 +173,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
 
             <span className="relative z-10">Fazer Inscrição Agora</span>
             <ChevronRight className="group-hover:translate-x-1 transition-transform relative z-10" strokeWidth={3} aria-hidden="true" />
+          </button>
+
+          {/* Ver o mapa 3D do percurso */}
+          <button
+            onClick={onOpenCourse}
+            className="group inline-flex items-center gap-2.5 bg-slate-900/60 backdrop-blur-md border border-yellow-400/30 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:border-yellow-400/70 hover:bg-slate-900/80 transition-all"
+          >
+            <Route size={18} className="text-yellow-400 group-hover:scale-110 transition-transform" aria-hidden="true" />
+            Ver mapa do percurso
+            <span className="text-[10px] text-slate-500 font-bold normal-case tracking-normal">5 km</span>
           </button>
 
           <button
