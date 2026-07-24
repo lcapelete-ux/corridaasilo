@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Flag } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
+import { SicrediMark } from './SicrediMark';
+import { RondonTexMark } from './RondonTexMark';
 
 // A vinheta roda uma única vez por carregamento da página (voltar de outra tela não repete)
 let alreadyPlayed = false;
@@ -11,7 +13,9 @@ export const shouldPlayRaceIntro = (): boolean => {
   return true;
 };
 
-type IntroStep = 'ready' | '3' | '2' | '1' | 'go' | 'exit';
+// Sequência: os patrocinadores master surgem um a um, "apresentam", e então a
+// largada (mesma animação de antes).
+type IntroStep = 'ready' | 'sicredi' | 'rondontex' | 'apresentam' | 'go' | 'exit';
 
 const RunnerIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 100 100" className={className} aria-hidden="true">
@@ -65,28 +69,28 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
     };
 
     const timers = [
-      setTimeout(() => count('3'), 400),
-      setTimeout(() => count('2'), 1150),
-      setTimeout(() => count('1'), 1900),
+      setTimeout(() => count('sicredi'), 400),
+      setTimeout(() => count('rondontex'), 1500),
+      setTimeout(() => count('apresentam'), 2600),
       setTimeout(() => {
         setStep('go');
         // LARGADA: bipe longo + música entrando junto (ou no primeiro toque,
         // se o navegador ainda estiver bloqueando o áudio)
         nightMusic.countBeep(true);
         nightMusic.requestStart();
-      }, 2650),
-      setTimeout(() => { setStep('exit'); onRevealRef.current(); }, 3850),
+      }, 3500),
+      setTimeout(() => { setStep('exit'); onRevealRef.current(); }, 4700),
       setTimeout(() => {
         if (!finishedRef.current) {
           finishedRef.current = true;
           onFinishRef.current();
         }
-      }, 4350),
+      }, 5200),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const isCounting = step === '3' || step === '2' || step === '1';
+  const isSponsor = step === 'sicredi' || step === 'rondontex' || step === 'apresentam';
 
   return (
     <div
@@ -99,21 +103,27 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
         2ª Corrida Noturna LSC · 5K
       </div>
 
-      {/* Contagem regressiva / Largada */}
-      <div className="relative h-36 md:h-48 w-full flex items-center justify-center">
-        {isCounting && (
-          <>
-            <span
-              key={`ring-${step}`}
-              className="absolute w-36 h-36 md:w-48 md:h-48 rounded-full border-2 border-yellow-400/50 animate-shockwave"
-            />
-            <span
-              key={`num-${step}`}
-              className="text-[7rem] md:text-[10rem] leading-none font-black italic text-yellow-400 animate-count-stamp [text-shadow:0_0_20px_rgba(250,204,21,0.8),0_0_60px_rgba(250,204,21,0.45)]"
-            >
-              {step}
-            </span>
-          </>
+      {/* Patrocinadores master surgindo, um a um / Largada */}
+      <div className="relative h-36 md:h-48 w-full flex items-center justify-center px-6">
+        {isSponsor && (
+          <span
+            key={`ring-${step}`}
+            className="absolute w-48 h-48 md:w-64 md:h-64 rounded-full border-2 border-yellow-400/40 animate-shockwave"
+          />
+        )}
+        {step === 'sicredi' && (
+          <SicrediMark key="sicredi" className="text-4xl md:text-6xl animate-count-stamp" />
+        )}
+        {step === 'rondontex' && (
+          <RondonTexMark key="rondontex" className="text-4xl md:text-6xl animate-count-stamp" />
+        )}
+        {step === 'apresentam' && (
+          <span
+            key="apresentam"
+            className="text-3xl md:text-5xl font-black italic uppercase tracking-[0.25em] text-yellow-400 animate-count-stamp [text-shadow:0_0_20px_rgba(250,204,21,0.75),0_0_60px_rgba(250,204,21,0.4)]"
+          >
+            Apresentam
+          </span>
         )}
         {(step === 'go' || step === 'exit') && (
           <span className="text-5xl md:text-8xl font-black italic text-white animate-go-burst [text-shadow:0_0_25px_rgba(250,204,21,0.9),0_0_70px_rgba(250,204,21,0.5)]">

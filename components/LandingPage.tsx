@@ -3,6 +3,7 @@ import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Mus
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
+import { RondonTexMark } from './RondonTexMark';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 import { formatBrDate } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
@@ -106,12 +107,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center text-center p-4 relative z-10 w-full max-w-4xl mx-auto mt-4 md:mt-0">
 
-        {/* Sponsor Header */}
-        <div className="mb-6 animate-fade-in-up">
-           <div className="flex items-center justify-center gap-2 text-white font-bold text-lg md:text-xl tracking-tighter">
+        {/* Sponsor Header — patrocinadores master (Sicredi + RondonTex) */}
+        <div className="mb-6 animate-fade-in-up flex flex-col items-center gap-3">
+           <p className="text-yellow-400/90 text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold">Patrocínio Master</p>
+           <div className="flex items-center justify-center gap-4 md:gap-6 text-2xl md:text-4xl">
              <SicrediMark />
-             <span className="text-yellow-400 text-xs uppercase tracking-widest border border-yellow-400 px-1 rounded shadow-[0_0_10px_rgba(250,204,21,0.3)]">Apresenta</span>
+             <span className="text-slate-600 text-lg md:text-xl">✕</span>
+             <RondonTexMark />
            </div>
+           <span className="text-yellow-400 text-[10px] md:text-xs uppercase tracking-[0.25em] font-bold border border-yellow-400/60 px-3 py-1 rounded-full shadow-[0_0_10px_rgba(250,204,21,0.3)]">Apresentam</span>
         </div>
 
         {/* Big Typography Logo */}

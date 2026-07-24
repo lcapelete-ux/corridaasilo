@@ -10,7 +10,7 @@ const PETAL_PATH = 'M0,0 C-4,-10 -16,-18 -2,-28 C14,-22 16,-10 0,0 Z';
 
 export const SicrediMark: React.FC<SicrediMarkProps> = ({ className }) => (
   <span className={`inline-flex items-center gap-1.5 ${className ?? ''}`}>
-    <svg viewBox="-30 -30 60 60" className="h-5 md:h-6 w-auto" role="img" aria-label="Sicredi" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="-30 -30 60 60" className="h-[1.05em] w-auto shrink-0" role="img" aria-label="Sicredi" xmlns="http://www.w3.org/2000/svg">
       {PETAL_COLORS.map((color, i) => (
         <path
           key={i}
