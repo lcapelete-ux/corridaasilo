@@ -5,6 +5,7 @@ import sicrediLogo from '../assets/sicredi-logo.jpg';
 import { SicrediMark } from './SicrediMark';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 import { formatBrDate } from '../constants';
+import { cloudinaryLogoUrl } from '../services/imageUtils';
 import { SponsorLogo } from '../types';
 
 interface LandingPageProps {
@@ -227,14 +228,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       {/* Logos/Footer */}
       <footer className="relative z-10 py-6 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center px-6 gap-4">
-           {/* Sicredi + logos dos patrocinadores (quebram em 2-3 linhas se houver muitos) */}
-           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-              <div className="bg-white rounded px-3 py-1.5 flex items-center">
-                <img src={sicrediLogo} alt="Sicredi" className="h-8 md:h-10 w-auto object-contain" />
+           {/* Sicredi + logos dos patrocinadores (quebram em 2-3 linhas se houver muitos).
+               Chips de altura fixa; os logos são aparados (e_trim no Cloudinary) e
+               centralizados, para ficarem no mesmo tamanho visual, sem "moldura branca". */}
+           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+              <div className="bg-white rounded-lg h-12 md:h-14 px-4 flex items-center justify-center">
+                <img src={sicrediLogo} alt="Sicredi" className="max-h-8 md:max-h-10 w-auto object-contain" />
               </div>
               {sponsorLogos.map(logo => (
-                <div key={logo.id} className="bg-white rounded px-3 py-1.5 flex items-center">
-                  <img src={logo.imageData} alt={logo.name || 'Patrocinador'} className="h-8 md:h-10 w-auto object-contain" />
+                <div key={logo.id} className="bg-white rounded-lg h-12 md:h-14 px-4 flex items-center justify-center">
+                  <img src={cloudinaryLogoUrl(logo.imageData)} alt={logo.name || 'Patrocinador'} className="max-h-8 md:max-h-10 w-auto object-contain" />
                 </div>
               ))}
            </div>
