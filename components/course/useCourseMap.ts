@@ -127,20 +127,23 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
         map.addSource('route-full', { type: 'geojson', data: fullLineGeoJSON() });
         map.addSource('route-traveled', { type: 'geojson', data: traveledLineGeoJSON(0) });
 
+        // Cores pensadas para o mapa claro (OSM): traços escuros, com bom
+        // contraste. Trecho a percorrer em cinza-escuro; trecho já percorrido
+        // em verde-escuro com um leve halo.
         map.addLayer({
           id: 'route-full-line', type: 'line', source: 'route-full',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#475569', 'line-width': 3, 'line-opacity': 0.7 },
+          paint: { 'line-color': '#1e293b', 'line-width': 4, 'line-opacity': 0.55 },
         });
         map.addLayer({
           id: 'route-traveled-glow', type: 'line', source: 'route-traveled',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#22c55e', 'line-width': 14, 'line-opacity': 0.35, 'line-blur': 12 },
+          paint: { 'line-color': '#065f46', 'line-width': 12, 'line-opacity': 0.3, 'line-blur': 8 },
         });
         map.addLayer({
           id: 'route-traveled-line', type: 'line', source: 'route-traveled',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#4ade80', 'line-width': 5 },
+          paint: { 'line-color': '#15803d', 'line-width': 5.5 },
         });
 
         new maplibregl.Marker({ element: makeMarkerEl('start'), anchor: 'center' }).setLngLat(START).addTo(map);
