@@ -98,12 +98,16 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
       'bottom-left',
     );
 
-    // Se os tiles/rede falharem por completo, sinaliza para o container
-    let loaded = false;
-    const failTimer = setTimeout(() => { if (!loaded) setFailed(true); }, 12000);
+    // Fica "pronto" assim que o ESTILO carrega (instantâneo, estilo é interno),
+    // sem esperar os tiles das ruas — a linha do percurso e os marcadores
+    // aparecem na hora; as ruas entram quando os tiles chegam. Só marca falha
+    // se nem o estilo carregar (raro).
+    let inited = false;
+    const failTimer = setTimeout(() => { if (!inited) setFailed(true); }, 15000);
 
-    map.on('load', () => {
-      loaded = true;
+    const init = () => {
+      if (inited) return;
+      inited = true;
       clearTimeout(failTimer);
       // Garante que o mapa preencha o container (caso tenha iniciado antes do layout)
       try { map.resize(); } catch { /* noop */ }
@@ -154,7 +158,12 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
       } catch {
         setFailed(true);
       }
-    });
+    };
+
+    // Dispara pelo que vier primeiro: 'load' (estilo + 1º render) ou o estilo
+    // já estar carregado (styledata) — assim não dependemos dos tiles das ruas.
+    map.on('load', init);
+    map.on('styledata', () => { if (map.isStyleLoaded()) init(); });
 
     // Se os tiles da base (OSM) falharem (CORS/rede/cache), sinaliza para a UI
     // avisar — o traçado do percurso continua visível de qualquer forma.

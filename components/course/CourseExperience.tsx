@@ -104,8 +104,11 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[100] bg-slate-950 animate-fade-in">
-      {/* Mapa */}
-      <div ref={mapContainerRef} className="course-map absolute inset-0" />
+      {/* Mapa. O tamanho vai por style inline de propósito: o MapLibre adiciona
+          a classe .maplibregl-map (position: relative) na mesma div, que
+          sobrescreveria um "absolute inset-0" via classe e colapsaria a altura
+          para 0. O style inline vence o CSS do MapLibre e garante o preenchimento. */}
+      <div ref={mapContainerRef} className="course-map" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
 
       {/* Botão fechar (sempre acessível) */}
       <button
