@@ -62,12 +62,12 @@ direto, sem expor a API secret. Os mesmos valores já estão configurados no
 `netlify.toml` e no workflow do GitHub Pages (`.github/workflows/deploy.yml`);
 não são segredos (o preset unsigned é feito para ficar público no bundle).
 
-### Mapa do percurso (MapLibre + CARTO)
+### Mapa do percurso (MapLibre + Esri Dark Gray)
 
 A tela "Ver mapa do percurso" (botão na página inicial) mostra o traçado
-oficial em um mapa animado. Usa **MapLibre GL** com a base escura **"dark
-matter" da CARTO** — **sem conta, sem chave de API e sem cartão**: funciona
-direto, sem configurar nada.
+oficial em um mapa animado. Usa **MapLibre GL** com a base escura **"Dark Gray
+Canvas" da Esri** (ruas + nomes) — **sem conta, sem chave de API e sem cartão**:
+funciona direto, sem configurar nada.
 
 O percurso vem de um GPX (Strava) pré-processado em
 `components/course/courseData.ts` (coordenadas + distância acumulada +
@@ -76,7 +76,7 @@ elevação), para não parsear XML no navegador. A biblioteca do mapa é carrega
 página inicial leve. Se o mapa não carregar (ex.: sem internet), a tela mostra
 um aviso amigável com os dados do percurso e o botão de inscrição, sem quebrar.
 
-Créditos do mapa (exibidos no canto): © OpenStreetMap · © CARTO.
+Créditos do mapa (exibidos no canto): Esri · HERE · Garmin · © OpenStreetMap.
 
 ## Deploy (Netlify)
 
