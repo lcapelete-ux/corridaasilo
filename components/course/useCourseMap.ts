@@ -17,26 +17,31 @@ const FINISH: LngLat = [
   COURSE.coords[COURSE.coords.length - 1][1],
 ];
 
-// Estilo MapLibre com base escura da CARTO (raster "dark matter"): sem conta,
-// sem chave de API, sem cartão. Atribuição obrigatória de OSM/CARTO incluída.
+// Estilo MapLibre com base escura da Esri ("Dark Gray Canvas"): mostra as ruas
+// e é gratuito, sem conta, sem chave de API, sem cartão. Duas camadas: a base
+// (ruas/quadras) e a de referência (nomes de ruas). Atribuição incluída.
+const ATTRIB = 'Esri · HERE · Garmin · © OpenStreetMap contributors';
 const DARK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {
-    'carto-dark': {
+    'esri-dark': {
       type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      ],
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
       tileSize: 256,
-      attribution: '© OpenStreetMap · © CARTO',
+      maxzoom: 16,
+      attribution: ATTRIB,
+    },
+    'esri-dark-ref': {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 16,
     },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#0b1120' } },
-    { id: 'carto-dark', type: 'raster', source: 'carto-dark', paint: { 'raster-opacity': 0.95 } },
+    { id: 'esri-dark', type: 'raster', source: 'esri-dark' },
+    { id: 'esri-dark-ref', type: 'raster', source: 'esri-dark-ref' },
   ],
 };
 
@@ -86,7 +91,7 @@ export function useCourseMap(containerRef: React.RefObject<HTMLDivElement>): Cou
     }
     mapRef.current = map;
     map.addControl(
-      new maplibregl.AttributionControl({ compact: true, customAttribution: '© OpenStreetMap · CARTO' }),
+      new maplibregl.AttributionControl({ compact: true, customAttribution: ATTRIB }),
       'bottom-left',
     );
 
