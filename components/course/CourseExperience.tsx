@@ -116,6 +116,15 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
         <X size={20} />
       </button>
 
+      {/* Aviso: as ruas do mapa não carregaram (tiles bloqueados/rede/cache) */}
+      {map.tilesFailed && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 max-w-[90%] text-center">
+          <div className="inline-block rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-bold px-3 py-2 backdrop-blur-md">
+            As ruas do mapa não carregaram (conexão?). O traçado do percurso segue visível.
+          </div>
+        </div>
+      )}
+
       {/* Carregando o mapa */}
       {!map.ready && phase !== 'finished' && (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
