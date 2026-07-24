@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { RotateCcw, ChevronRight, X } from 'lucide-react';
+import { RotateCcw, ChevronRight, X, Download } from 'lucide-react';
 import { COURSE } from './courseData';
 import { fmtDistance } from './courseGeo';
 
@@ -123,12 +123,21 @@ export const CourseFinish: React.FC<CourseFinishProps> = ({ onReplay, onRegister
           Faça sua inscrição
           <ChevronRight size={20} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
         </button>
-        <button
-          onClick={onReplay}
-          className="w-full inline-flex items-center justify-center gap-2 text-slate-400 hover:text-white text-sm font-bold py-2 transition-colors"
-        >
-          <RotateCcw size={15} /> Assistir de novo
-        </button>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={onReplay}
+            className="inline-flex items-center justify-center gap-2 text-slate-400 hover:text-white text-sm font-bold py-2 transition-colors"
+          >
+            <RotateCcw size={15} /> Assistir de novo
+          </button>
+          <a
+            href={`${import.meta.env.BASE_URL}percurso-lsc.gpx`}
+            download="percurso-2a-corrida-noturna-lsc.gpx"
+            className="inline-flex items-center justify-center gap-2 text-slate-400 hover:text-white text-sm font-bold py-2 transition-colors"
+          >
+            <Download size={15} /> Baixar GPX
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, X, Map as MapIcon, AlertTriangleIcon } from 'lucide-react';
+import { Play, X, Map as MapIcon, AlertTriangleIcon, Download } from 'lucide-react';
 import { COURSE } from './courseData';
 import { fmtDistance, pointAtProgress } from './courseGeo';
 import { useCourseMap } from './useCourseMap';
@@ -155,6 +155,17 @@ export const CourseExperience: React.FC<CourseExperienceProps> = ({ onClose, onR
             >
               <Play size={24} className="fill-slate-900" /> Iniciar percurso
             </button>
+            {/* Baixar o arquivo GPX do percurso (abre em Strava, Garmin, Google Earth etc.) */}
+            <div className="mt-5">
+              <a
+                href={`${import.meta.env.BASE_URL}percurso-lsc.gpx`}
+                download="percurso-2a-corrida-noturna-lsc.gpx"
+                className="inline-flex items-center gap-2 text-slate-300 hover:text-white text-sm font-bold border border-white/15 hover:border-white/40 rounded-xl px-5 py-2.5 transition-all bg-slate-950/40 backdrop-blur-md"
+              >
+                <Download size={16} className="text-yellow-400" /> Baixar percurso (GPX)
+              </a>
+              <p className="text-[11px] text-slate-500 mt-2">Abra no Strava, Garmin, Google Earth ou no seu relógio.</p>
+            </div>
           </div>
         </div>
       )}
