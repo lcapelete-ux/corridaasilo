@@ -62,6 +62,32 @@ direto, sem expor a API secret. Os mesmos valores já estão configurados no
 `netlify.toml` e no workflow do GitHub Pages (`.github/workflows/deploy.yml`);
 não são segredos (o preset unsigned é feito para ficar público no bundle).
 
+### Mapa 3D do percurso (Mapbox)
+
+A tela "Ver mapa do percurso" (botão na página inicial) mostra o traçado
+oficial em um mapa 3D animado. Ela usa o Mapbox GL e precisa de um **token de
+acesso** do Mapbox na variável `VITE_MAPBOX_TOKEN`:
+
+```
+VITE_MAPBOX_TOKEN=pk.seu_token_aqui
+```
+
+Como obter (plano gratuito atende bem um evento):
+1. Crie uma conta em [mapbox.com](https://account.mapbox.com/).
+2. Copie o **Default public token** (começa com `pk.`) ou crie um novo.
+3. (Recomendado) Restrinja o token por URL (URL restrictions) para o domínio
+   do site, já que ele fica visível no bundle — é assim que tokens públicos do
+   Mapbox funcionam.
+
+Sem o token, o site continua funcionando normalmente: o botão abre uma tela
+"Mapa em configuração" com os dados do percurso (5,05 km, +81 m de elevação) e
+a chamada para inscrição, sem quebrar nada.
+
+O percurso vem de um GPX (Strava) pré-processado em `components/course/courseData.ts`
+(coordenadas + distância acumulada + elevação), para não parsear XML no
+navegador. A biblioteca do mapa é carregada **sob demanda** (lazy) — só quem
+abre o percurso baixa o Mapbox, mantendo a página inicial leve.
+
 ## Deploy (Netlify)
 
 O `netlify.toml` já está configurado: build com `npm run build` e publicação da
