@@ -785,6 +785,15 @@ alter table public.runners add column if not exists extra_donation numeric(10, 2
 comment on column public.runners.extra_donation is
   'Contribuição extra opcional somada à inscrição (ex.: 60+ que pagou meia mas quis ajudar com um valor à parte)';
 
+-- 16. Semeia a tabela "cities" com as cidades que até agora estavam fixas no
+--     código do formulário. A tabela já existia desde o setup_completo.sql
+--     (mesmo padrão de "teams"), mas nunca tinha sido usada pelo app — o
+--     admin agora gerencia essa lista pela tela "Cidades".
+insert into public.cities (name) values
+  ('Laranjal Paulista'), ('Cerquilho'), ('Cesário Lange'), ('Conchas'),
+  ('Jumirim'), ('Pereiras'), ('Tiete')
+on conflict (name) do nothing;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
@@ -792,4 +801,5 @@ select
   (select count(*) from public.runners)      as inscricoes,
   (select count(*) from public.team_coupons) as cupons,
   (select count(*) from public.organizers)   as organizadores,
+  (select count(*) from public.cities)       as cidades,
   'Banco atualizado com sucesso!'            as status;

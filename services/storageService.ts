@@ -12,6 +12,7 @@ const friendlyError = (error: { code?: string; message?: string } | null, fallba
     if (msg.includes('runners_email')) return new Error('Este e-mail já está sendo utilizado em outra inscrição.');
     if (msg.includes('team_coupons_code')) return new Error('Já existe um cupom com este código.');
     if (msg.includes('teams_pkey')) return new Error('Já existe uma equipe com este nome.');
+    if (msg.includes('cities_pkey')) return new Error('Já existe uma cidade com este nome.');
     return new Error('Registro duplicado.');
   }
   if (msg.includes('row-level security')) {
@@ -686,6 +687,25 @@ export const createTeam = async (name: string): Promise<void> => {
 export const deleteTeam = async (name: string): Promise<void> => {
   const { error } = await supabase.from('teams').delete().eq('name', name);
   if (error) throw friendlyError(error, 'Erro ao remover equipe');
+};
+
+// --- Cidades oficiais (lista usada pelo formulário de inscrição) ---
+// Mesmo padrão de "teams": leitura pública, escrita só admin (RLS).
+
+export const getCities = async (): Promise<string[]> => {
+  const { data, error } = await supabase.from('cities').select('name').order('name');
+  if (error) throw friendlyError(error, 'Erro ao carregar cidades');
+  return (data as { name: string }[]).map(c => c.name);
+};
+
+export const createCity = async (name: string): Promise<void> => {
+  const { error } = await supabase.from('cities').insert({ name: name.trim() });
+  if (error) throw friendlyError(error, 'Erro ao criar cidade');
+};
+
+export const deleteCity = async (name: string): Promise<void> => {
+  const { error } = await supabase.from('cities').delete().eq('name', name);
+  if (error) throw friendlyError(error, 'Erro ao remover cidade');
 };
 
 // Renomeia uma equipe e leva junto quem depende do nome dela.

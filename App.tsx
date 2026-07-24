@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo } from './services/storageService';
 import { supabase } from './services/supabaseClient';
-import { getRunnerPaidValue, PREDEFINED_TEAMS } from './constants';
+import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
 import { TeamView } from './components/TeamView';
+import { CitiesManager } from './components/CitiesManager';
 import { SponsorsManager } from './components/SponsorsManager';
 import { ExpensesManager } from './components/ExpensesManager';
 import { ExtraRevenueManager } from './components/ExtraRevenueManager';
@@ -19,7 +20,7 @@ import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -40,6 +41,8 @@ const App: React.FC = () => {
   // Lista de equipes/academias: seed com a constante e some para a versão
   // ao vivo do banco assim que carrega — funciona até para visitante anônimo
   const [officialTeams, setOfficialTeams] = useState<string[]>(PREDEFINED_TEAMS);
+  // Mesmo padrão para as cidades do formulário
+  const [officialCities, setOfficialCities] = useState<string[]>(PREDEFINED_CITIES);
   const [raceGroupName, setRaceGroupName] = useState('2ª CORRIDA NOTURNA LSC');
   const [promoDeadline, setPromoDeadline] = useState('2026-08-23');
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-09-05');
@@ -151,8 +154,18 @@ const App: React.FC = () => {
     }
   };
 
+  // Mesma lógica para as cidades: leitura pública, reserva na constante padrão
+  const refreshCities = async () => {
+    try {
+      setOfficialCities(await getCities());
+    } catch {
+      // Mantém o valor atual (a constante padrão ou o último carregado)
+    }
+  };
+
   useEffect(() => {
     refreshTeams();
+    refreshCities();
     refreshRaceGroupName();
     refreshPromoDeadline();
     refreshRegistrationDeadline();
@@ -252,6 +265,24 @@ const App: React.FC = () => {
       await refreshRunners();
     } catch (e: any) {
       alert(e?.message || 'Erro ao renomear equipe.');
+    }
+  };
+
+  const handleCreateCity = async (name: string) => {
+    try {
+      await createCity(name);
+      await refreshCities();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao criar cidade.');
+    }
+  };
+
+  const handleDeleteCity = async (name: string) => {
+    try {
+      await deleteCity(name);
+      await refreshCities();
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao remover cidade.');
     }
   };
 
@@ -620,6 +651,7 @@ const App: React.FC = () => {
                onSave={handleSaveRunner}
                existingTeams={getExistingTeams()}
                officialTeams={officialTeams}
+               officialCities={officialCities}
                isPublicView={true}
              />
            )}
@@ -690,6 +722,7 @@ const App: React.FC = () => {
           {userSession?.role === 'admin' && (
             <>
               <NavItem target="teams" icon={Flag} label="Equipes" />
+              <NavItem target="cities" icon={MapPin} label="Cidades" />
               <div className="py-3">
                 <div className="h-px bg-slate-800/80 w-full" />
                 <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-3 px-4">Financeiro</p>
@@ -752,6 +785,7 @@ const App: React.FC = () => {
                 onSave={handleSaveRunner}
                 existingTeams={getExistingTeams()}
                 officialTeams={officialTeams}
+                officialCities={officialCities}
                 isPublicView={false}
                 userSession={userSession}
                 coupons={coupons}
@@ -782,7 +816,15 @@ const App: React.FC = () => {
                 onRenameTeam={handleRenameTeam}
               />
             )}
-            
+
+            {currentView === 'cities' && (
+              <CitiesManager
+                cities={officialCities}
+                onCreate={handleCreateCity}
+                onDelete={handleDeleteCity}
+              />
+            )}
+
             {currentView === 'sponsors' && (
               <SponsorsManager 
                 sponsors={sponsors} 
