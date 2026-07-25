@@ -17,9 +17,57 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
     <title>2ª Corrida Noturna LSC – Laranjal Paulista</title>
+
+    <!-- Tela de carregamento INSTANTÂNEA (HTML/CSS puro): aparece já no
+         primeiro paint, antes do JavaScript baixar/executar, para nunca
+         ficar "sem nada". Quando o React monta, a BootSplash continua a
+         barra do mesmo ponto (tempo relativo ao load) e emenda sem cortes. -->
+    <style>
+      html, body { margin: 0; background-color: #020617; }
+      #initial-loader {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; align-items: center; justify-content: center;
+        background: #020617; color: #fff; overflow: hidden;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      #initial-loader .il-glow-a { position: absolute; top: -10%; right: -10%; width: 500px; height: 500px; background: #eab308; border-radius: 9999px; filter: blur(120px); opacity: .2; }
+      #initial-loader .il-glow-b { position: absolute; bottom: -10%; left: -10%; width: 400px; height: 400px; background: #312e81; border-radius: 9999px; filter: blur(100px); opacity: .25; }
+      #initial-loader .il-inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding: 0 24px; }
+      #initial-loader .il-badge {
+        color: #facc15; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .15em;
+        border: 1px solid rgba(250, 204, 21, .4); padding: 6px 16px; border-radius: 9999px; margin-bottom: 32px;
+      }
+      #initial-loader .il-title { font-size: clamp(24px, 6vw, 30px); font-weight: 900; font-style: italic; letter-spacing: -.02em; text-align: center; line-height: 1.1; margin: 0 0 4px; }
+      #initial-loader .il-sub { color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .25em; margin: 0 0 34px; }
+      #initial-loader .il-track { position: relative; width: 256px; max-width: 70vw; height: 6px; border-radius: 9999px; background: rgba(30, 41, 59, .8); }
+      #initial-loader .il-fill {
+        position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 9999px;
+        background: linear-gradient(90deg, #eab308, #fde047);
+        box-shadow: 0 0 12px rgba(250, 204, 21, .6);
+        animation: il-fill 1600ms cubic-bezier(0.33, 1, 0.68, 1) forwards;
+      }
+      #initial-loader .il-runner { position: absolute; right: 0; top: -22px; transform: translateX(50%); font-size: 18px; line-height: 1; }
+      #initial-loader .il-label { margin-top: 20px; color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .15em; }
+      @keyframes il-fill { from { width: 0; } to { width: 92%; } }
+      @media (prefers-reduced-motion: reduce) {
+        #initial-loader .il-fill { animation: none; width: 65%; }
+      }
+    </style>
   </head>
   <body class="bg-slate-950 text-slate-100 font-sans antialiased">
-    <div id="root"></div>
+    <div id="root">
+      <div id="initial-loader" role="status" aria-label="Carregando">
+        <div class="il-glow-a"></div>
+        <div class="il-glow-b"></div>
+        <div class="il-inner">
+          <div class="il-badge">2ª Corrida Noturna LSC · 5K</div>
+          <div class="il-title">2ª CORRIDA NOTURNA LSC</div>
+          <div class="il-sub">Laranjal Paulista</div>
+          <div class="il-track"><div class="il-fill"><span class="il-runner">🏃</span></div></div>
+          <div class="il-label">Carregando…</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

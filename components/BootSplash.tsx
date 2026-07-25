@@ -10,9 +10,29 @@ interface BootSplashProps {
 
 // Tempo mínimo de tela para o carregamento não "piscar", e teto de segurança
 // para nunca travar caso um recurso demore/ falhe (rede lenta ou offline).
-const MIN_MS = 1300;
-const HARD_CAP_MS = 4500;
+// MIN_MS casa com a animação da barra estática do index.html (1600ms), para
+// a React BootSplash continuar a barra do mesmo ponto sem "voltar ao zero".
+const MIN_MS = 1600;
+const HARD_CAP_MS = 5000;
 const FADE_MS = 520;
+
+// Posição da barra (0–92%) em função do tempo desde o carregamento da página.
+// Mesma curva (easeOutCubic) e duração usadas pela barra estática no HTML.
+const barTargetAt = (elapsedMs: number) => {
+  const f = Math.min(1, Math.max(0, elapsedMs) / MIN_MS);
+  return (1 - Math.pow(1 - f, 3)) * 92;
+};
+
+// Tempo desde o início da navegação (≈ carregamento da página). performance.now()
+// é relativo ao timeOrigin do documento, então serve de âncora comum entre a
+// barra estática e esta.
+const pageElapsed = () => {
+  try {
+    return performance.now();
+  } catch {
+    return MIN_MS;
+  }
+};
 
 // Pré-carrega uma imagem sem travar em caso de erro (resolve de qualquer forma)
 const preload = (src: string) =>
@@ -27,7 +47,9 @@ const preload = (src: string) =>
 // Tela de carregamento: aparece primeiro, prepara os recursos da vinheta
 // (logos Sicredi/RondonTex) e só então libera a introdução.
 export const BootSplash: React.FC<BootSplashProps> = ({ onReady }) => {
-  const [progress, setProgress] = useState(0);
+  // Já inicia na posição em que a barra estática do index.html está (tempo
+  // relativo ao load), para o primeiro quadro emendar sem salto.
+  const [progress, setProgress] = useState(() => barTargetAt(pageElapsed()));
   const [leaving, setLeaving] = useState(false);
   const onReadyRef = useRef(onReady);
   const finishedRef = useRef(false);
@@ -40,7 +62,6 @@ export const BootSplash: React.FC<BootSplashProps> = ({ onReady }) => {
     let cancelled = false;
     let raf = 0;
     let tasksDone = false;
-    const start = performance.now();
 
     const fontsReady =
       typeof document !== 'undefined' && (document as any).fonts?.ready
@@ -63,12 +84,10 @@ export const BootSplash: React.FC<BootSplashProps> = ({ onReady }) => {
 
     const tick = () => {
       if (cancelled) return;
-      const elapsed = performance.now() - start;
+      const elapsed = pageElapsed();
       // Barra sobe suave (ease-out) até ~92% enquanto carrega; fecha em 100%
       // quando os recursos terminam E o tempo mínimo já passou.
-      const timeFrac = Math.min(1, elapsed / MIN_MS);
-      const eased = 1 - Math.pow(1 - timeFrac, 3);
-      let target = eased * 92;
+      let target = barTargetAt(elapsed);
       if (tasksDone && elapsed >= MIN_MS) target = 100;
       setProgress((p) => (target > p ? target : p));
       if (target >= 100) {
@@ -132,7 +151,7 @@ export const BootSplash: React.FC<BootSplashProps> = ({ onReady }) => {
         </div>
 
         <p className="mt-5 text-slate-400 text-xs font-bold uppercase tracking-widest">
-          Preparando a largada…
+          Carregando…
         </p>
       </div>
     </div>
