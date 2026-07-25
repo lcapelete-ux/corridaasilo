@@ -19,6 +19,7 @@ import { KitDelivery } from './components/KitDelivery';
 import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
+import { BootSplash } from './components/BootSplash';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
 import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin } from 'lucide-react';
 
@@ -63,7 +64,10 @@ const App: React.FC = () => {
   const [lastRegisteredSeniorFullPrice, setLastRegisteredSeniorFullPrice] = useState<boolean>(false);
   const [lastRegisteredExtraDonation, setLastRegisteredExtraDonation] = useState<number>(0);
   const [showCourse, setShowCourse] = useState(false); // overlay do mapa 3D do percurso
-  
+  // Tela de carregamento inicial: segura tudo até o site estar pronto (imagens
+  // da vinheta pré-carregadas) e só então libera a landing + introdução
+  const [booted, setBooted] = useState(false);
+
   // Auth State
   const [userSession, setUserSession] = useState<UserSession | null>(null);
 
@@ -584,6 +588,12 @@ const App: React.FC = () => {
       <span className="font-medium">{label}</span>
     </button>
   );
+
+  // RENDER: TELA DE CARREGAMENTO (só na abertura do site) — carrega primeiro,
+  // depois solta a landing e a vinheta de introdução
+  if (!booted) {
+    return <BootSplash onReady={() => setBooted(true)} />;
+  }
 
   // RENDER: LANDING PAGE (NOVA TELA INICIAL)
   if (mode === 'landing') {

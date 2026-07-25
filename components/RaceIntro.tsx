@@ -68,24 +68,26 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
       nightMusic.countBeep();
     };
 
+    // Cadência mais pausada: cada logo de patrocinador fica ~1,5s na tela
+    // (antes ~1,1s), para a abertura não parecer atropelada.
     const timers = [
-      setTimeout(() => count('sicredi'), 400),
-      setTimeout(() => count('rondontex'), 1500),
-      setTimeout(() => count('apresentam'), 2600),
+      setTimeout(() => count('sicredi'), 550),
+      setTimeout(() => count('rondontex'), 2050),
+      setTimeout(() => count('apresentam'), 3550),
       setTimeout(() => {
         setStep('go');
         // LARGADA: bipe longo + música entrando junto (ou no primeiro toque,
         // se o navegador ainda estiver bloqueando o áudio)
         nightMusic.countBeep(true);
         nightMusic.requestStart();
-      }, 3500),
-      setTimeout(() => { setStep('exit'); onRevealRef.current(); }, 4700),
+      }, 4800),
+      setTimeout(() => { setStep('exit'); onRevealRef.current(); }, 6050),
       setTimeout(() => {
         if (!finishedRef.current) {
           finishedRef.current = true;
           onFinishRef.current();
         }
-      }, 5200),
+      }, 6550),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -112,12 +114,12 @@ export const RaceIntro: React.FC<RaceIntroProps> = ({ onReveal, onFinish }) => {
           />
         )}
         {step === 'sicredi' && (
-          <div key="sicredi" className="bg-white rounded-2xl px-8 py-5 md:px-12 md:py-7 shadow-2xl animate-count-stamp">
+          <div key="sicredi" className="bg-white rounded-2xl px-8 py-5 md:px-12 md:py-7 shadow-2xl animate-count-stamp-slow">
             <img src={sicrediLogo} alt="Sicredi" className="h-12 md:h-16 w-auto object-contain" />
           </div>
         )}
         {step === 'rondontex' && (
-          <div key="rondontex" className="bg-white rounded-2xl px-8 py-5 md:px-12 md:py-7 shadow-2xl animate-count-stamp">
+          <div key="rondontex" className="bg-white rounded-2xl px-8 py-5 md:px-12 md:py-7 shadow-2xl animate-count-stamp-slow">
             <img src={rondontexLogo} alt="RondonTex" className="h-12 md:h-16 w-auto object-contain" />
           </div>
         )}
