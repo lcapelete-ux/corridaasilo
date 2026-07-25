@@ -19,7 +19,9 @@ import { KitDelivery } from './components/KitDelivery';
 import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
-import { BootSplash } from './components/BootSplash';
+import { nightMusic } from './services/nightMusic';
+import sicrediLogo from './assets/sicredi-logo.jpg';
+import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
 import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin } from 'lucide-react';
 
@@ -64,9 +66,9 @@ const App: React.FC = () => {
   const [lastRegisteredSeniorFullPrice, setLastRegisteredSeniorFullPrice] = useState<boolean>(false);
   const [lastRegisteredExtraDonation, setLastRegisteredExtraDonation] = useState<number>(0);
   const [showCourse, setShowCourse] = useState(false); // overlay do mapa 3D do percurso
-  // Tela de carregamento inicial: segura tudo até o site estar pronto (imagens
-  // da vinheta pré-carregadas) e só então libera a landing + introdução
-  const [booted, setBooted] = useState(false);
+  // Quando o loader inicial (do index.html) termina, libera a vinheta de
+  // introdução para começar por baixo, num crossfade sem gap escuro.
+  const [revealIntro, setRevealIntro] = useState(false);
 
   // Auth State
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -152,6 +154,51 @@ const App: React.FC = () => {
         // Sem sessão salva ou sem conexão: segue deslogado
       }
     })();
+  }, []);
+
+  // Sequência de abertura: prepara o áudio (destrava no 1º gesto) e pré-carrega
+  // os logos da vinheta; depois some com o loader estático do index.html,
+  // revelando a introdução por baixo (crossfade, sem tela preta no meio).
+  useEffect(() => {
+    // Deixa a música pronta junto com a página: qualquer toque destrava o áudio
+    nightMusic.primeAudio();
+
+    let cancelled = false;
+    const MIN_MS = 1600;      // casa com a barra do loader (index.html)
+    const HARD_CAP_MS = 5000; // teto de segurança p/ rede lenta
+    const FADE_MS = 500;      // = transição do #initial-loader
+
+    const preload = (src: string) =>
+      new Promise<void>((res) => {
+        const img = new Image();
+        img.onload = () => res();
+        img.onerror = () => res();
+        img.src = src;
+      });
+
+    const fontsReady = (document as any).fonts?.ready ?? Promise.resolve();
+    const tasks = Promise.all([preload(sicrediLogo), preload(rondontexLogo), fontsReady]);
+    const cap = new Promise<void>((res) => setTimeout(res, HARD_CAP_MS));
+
+    Promise.race([tasks, cap]).then(() => {
+      if (cancelled) return;
+      const elapsed = (() => {
+        try { return performance.now(); } catch { return MIN_MS; }
+      })();
+      const waitMin = Math.max(0, MIN_MS - elapsed);
+      setTimeout(() => {
+        if (cancelled) return;
+        // Revela a introdução por baixo enquanto o loader some (crossfade)
+        setRevealIntro(true);
+        const el = document.getElementById('initial-loader');
+        if (el) {
+          el.classList.add('il-hide');
+          window.setTimeout(() => { el.parentNode?.removeChild(el); }, FADE_MS + 80);
+        }
+      }, waitMin);
+    });
+
+    return () => { cancelled = true; };
   }, []);
 
   // Lista de equipes: carrega sempre, mesmo sem login (o formulário público
@@ -589,12 +636,6 @@ const App: React.FC = () => {
     </button>
   );
 
-  // RENDER: TELA DE CARREGAMENTO (só na abertura do site) — carrega primeiro,
-  // depois solta a landing e a vinheta de introdução
-  if (!booted) {
-    return <BootSplash onReady={() => setBooted(true)} />;
-  }
-
   // RENDER: LANDING PAGE (NOVA TELA INICIAL)
   if (mode === 'landing') {
     return (
@@ -607,6 +648,7 @@ const App: React.FC = () => {
           raceGroupName={raceGroupName}
           promoDeadline={promoDeadline}
           sponsorLogos={sponsorLogos}
+          startIntro={revealIntro}
         />
         {showCourse && (
           <Suspense fallback={<div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center text-slate-400 font-bold animate-pulse">Carregando percurso...</div>}>

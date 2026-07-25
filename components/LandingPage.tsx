@@ -16,9 +16,12 @@ interface LandingPageProps {
   raceGroupName?: string;
   promoDeadline?: string;
   sponsorLogos?: SponsorLogo[];
+  // A vinheta só começa quando o loader inicial libera (crossfade sem gap).
+  // Default true para funcionar caso a landing seja usada fora do fluxo de boot.
+  startIntro?: boolean;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [] }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [], startIntro = true }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
   // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
@@ -76,8 +79,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         ))}
       </div>
 
-      {/* Vinheta de Largada (contagem 3-2-1 + corredor) */}
-      {!introDone && (
+      {/* Vinheta de Largada (Sicredi → RondonTex → Apresentam → Largada).
+          Só monta quando o loader inicial libera (startIntro), para emendar
+          com o fim do carregamento num crossfade — sem tela preta no meio. */}
+      {!introDone && startIntro && (
         <RaceIntro
           onReveal={() => setContentVisible(true)}
           onFinish={() => {

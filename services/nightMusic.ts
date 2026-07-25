@@ -33,6 +33,7 @@ class NightMusicEngine {
   private step = 0;
   private playing = false;
   private gestureHandler: (() => void) | null = null;
+  private primeHandler: (() => void) | null = null;
 
   private ensureContext(): AudioContext {
     if (!this.ctx) {
@@ -209,6 +210,39 @@ class NightMusicEngine {
       ]);
     }
     return ctx.state === 'running';
+  }
+
+  /** Prepara o áudio já na abertura da página: cria o contexto e o destrava no
+   *  primeiro gesto do usuário (sem tocar nada ainda). Assim a música entra na
+   *  largada de forma confiável, sem depender de sorte com o autoplay do
+   *  navegador. Chamar cedo (no carregamento) deixa o som "pronto junto com a
+   *  página". */
+  primeAudio() {
+    try {
+      this.ensureContext();
+    } catch {
+      return; // navegador sem Web Audio
+    }
+    if (this.ctx && this.ctx.state === 'running') return;
+    if (this.primeHandler) return;
+    const handler = () => {
+      this.unlock().finally(() => {
+        if (this.ctx && this.ctx.state === 'running') this.cancelPrime();
+      });
+    };
+    this.primeHandler = handler;
+    window.addEventListener('pointerdown', handler);
+    window.addEventListener('touchend', handler);
+    window.addEventListener('keydown', handler);
+  }
+
+  private cancelPrime() {
+    if (this.primeHandler) {
+      window.removeEventListener('pointerdown', this.primeHandler);
+      window.removeEventListener('touchend', this.primeHandler);
+      window.removeEventListener('keydown', this.primeHandler);
+      this.primeHandler = null;
+    }
   }
 
   /** Bipe da contagem regressiva: 3/2/1 curtos, largada longa e uma oitava acima. */
