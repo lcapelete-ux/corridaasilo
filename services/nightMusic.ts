@@ -22,6 +22,10 @@ const BASS_ROOT_HZ = 55;  // A1
 const ARP_ROOT_HZ = 220;  // A3
 const semi = (base: number, s: number) => base * Math.pow(2, s / 12);
 
+// Eventos de gesto que destravam o áudio (cobre desktop, toque e teclado). Em
+// alguns navegadores só um deles conta como "interação", então ouvimos todos.
+const GESTURE_EVENTS = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'] as const;
+
 class NightMusicEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -34,6 +38,16 @@ class NightMusicEngine {
   private playing = false;
   private gestureHandler: (() => void) | null = null;
   private primeHandler: (() => void) | null = null;
+  private listeners = new Set<() => void>();
+
+  /** Avisa a UI (ex.: botão de som) quando o estado de reprodução muda. */
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+  private notify() {
+    this.listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
+  }
 
   private ensureContext(): AudioContext {
     if (!this.ctx) {
@@ -199,8 +213,51 @@ class NightMusicEngine {
     }
   };
 
-  /** Destrava o áudio (navegadores exigem um toque antes de tocar som).
-   *  resume() sem gesto pode ficar pendente para sempre — corre contra um timeout. */
+  /** Toca um buffer curtíssimo e mudo. Truque clássico para destravar o áudio
+   *  no iOS/Safari, onde só o resume() às vezes não basta. */
+  private playSilentPing() {
+    try {
+      const ctx = this.ctx!;
+      const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch {
+      /* ignora */
+    }
+  }
+
+  /** Retoma o contexto DENTRO de um gesto do usuário. Diferente do unlock()
+   *  automático, aqui esperamos o resume() terminar por completo (sem corte de
+   *  250ms) — em celulares mais lentos o resume pode levar mais que isso, e o
+   *  corte curto era o motivo de "nem no primeiro toque o som funcionar". */
+  private async resumeInGesture(): Promise<boolean> {
+    const ctx = this.ensureContext();
+    if (ctx.state !== 'running') {
+      const p = ctx.resume();   // precisa ser chamado de forma síncrona no gesto
+      this.playSilentPing();    // destrava o iOS
+      try { await p; } catch { /* ignora */ }
+    }
+    return ctx.state === 'running';
+  }
+
+  /** Inicia o sequenciador (assume o contexto já 'running'). */
+  private beginPlayback() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || !this.master || this.playing) return;
+    this.playing = true;
+    this.step = 0;
+    this.nextTime = ctx.currentTime + 0.06;
+    this.master.gain.cancelScheduledValues(ctx.currentTime);
+    this.master.gain.setValueAtTime(0.0001, ctx.currentTime);
+    this.master.gain.exponentialRampToValueAtTime(0.62, ctx.currentTime + 0.12);
+    this.timer = window.setInterval(this.tick, LOOKAHEAD_MS);
+    this.notify();
+  }
+
+  /** Destrava o áudio numa tentativa automática (sem gesto). Corre contra um
+   *  timeout curto porque, sem interação, o resume() pode nunca resolver. */
   async unlock(): Promise<boolean> {
     const ctx = this.ensureContext();
     if (ctx.state === 'suspended') {
@@ -213,10 +270,9 @@ class NightMusicEngine {
   }
 
   /** Prepara o áudio já na abertura da página: cria o contexto e o destrava no
-   *  primeiro gesto do usuário (sem tocar nada ainda). Assim a música entra na
-   *  largada de forma confiável, sem depender de sorte com o autoplay do
-   *  navegador. Chamar cedo (no carregamento) deixa o som "pronto junto com a
-   *  página". */
+   *  primeiro gesto do usuário (qualquer toque, em qualquer lugar). Deixa o som
+   *  pronto para a música entrar na largada — sem depender de sorte com o
+   *  autoplay do navegador. */
   primeAudio() {
     try {
       this.ensureContext();
@@ -226,23 +282,27 @@ class NightMusicEngine {
     if (this.ctx && this.ctx.state === 'running') return;
     if (this.primeHandler) return;
     const handler = () => {
-      this.unlock().finally(() => {
+      this.resumeInGesture().then(() => {
         if (this.ctx && this.ctx.state === 'running') this.cancelPrime();
       });
     };
     this.primeHandler = handler;
-    window.addEventListener('pointerdown', handler);
-    window.addEventListener('touchend', handler);
-    window.addEventListener('keydown', handler);
+    GESTURE_EVENTS.forEach(ev => window.addEventListener(ev, handler, { passive: true }));
   }
 
   private cancelPrime() {
     if (this.primeHandler) {
-      window.removeEventListener('pointerdown', this.primeHandler);
-      window.removeEventListener('touchend', this.primeHandler);
-      window.removeEventListener('keydown', this.primeHandler);
+      GESTURE_EVENTS.forEach(ev => window.removeEventListener(ev, this.primeHandler!));
       this.primeHandler = null;
     }
+  }
+
+  /** Liga o som a pedido explícito do usuário (ex.: botão de som). Como roda
+   *  dentro de um gesto, destrava e começa a tocar de forma confiável. */
+  async enableSound(): Promise<boolean> {
+    const running = await this.resumeInGesture();
+    if (running) this.beginPlayback();
+    return running;
   }
 
   /** Bipe da contagem regressiva: 3/2/1 curtos, largada longa e uma oitava acima. */
@@ -282,47 +342,33 @@ class NightMusicEngine {
 
   /** Tenta tocar. Retorna false se o navegador bloqueou (precisa de um toque). */
   async start(): Promise<boolean> {
-    const ctx = this.ensureContext();
-    if (ctx.state === 'suspended') {
-      await Promise.race([
-        ctx.resume().catch(() => {}),
-        new Promise(res => setTimeout(res, 250)),
-      ]);
-    }
-    if (ctx.state !== 'running') return false;
-    if (this.playing) return true;
-
-    this.playing = true;
-    this.step = 0;
-    this.nextTime = ctx.currentTime + 0.06;
-    this.master!.gain.cancelScheduledValues(ctx.currentTime);
-    this.master!.gain.setValueAtTime(0.0001, ctx.currentTime);
-    this.master!.gain.exponentialRampToValueAtTime(0.62, ctx.currentTime + 0.12);
-    this.timer = window.setInterval(this.tick, LOOKAHEAD_MS);
+    await this.unlock();
+    if (!this.ctx || this.ctx.state !== 'running') return false;
+    this.beginPlayback();
     return true;
   }
 
-  /** Toca agora; se o navegador bloquear, começa sozinho no primeiro toque. */
+  /** Toca agora; se o navegador bloquear, começa sozinho no primeiro toque
+   *  (em qualquer lugar da página), esperando o resume() por completo. */
   requestStart() {
     this.start().then(ok => {
       if (ok || this.gestureHandler) return;
       const handler = () => {
-        this.start().then(started => {
-          if (started) this.cancelPendingStart();
+        this.resumeInGesture().then(running => {
+          if (running) {
+            this.beginPlayback();
+            this.cancelPendingStart();
+          }
         });
       };
       this.gestureHandler = handler;
-      window.addEventListener('pointerdown', handler);
-      window.addEventListener('keydown', handler);
-      window.addEventListener('touchend', handler);
+      GESTURE_EVENTS.forEach(ev => window.addEventListener(ev, handler, { passive: true }));
     });
   }
 
   cancelPendingStart() {
     if (this.gestureHandler) {
-      window.removeEventListener('pointerdown', this.gestureHandler);
-      window.removeEventListener('keydown', this.gestureHandler);
-      window.removeEventListener('touchend', this.gestureHandler);
+      GESTURE_EVENTS.forEach(ev => window.removeEventListener(ev, this.gestureHandler!));
       this.gestureHandler = null;
     }
   }
@@ -341,6 +387,7 @@ class NightMusicEngine {
       this.master.gain.setValueAtTime(Math.max(this.master.gain.value, 0.0001), t);
       this.master.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
     }
+    this.notify();
   }
 
   isPlaying() {

@@ -4,6 +4,7 @@ import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import rondontexLogo from '../assets/rondontex-logo.png';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
+import { SoundToggle } from './SoundToggle';
 import { formatBrDate } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
 import { SponsorLogo } from '../types';
@@ -93,6 +94,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       )}
 
       {contentVisible && (<>
+
+      {/* Botão de som (flutuante): garante ligar o áudio com um toque */}
+      <SoundToggle />
 
       {/* Navbar Minimalista */}
       <nav className="relative z-20 flex justify-between items-center p-6 max-w-6xl mx-auto w-full">
