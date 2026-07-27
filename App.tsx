@@ -3,7 +3,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo } from './types';
 import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo } from './services/storageService';
 import { supabase } from './services/supabaseClient';
-import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES } from './constants';
+import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -65,6 +65,8 @@ const App: React.FC = () => {
   const [lastRegisteredDiscount, setLastRegisteredDiscount] = useState<number>(0);
   const [lastRegisteredSeniorFullPrice, setLastRegisteredSeniorFullPrice] = useState<boolean>(false);
   const [lastRegisteredExtraDonation, setLastRegisteredExtraDonation] = useState<number>(0);
+  const [lastRegisteredCpf, setLastRegisteredCpf] = useState<string>('');
+  const [lastRegisteredIsMinor, setLastRegisteredIsMinor] = useState<boolean>(false);
   const [showCourse, setShowCourse] = useState(false); // overlay do mapa 3D do percurso
   // Quando o loader inicial (do index.html) termina, libera a vinheta de
   // introdução para começar por baixo, num crossfade sem gap escuro.
@@ -365,6 +367,8 @@ const App: React.FC = () => {
     setLastRegisteredDiscount(runner.couponDiscount || 0);
     setLastRegisteredSeniorFullPrice(!!runner.seniorFullPrice);
     setLastRegisteredExtraDonation(runner.extraDonation || 0);
+    setLastRegisteredCpf(runner.cpf || '');
+    setLastRegisteredIsMinor(isMinorAtEvent(runner.birthDate || ''));
 
     if (mode === 'public') {
       setMode('registration_success');
@@ -674,7 +678,7 @@ const App: React.FC = () => {
 
   // RENDER: TELA DE SUCESSO DO PIX
   if (mode === 'registration_success') {
-    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} />;
+    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} cpf={lastRegisteredCpf} isMinor={lastRegisteredIsMinor} />;
   }
 
   // RENDER: FORMULÁRIO PÚBLICO

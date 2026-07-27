@@ -1,7 +1,9 @@
 
-import React, { useState } from 'react';
-import { Copy, Check, Timer, QrCode, Tag, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Copy, Check, Timer, QrCode, Tag, AlertCircle, Upload, FileText, CheckCircle, ShieldAlert } from 'lucide-react';
 import { REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR } from '../constants';
+import { prepareProofFile } from '../services/imageUtils';
+import { attachPaymentProof } from '../services/storageService';
 
 interface RegistrationSuccessProps {
   onBack: () => void;
@@ -9,11 +11,74 @@ interface RegistrationSuccessProps {
   discount?: number; // Desconto do cupom da academia (R$) ou de apoiador (60+)
   seniorFullPrice?: boolean; // 60+ que optou por não usar a meia-inscrição (ajuda o Lar São Cristóvão)
   extraDonation?: number; // Contribuição extra opcional somada à inscrição
+  cpf?: string; // CPF do inscrito (permite enviar o comprovante aqui mesmo)
+  isMinor?: boolean; // Menor de 18 no dia do evento: exige autorização junto
 }
 
-export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false, extraDonation = 0 }) => {
+export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false, extraDonation = 0, cpf, isMinor = false }) => {
   const [copied, setCopied] = useState(false);
   const pixKey = "corridaasilo@gmail.com";
+
+  // Envio do comprovante direto nesta tela (usa o CPF que acabou de se inscrever)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const authInputRef = useRef<HTMLInputElement>(null);
+  const [proofFile, setProofFile] = useState<string | null>(null);
+  const [authFile, setAuthFile] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [preparingAuth, setPreparingAuth] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [proofError, setProofError] = useState('');
+
+  const needsAuth = isMinor && !authFile; // menor precisa anexar a autorização
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPreparing(true);
+    setProofError('');
+    try {
+      setProofFile(await prepareProofFile(file));
+    } catch (err: any) {
+      setProofError(err?.message || 'Não foi possível preparar o arquivo.');
+    } finally {
+      setPreparing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAuthFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPreparingAuth(true);
+    setProofError('');
+    try {
+      setAuthFile(await prepareProofFile(file));
+    } catch (err: any) {
+      setProofError(err?.message || 'Não foi possível preparar a autorização.');
+    } finally {
+      setPreparingAuth(false);
+      if (authInputRef.current) authInputRef.current.value = '';
+    }
+  };
+
+  const handleSubmitProof = async () => {
+    if (!cpf || !proofFile) return;
+    if (needsAuth) {
+      setProofError('Atleta menor de 18: anexe também a autorização assinada do responsável.');
+      return;
+    }
+    setBusy(true);
+    setProofError('');
+    try {
+      await attachPaymentProof(cpf, proofFile, authFile || undefined);
+      setSent(true);
+    } catch (err: any) {
+      setProofError(err?.message || 'Erro ao enviar o comprovante. Tente novamente.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const basePrice = isSenior && !seniorFullPrice ? REGISTRATION_PRICE_SENIOR : REGISTRATION_PRICE;
   const finalPrice = Math.max(0, basePrice - discount) + extraDonation;
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -89,17 +154,147 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
               </button>
             </div>
 
-            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3">
-               <AlertCircle className="text-indigo-600 shrink-0 mt-0.5" size={20} />
-               <div className="text-sm">
-                 <p className="font-bold text-indigo-900 leading-tight mb-1">
-                   Envie o comprovante para o organizador responsável da sua equipe.
-                 </p>
-                 <p className="text-xs text-indigo-600/80 leading-relaxed">
-                   Se sua inscrição for avulsa, guarde o comprovante para apresentar na retirada do kit.
-                 </p>
-               </div>
-            </div>
+            {/* Envio do comprovante — direto aqui (usando o CPF da inscrição) */}
+            {sent ? (
+              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-start gap-3">
+                <CheckCircle className="text-emerald-600 shrink-0 mt-0.5" size={22} />
+                <div className="text-sm">
+                  <p className="font-bold text-emerald-900 leading-tight mb-1">Comprovante enviado!</p>
+                  <p className="text-xs text-emerald-700/80 leading-relaxed">
+                    Recebemos seu comprovante. A confirmação do pagamento é feita manualmente pela organização.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
+                <div className="flex items-start gap-3 mb-3">
+                  <AlertCircle className="text-indigo-600 shrink-0 mt-0.5" size={20} />
+                  <div className="text-sm">
+                    <p className="font-bold text-indigo-900 leading-tight mb-1">
+                      Já pagou? Envie o comprovante aqui.
+                    </p>
+                    <p className="text-xs text-indigo-600/80 leading-relaxed">
+                      Anexe o comprovante do PIX (foto ou PDF). Você também pode enviar depois na tela inicial,
+                      em “Enviar comprovante”, digitando seu CPF.
+                    </p>
+                  </div>
+                </div>
+
+                {cpf ? (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*,application/pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <div
+                      onClick={() => !preparing && fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                        proofFile ? 'border-emerald-400 bg-emerald-50' : 'border-indigo-200 bg-white hover:border-yellow-400'
+                      } ${preparing ? 'opacity-60 cursor-wait' : ''}`}
+                    >
+                      {preparing ? (
+                        <div className="flex flex-col items-center text-slate-500">
+                          <Upload size={26} className="mb-2 animate-pulse" />
+                          <span className="font-bold text-sm">Preparando arquivo...</span>
+                        </div>
+                      ) : proofFile ? (
+                        <div className="flex flex-col items-center text-emerald-600">
+                          <CheckCircle size={26} className="mb-2" />
+                          <span className="font-bold text-sm">Comprovante pronto para enviar</span>
+                          <span className="text-xs opacity-70 mt-1">Toque para trocar</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-500">
+                          <FileText size={26} className="mb-2" />
+                          <span className="font-bold text-sm">Toque para anexar o comprovante</span>
+                          <span className="text-xs opacity-60 mt-1">Foto ou PDF</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Menor de 18: autorização do responsável exigida junto */}
+                    {isMinor && (
+                      <div className="mt-3">
+                        <div className="rounded-xl p-3 mb-2 border bg-amber-50 border-amber-200 flex items-start gap-2">
+                          <ShieldAlert size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800">
+                            <strong>Atleta menor de 18 anos.</strong> Anexe também a <strong>autorização assinada</strong> do responsável.{' '}
+                            <a
+                              href={`${import.meta.env.BASE_URL}autorizacao-menor.html`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline font-bold text-amber-900 hover:text-amber-950"
+                            >
+                              Baixar modelo
+                            </a>.
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          ref={authInputRef}
+                          accept="image/*,application/pdf"
+                          onChange={handleAuthFileChange}
+                          className="hidden"
+                        />
+                        <div
+                          onClick={() => !preparingAuth && authInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                            authFile ? 'border-emerald-400 bg-emerald-50' : 'border-amber-300 bg-white hover:border-amber-400'
+                          } ${preparingAuth ? 'opacity-60 cursor-wait' : ''}`}
+                        >
+                          {preparingAuth ? (
+                            <div className="flex flex-col items-center text-slate-500">
+                              <Upload size={22} className="mb-1.5 animate-pulse" />
+                              <span className="font-bold text-sm">Preparando...</span>
+                            </div>
+                          ) : authFile ? (
+                            <div className="flex flex-col items-center text-emerald-600">
+                              <CheckCircle size={22} className="mb-1.5" />
+                              <span className="font-bold text-sm">Autorização pronta</span>
+                              <span className="text-xs opacity-70 mt-0.5">Toque para trocar</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center text-amber-600">
+                              <ShieldAlert size={22} className="mb-1.5" />
+                              <span className="font-bold text-sm">Anexar autorização assinada</span>
+                              <span className="text-xs opacity-60 mt-0.5">Foto ou PDF</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {proofError && (
+                      <p className="text-red-500 text-xs mt-2 font-bold flex items-center gap-1">
+                        <AlertCircle size={12} /> {proofError}
+                      </p>
+                    )}
+
+                    {proofFile && (
+                      <button
+                        onClick={handleSubmitProof}
+                        disabled={busy || needsAuth}
+                        className="w-full mt-3 py-3 rounded-xl font-black italic uppercase tracking-wider transition-all shadow bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {busy ? 'Enviando...' : 'Enviar comprovante'}
+                      </button>
+                    )}
+                    {proofFile && needsAuth && (
+                      <p className="text-amber-600 text-xs mt-2 text-center font-bold flex items-center justify-center gap-1">
+                        <ShieldAlert size={12} /> Anexe a autorização do responsável para liberar o envio.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-indigo-700 font-medium leading-relaxed">
+                    Envie o comprovante na tela inicial, em “Enviar comprovante”, digitando seu CPF.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
