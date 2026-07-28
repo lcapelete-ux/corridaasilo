@@ -1,7 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { Runner, ShirtSize } from '../types';
-import { Users, Trophy, DollarSign, TrendingDown, Wallet } from 'lucide-react';
+import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar } from 'lucide-react';
+import { SENIOR_AGE } from '../constants';
 import { StatsCard } from './StatsCard';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -12,13 +13,54 @@ interface DashboardProps {
 }
 
 const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'];
+const tooltipStyle = { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' } as const;
+
+// Donut com total no centro e legenda com contagem/percentual ao lado
+const DonutCard: React.FC<{ title: string; data: { name: string; value: number }[]; colors: string[]; total: number }> = ({ title, data, colors, total }) => (
+  <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+    <h3 className="text-base font-bold text-white mb-4">{title}</h3>
+    {total > 0 ? (
+      <div className="flex items-center gap-5">
+        <div className="h-40 w-40 shrink-0 relative">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
+                {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-3xl font-black text-white leading-none">{total}</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">total</span>
+          </div>
+        </div>
+        <div className="flex-1 space-y-2.5">
+          {data.map((d, i) => (
+            <div key={d.name} className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 text-slate-300">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: colors[i % colors.length] }} />
+                {d.name}
+              </span>
+              <span className="font-bold text-white">
+                {d.value} <span className="text-slate-500 text-xs font-normal">({total ? Math.round((d.value / total) * 100) : 0}%)</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="h-40 flex items-center justify-center text-slate-600">Sem dados ainda</div>
+    )}
+  </div>
+);
 
 export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0 }) => {
-  
+
   const stats = useMemo(() => {
     const totalRunners = runners.length;
-    
-    // Shirt Sizes Breakdown
+
+    // Camisetas
     const sizeCounts: Record<string, number> = {
       [ShirtSize.S]: 0,   // P
       [ShirtSize.M]: 0,   // M
@@ -26,33 +68,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       [ShirtSize.XL]: 0,  // GG
       [ShirtSize.XXL]: 0, // EXG
     };
-    
-    // Teams Breakdown
+
     const teamCounts: Record<string, number> = {};
+    const cityCounts: Record<string, { name: string; count: number }> = {};
+
+    let sumAge = 0;
+    let paidCount = 0;
+    let paidNoProofCount = 0;
+    let m5 = 0;
+    let m3 = 0;
+    let seniorCount = 0;
 
     runners.forEach(r => {
-      // Shirts - Verifica se o tamanho existe no contador (para evitar erros com dados legados)
-      if (sizeCounts[r.shirtSize] !== undefined) {
-        sizeCounts[r.shirtSize]++;
-      } else {
-        // Fallback para tamanhos antigos ou desconhecidos
-        // Se houver necessidade, poderíamos criar uma categoria 'Outros'
-      }
-      
-      // Teams
+      if (sizeCounts[r.shirtSize] !== undefined) sizeCounts[r.shirtSize]++;
+
       const team = r.teamName || 'Avulso';
       teamCounts[team] = (teamCounts[team] || 0) + 1;
+
+      const city = (r.city || '').trim();
+      if (city) {
+        const key = city.toLowerCase();
+        if (!cityCounts[key]) cityCounts[key] = { name: city, count: 0 };
+        cityCounts[key].count++;
+      }
+
+      sumAge += r.age || 0;
+      if (r.isPaid) paidCount++;
+      if (r.paidNoProof && !r.isPaid) paidNoProofCount++;
+      if (r.modality === '3k') m3++; else m5++;
+      if (r.age >= SENIOR_AGE) seniorCount++;
     });
 
-    // Convert Teams to array and sort
     const sortedTeams = Object.entries(teamCounts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5); // Top 5
+      .slice(0, 5);
 
     const uniqueTeams = Object.keys(teamCounts).filter(t => t !== 'Avulso').length;
 
-    // Gender data for chart
     const genderData = Object.entries(
       runners.reduce((acc, curr) => {
         acc[curr.gender] = (acc[curr.gender] || 0) + 1;
@@ -60,89 +113,116 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       }, {} as Record<string, number>)
     ).map(([name, value]) => ({ name, value }));
 
-    // Age groups
-    const ageGroups = {
-      '18-29': 0,
-      '30-39': 0,
-      '40-49': 0,
-      '50+': 0
-    };
+    const ageGroups = { '18-29': 0, '30-39': 0, '40-49': 0, '50-59': 0, '60+': 0 };
     runners.forEach(r => {
       if (r.age < 30) ageGroups['18-29']++;
       else if (r.age < 40) ageGroups['30-39']++;
       else if (r.age < 50) ageGroups['40-49']++;
-      else ageGroups['50+']++;
+      else if (r.age < 60) ageGroups['50-59']++;
+      else ageGroups['60+']++;
     });
     const ageData = Object.entries(ageGroups).map(([name, value]) => ({ name, value }));
 
-    return { totalRunners, uniqueTeams, sizeCounts, genderData, ageData, sortedTeams };
+    const topCities = Object.values(cityCounts).sort((a, b) => b.count - a.count).slice(0, 8);
+    const distinctCities = Object.keys(cityCounts).length;
+
+    const pendingCount = totalRunners - paidCount;
+    const pctPaid = totalRunners ? Math.round((paidCount / totalRunners) * 100) : 0;
+    const avgAge = totalRunners ? Math.round(sumAge / totalRunners) : 0;
+
+    const paymentData = [
+      { name: 'Pagos', value: paidCount },
+      { name: 'Pendentes', value: pendingCount },
+    ];
+    const modalityData = [
+      { name: 'Corrida 5 km', value: m5 },
+      { name: 'Caminhada 3 km', value: m3 },
+    ];
+
+    return {
+      totalRunners, uniqueTeams, sizeCounts, genderData, ageData, sortedTeams,
+      topCities, distinctCities, paidCount, pendingCount, pctPaid, avgAge,
+      seniorCount, m5, m3, paidNoProofCount, paymentData, modalityData,
+    };
   }, [runners]);
 
   const balance = totalRevenue - totalExpenses;
+  const PAYMENT_COLORS = ['#10b981', '#f59e0b'];
+  const MODALITY_COLORS = ['#6366f1', '#0ea5e9'];
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Linha 1 — Financeiro */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard 
-          title="Total de Inscritos" 
-          value={stats.totalRunners} 
-          icon={Users} 
-          color="bg-indigo-500" 
-          description="Atletas cadastrados"
+        <StatsCard
+          title="Total de Inscritos"
+          value={stats.totalRunners}
+          icon={Users}
+          color="bg-indigo-500"
+          description={`${stats.uniqueTeams} equipe(s) • ${stats.distinctCities} cidade(s)`}
         />
-        <StatsCard 
+        <StatsCard
           title="Receita Total"
           value={`R$ ${totalRevenue.toLocaleString('pt-BR', { notation: 'compact' })}`}
           icon={DollarSign}
           color="bg-emerald-500"
           description="Inscrições + Patrocínios + Extras"
         />
-        <StatsCard 
-          title="Despesas" 
-          value={`R$ ${totalExpenses.toLocaleString('pt-BR', { notation: 'compact' })}`} 
-          icon={TrendingDown} 
-          color="bg-red-500" 
+        <StatsCard
+          title="Despesas"
+          value={`R$ ${totalExpenses.toLocaleString('pt-BR', { notation: 'compact' })}`}
+          icon={TrendingDown}
+          color="bg-red-500"
           description="Gastos totais"
         />
-        <StatsCard 
-          title="Balanço Final" 
-          value={`R$ ${balance.toLocaleString('pt-BR', { notation: 'compact' })}`} 
-          icon={Wallet} 
+        <StatsCard
+          title="Balanço Final"
+          value={`R$ ${balance.toLocaleString('pt-BR', { notation: 'compact' })}`}
+          icon={Wallet}
           color={balance >= 0 ? "bg-blue-500" : "bg-red-600"}
           description="Lucro líquido"
         />
       </div>
 
+      {/* Linha 2 — Participação */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          title="Pagamentos Confirmados"
+          value={`${stats.paidCount}/${stats.totalRunners}`}
+          icon={CheckCircle}
+          color="bg-emerald-500"
+          description={`${stats.pctPaid}% confirmado • ${stats.pendingCount} pendente(s)`}
+        />
+        <StatsCard
+          title="Corrida 5 km"
+          value={stats.m5}
+          icon={Activity}
+          color="bg-indigo-500"
+          description="Atletas na corrida"
+        />
+        <StatsCard
+          title="Caminhada 3 km"
+          value={stats.m3}
+          icon={Footprints}
+          color="bg-sky-500"
+          description="Atletas na caminhada"
+        />
+        <StatsCard
+          title="Idade Média"
+          value={stats.avgAge}
+          icon={Calendar}
+          color="bg-fuchsia-500"
+          description={`anos • ${stats.seniorCount} atleta(s) 60+`}
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Resumo de Camisetas */}
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-            👕 Resumo de Camisetas
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase">
-                <tr className="bg-slate-800/50">
-                  <th className="px-4 py-3 rounded-l-lg">Tamanho</th>
-                  <th className="px-4 py-3 text-right rounded-r-lg">Quantidade</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(stats.sizeCounts).map(([size, count]) => (
-                  <tr key={size} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 font-medium text-slate-300">{size}</td>
-                    <td className="px-4 py-3 text-right font-bold text-white">{count}</td>
-                  </tr>
-                ))}
-                <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
-                  <td className="px-4 py-3 text-yellow-400">TOTAL</td>
-                  <td className="px-4 py-3 text-right text-yellow-400">{stats.totalRunners}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {/* Status de Pagamento */}
+        <DonutCard title="Status de Pagamento" data={stats.paymentData} colors={PAYMENT_COLORS} total={stats.totalRunners} />
+
+        {/* Modalidade */}
+        <DonutCard title="Modalidade" data={stats.modalityData} colors={MODALITY_COLORS} total={stats.totalRunners} />
 
         {/* Resumo de Equipes */}
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
@@ -175,7 +255,67 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
           </div>
         </div>
 
-        {/* Gender Chart */}
+        {/* Top Cidades */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            📍 Top Cidades
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-500 uppercase">
+                <tr className="bg-slate-800/50">
+                  <th className="px-4 py-3 rounded-l-lg">Cidade</th>
+                  <th className="px-4 py-3 text-right rounded-r-lg">Atletas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.topCities.map((c, idx) => (
+                  <tr key={c.name} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-300 flex items-center gap-2">
+                      {idx < 3 && <span className="text-xs">{['🥇', '🥈', '🥉'][idx]}</span>}
+                      {c.name}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{c.count}</td>
+                  </tr>
+                ))}
+                {stats.topCities.length === 0 && (
+                  <tr><td colSpan={2} className="px-4 py-8 text-center text-slate-600">Nenhuma cidade registrada</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Resumo de Camisetas */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            👕 Resumo de Camisetas
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-500 uppercase">
+                <tr className="bg-slate-800/50">
+                  <th className="px-4 py-3 rounded-l-lg">Tamanho</th>
+                  <th className="px-4 py-3 text-right rounded-r-lg">Quantidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(stats.sizeCounts).map(([size, count]) => (
+                  <tr key={size} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-300">{size}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{count}</td>
+                  </tr>
+                ))}
+                <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                  <td className="px-4 py-3 text-yellow-400">TOTAL</td>
+                  <td className="px-4 py-3 text-right text-yellow-400">{stats.totalRunners}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Gênero */}
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
           <h3 className="text-base font-bold text-white mb-4">Distribuição por Gênero</h3>
           <div className="h-64">
@@ -196,7 +336,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' }} />
+                  <Tooltip contentStyle={tooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -205,8 +345,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
           </div>
         </div>
 
-        {/* Age Chart */}
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+        {/* Faixa Etária (largura total) */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 lg:col-span-2">
           <h3 className="text-base font-bold text-white mb-4">Faixa Etária</h3>
           <div className="h-64">
             {stats.totalRunners > 0 ? (
@@ -215,7 +355,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
                   <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' }} />
+                  <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={tooltipStyle} />
                   <Bar dataKey="value" fill="#facc15" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

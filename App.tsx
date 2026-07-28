@@ -895,6 +895,7 @@ const App: React.FC = () => {
             {currentView === 'cities' && (
               <CitiesManager
                 cities={officialCities}
+                runners={runners}
                 onCreate={handleCreateCity}
                 onDelete={handleDeleteCity}
               />
