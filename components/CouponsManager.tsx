@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TeamCoupon } from '../types';
 import { REGISTRATION_PRICE, calcCouponDiscount } from '../constants';
-import { Plus, Trash2, Ticket, Pencil, Flag, BadgePercent, Lock, Unlock, Globe } from 'lucide-react';
+import { Plus, Trash2, Ticket, Pencil, Flag, BadgePercent, Lock, Unlock, Globe, Ban } from 'lucide-react';
 
 interface CouponsManagerProps {
   coupons: TeamCoupon[];
@@ -10,13 +10,14 @@ interface CouponsManagerProps {
   onUpdate: (coupon: TeamCoupon) => void;
   onDelete: (id: string) => void;
   onToggleBlock?: (coupon: TeamCoupon) => void;
+  couponsBlocked?: boolean; // Bloqueio geral (Configurações): todos desativados
 }
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm";
 const selectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm [color-scheme:dark]";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, onSave, onUpdate, onDelete, onToggleBlock }) => {
+export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, onSave, onUpdate, onDelete, onToggleBlock, couponsBlocked = false }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -108,6 +109,19 @@ export const CouponsManager: React.FC<CouponsManagerProps> = ({ coupons, teams, 
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Aviso de bloqueio geral (ligado em Configurações) */}
+      {couponsBlocked && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+          <Ban size={20} className="text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-red-400 text-sm">Todos os cupons estão bloqueados</p>
+            <p className="text-xs text-red-300/80 mt-0.5">
+              O bloqueio geral está ligado em <strong>Configurações → Cupons de Desconto</strong>. Nenhum cupom é aceito na inscrição, mesmo os liberados abaixo. Desligue lá para voltar a aceitar.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center bg-slate-900 p-6 rounded-xl border border-slate-800/60">
         <div>

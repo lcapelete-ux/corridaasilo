@@ -801,6 +801,31 @@ alter table public.runners add column if not exists note text;
 comment on column public.runners.note is
   'Observação livre do organizador sobre a inscrição (ex.: pagamento em nome de outra pessoa)';
 
+-- 18. Bloqueio geral de cupons: um interruptor no admin que desliga TODOS os
+--     cupons de desconto de uma vez (inclusive os que forem criados depois).
+alter table public.app_settings add column if not exists coupons_blocked boolean not null default false;
+comment on column public.app_settings.coupons_blocked is
+  'Quando true, nenhum cupom de desconto é aceito no formulário de inscrição (bloqueio geral definido pelo admin)';
+
+-- A validação pública passa a respeitar o bloqueio geral: com ele ligado, o
+-- cupom digitado é tratado como "não encontrado".
+drop function if exists public.find_coupon_by_code(text);
+create or replace function public.find_coupon_by_code(p_code text)
+returns table (id uuid, team_name text, code text, discount_type text, value numeric, is_global boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select c.id, c.team_name, c.code, c.discount_type, c.value, coalesce(c.is_global, false)
+  from public.team_coupons c
+  where upper(c.code) = upper(btrim(p_code))
+    and coalesce(c.blocked, false) = false
+    and coalesce((select s.coupons_blocked from public.app_settings s limit 1), false) = false;
+$$;
+
+grant execute on function public.find_coupon_by_code(text) to anon, authenticated;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

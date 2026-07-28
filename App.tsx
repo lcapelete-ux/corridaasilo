@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -56,6 +56,8 @@ const App: React.FC = () => {
   const [promoDeadline, setPromoDeadline] = useState('2026-08-23');
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-09-05');
   const [sponsorLogos, setSponsorLogos] = useState<SponsorLogo[]>([]);
+  // Bloqueio geral de cupons de desconto (interruptor do admin em Configurações)
+  const [couponsBlocked, setCouponsBlockedState] = useState(false);
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -230,6 +232,7 @@ const App: React.FC = () => {
     refreshPromoDeadline();
     refreshRegistrationDeadline();
     refreshSponsorLogos();
+    refreshCouponsBlocked();
   }, []);
 
   // Logos do rodapé: leitura pública. Se a migração ainda não rodou, engole o
@@ -292,6 +295,21 @@ const App: React.FC = () => {
     } catch {
       // Mantém o valor atual (padrão)
     }
+  };
+
+  // Bloqueio geral de cupons: leitura resiliente (se a migração ainda não rodou,
+  // assume "não bloqueado" e segue).
+  const refreshCouponsBlocked = async () => {
+    try {
+      setCouponsBlockedState(await getCouponsBlocked());
+    } catch {
+      // Mantém o valor atual (padrão: não bloqueado)
+    }
+  };
+
+  const handleUpdateCouponsBlocked = async (blocked: boolean) => {
+    await setCouponsBlocked(blocked); // erro propaga para o SettingsManager avisar
+    await refreshCouponsBlocked();
   };
 
   const handleUpdatePromoDeadline = async (date: string) => {
@@ -727,6 +745,7 @@ const App: React.FC = () => {
                officialTeams={officialTeams}
                officialCities={officialCities}
                isPublicView={true}
+               couponsBlocked={couponsBlocked}
              />
            )}
 
@@ -863,6 +882,7 @@ const App: React.FC = () => {
                 isPublicView={false}
                 userSession={userSession}
                 coupons={coupons}
+                couponsBlocked={couponsBlocked}
               />
             )}
 
@@ -935,6 +955,7 @@ const App: React.FC = () => {
                 onUpdate={handleUpdateCoupon}
                 onDelete={handleDeleteCoupon}
                 onToggleBlock={handleToggleCouponBlock}
+                couponsBlocked={couponsBlocked}
               />
             )}
 
@@ -959,6 +980,8 @@ const App: React.FC = () => {
                 registrationDeadline={registrationDeadline}
                 onUpdateRegistrationDeadline={handleUpdateRegistrationDeadline}
                 totalRunners={runners.length}
+                couponsBlocked={couponsBlocked}
+                onUpdateCouponsBlocked={handleUpdateCouponsBlocked}
               />
             )}
 

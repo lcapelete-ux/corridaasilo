@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Gender, Runner, ShirtSize, TeamCoupon, UserSession, RaceModality } from '../types';
 import { getTrainingTip } from '../services/geminiService';
 import { findCouponByCode } from '../services/storageService';
@@ -15,9 +15,10 @@ interface RegistrationFormProps {
   isPublicView?: boolean;
   userSession?: UserSession | null;
   coupons?: TeamCoupon[]; // Cupons disponíveis (área restrita): botão de aplicar direto
+  couponsBlocked?: boolean; // Bloqueio geral de cupons (admin): desativa todos
 }
 
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, officialCities, isPublicView = false, userSession, coupons }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, existingTeams, officialTeams, officialCities, isPublicView = false, userSession, coupons, couponsBlocked = false }) => {
   // "Avulso" já tem opção própria no <select>: não repete aqui
   const teamOptions = (officialTeams && officialTeams.length > 0 ? officialTeams : PREDEFINED_TEAMS)
     .filter(t => t !== 'Avulso');
@@ -141,7 +142,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     }
   };
 
+  // Bloqueio geral ligado: garante que nenhum cupom fique aplicado
+  useEffect(() => {
+    if (couponsBlocked && appliedCoupon) {
+      setAppliedCoupon(null);
+      setCouponInput('');
+      setCouponError('');
+    }
+  }, [couponsBlocked, appliedCoupon]);
+
   const handleApplyCoupon = async () => {
+    if (couponsBlocked) {
+      setCouponError('Os cupons de desconto estão desativados pela organização.');
+      return;
+    }
     const code = couponInput.trim().toUpperCase();
     setCouponError('');
 
@@ -191,6 +205,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
   // Aplica direto o cupom da equipe (botão), sem precisar digitar o código.
   const applyCouponDirect = (coupon: TeamCoupon) => {
     setCouponError('');
+    if (couponsBlocked) {
+      setCouponError('Os cupons de desconto estão desativados pela organização.');
+      return;
+    }
     if (coupon.blocked) {
       setCouponError('Este cupom está bloqueado pela organização.');
       return;
@@ -294,7 +312,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
     const isSeniorAtSubmit = ageCalculated >= SENIOR_AGE;
     const seniorFullPrice = isSeniorAtSubmit && seniorSupporterChoice;
     const feeForRunner = getRegistrationFee(ageCalculated, seniorFullPrice);
-    const discountForRunner = appliedCoupon && !isSeniorAtSubmit
+    const discountForRunner = !couponsBlocked && appliedCoupon && !isSeniorAtSubmit
       ? calcCouponDiscount(feeForRunner, appliedCoupon)
       : (seniorFullPrice ? SENIOR_SUPPORTER_DISCOUNT : 0);
 
@@ -842,7 +860,16 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   <Ticket size={14} /> Cupom de desconto <span className={isPublicView ? 'text-slate-500 font-normal' : 'text-slate-400 font-normal'}>(opcional)</span>
                 </label>
 
-                {isSeniorRegistrant ? (
+                {couponsBlocked ? (
+                  <div className={`flex items-start gap-2 rounded-lg px-4 py-3 border text-sm ${
+                    isPublicView
+                      ? 'bg-slate-800/60 border-slate-700 text-slate-400'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                  }`}>
+                    <AlertCircle size={16} className={`mt-0.5 shrink-0 ${isPublicView ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                    <span>Os cupons de desconto estão <strong>temporariamente indisponíveis</strong>.</span>
+                  </div>
+                ) : isSeniorRegistrant ? (
                   <div className={`flex items-start gap-2 rounded-lg px-4 py-3 border text-sm ${
                     isPublicView
                       ? 'bg-slate-800/60 border-slate-700 text-slate-400'

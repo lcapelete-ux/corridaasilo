@@ -616,6 +616,26 @@ export const updateTransferSettings = async (settings: TransferSettings): Promis
   if (error) throw friendlyError(error, 'Erro ao salvar configurações de transferência');
 };
 
+// --- Bloqueio geral de cupons (interruptor único do admin) ---
+
+export const getCouponsBlocked = async (): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('coupons_blocked')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar bloqueio de cupons');
+  return (data as { coupons_blocked: boolean | null } | null)?.coupons_blocked ?? false;
+};
+
+export const setCouponsBlocked = async (blocked: boolean): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ coupons_blocked: blocked })
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar bloqueio de cupons');
+};
+
 export const getRaceGroupName = async (): Promise<string> => {
   const { data, error } = await supabase
     .from('app_settings')

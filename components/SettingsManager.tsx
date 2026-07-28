@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users } from 'lucide-react';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket } from 'lucide-react';
 import { TransferSettings } from '../types';
 import { formatBrDate, MAX_ATHLETES } from '../constants';
 
@@ -13,9 +13,11 @@ interface SettingsManagerProps {
   registrationDeadline?: string;
   onUpdateRegistrationDeadline?: (date: string) => Promise<void>;
   totalRunners?: number;
+  couponsBlocked?: boolean;
+  onUpdateCouponsBlocked?: (blocked: boolean) => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0 }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +40,22 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
   const [savingTransfer, setSavingTransfer] = useState(false);
   const [transferError, setTransferError] = useState('');
   const [transferSuccess, setTransferSuccess] = useState(false);
+
+  const [savingCoupons, setSavingCoupons] = useState(false);
+  const [couponsError, setCouponsError] = useState('');
+
+  const handleToggleCouponsBlocked = async (blocked: boolean) => {
+    if (!onUpdateCouponsBlocked) return;
+    setSavingCoupons(true);
+    setCouponsError('');
+    try {
+      await onUpdateCouponsBlocked(blocked);
+    } catch (err: any) {
+      setCouponsError(err?.message || 'Erro ao salvar o bloqueio de cupons.');
+    } finally {
+      setSavingCoupons(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,6 +347,55 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
             <Save size={18} /> {savingReg ? 'Salvando...' : 'Salvar Prazo'}
           </button>
         </form>
+      </div>
+
+      {/* Cupons de Desconto — bloqueio geral */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className={`p-3 rounded-lg ${couponsBlocked ? 'bg-red-100' : 'bg-emerald-100'}`}>
+            <Ticket size={24} className={couponsBlocked ? 'text-red-600' : 'text-emerald-600'} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-800">Cupons de Desconto</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Status: <span className={`font-bold ${couponsBlocked ? 'text-red-600' : 'text-emerald-600'}`}>
+                {couponsBlocked ? '✗ Todos bloqueados' : '✓ Liberados'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-slate-600 text-sm mb-6">
+          Este interruptor desliga <strong>todos os cupons de uma vez</strong> — inclusive os que forem criados depois.
+          Com ele ligado, nenhum cupom é aceito na inscrição (nem no site público, nem no cadastro manual).
+        </p>
+
+        <label
+          className="flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 transition-all"
+          style={couponsBlocked ? { borderColor: '#fee2e2', backgroundColor: '#fef2f2' } : {}}
+        >
+          <input
+            type="checkbox"
+            checked={couponsBlocked}
+            disabled={savingCoupons || !onUpdateCouponsBlocked}
+            onChange={(e) => handleToggleCouponsBlocked(e.target.checked)}
+            className="w-5 h-5 rounded border-slate-300 accent-red-500 cursor-pointer disabled:opacity-50"
+          />
+          <div className="flex-1">
+            <span className="text-sm font-bold text-slate-800 block">Bloquear todos os cupons de desconto</span>
+            <span className="text-xs text-slate-600">
+              {savingCoupons ? 'Salvando...' : couponsBlocked ? 'Nenhum cupom está sendo aceito.' : 'Marque para desativar todos os cupons imediatamente.'}
+            </span>
+          </div>
+          {couponsBlocked && <Ban size={20} className="text-red-500 shrink-0" />}
+        </label>
+
+        {couponsError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mt-4">
+            <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+            <p className="text-red-700 font-medium text-sm">{couponsError}</p>
+          </div>
+        )}
       </div>
 
       {/* Painel de Transferências */}
