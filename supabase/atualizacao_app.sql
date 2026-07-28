@@ -794,6 +794,13 @@ insert into public.cities (name) values
   ('Jumirim'), ('Pereiras'), ('Tiete')
 on conflict (name) do nothing;
 
+-- 17. Observação livre por inscrito (uso do organizador). Ex.: quando o
+--     pagamento aparece em nome de outra pessoa, o admin anota aqui para se
+--     organizar. Editável na tela "Corredores".
+alter table public.runners add column if not exists note text;
+comment on column public.runners.note is
+  'Observação livre do organizador sobre a inscrição (ex.: pagamento em nome de outra pessoa)';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

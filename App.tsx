@@ -875,6 +875,7 @@ const App: React.FC = () => {
                 runners={getVisibleRunners()}
                 onDelete={handleDeleteRunner}
                 onUpdate={handleUpdateRunner}
+                onRefresh={refreshRunners}
                 userSession={userSession}
                 transferSettings={transferSettings}
                 onUpdateTransferSettings={handleUpdateTransferSettings}

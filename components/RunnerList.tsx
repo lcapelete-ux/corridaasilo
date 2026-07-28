@@ -1,17 +1,45 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote } from 'lucide-react';
 
 interface RunnerListProps {
   runners: Runner[];
   onDelete: (id: string) => void;
   onUpdate?: (runner: Runner) => void;
+  onRefresh?: () => Promise<void> | void; // Atualiza a lista puxando novas inscrições
   userSession?: UserSession | null;
   transferSettings?: TransferSettings | null;
   onUpdateTransferSettings?: (settings: TransferSettings) => void;
 }
+
+// Célula de observação editável (salva ao sair do campo). Uso do organizador:
+// ex.: pagamento em nome de outra pessoa.
+const NoteCell: React.FC<{ runner: Runner; onSave: (note: string) => void }> = ({ runner, onSave }) => {
+  const [val, setVal] = useState(runner.note || '');
+  const [focused, setFocused] = useState(false);
+  // Se o valor do banco mudar (ex.: após "Atualizar") e não estiver editando, sincroniza
+  useEffect(() => { if (!focused) setVal(runner.note || ''); }, [runner.note, focused]);
+
+  const commit = () => {
+    const next = val.trim();
+    if (next !== (runner.note || '')) onSave(next);
+  };
+
+  return (
+    <input
+      value={val}
+      onChange={e => setVal(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); commit(); }}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      placeholder="Obs..."
+      title="Observação (ex.: pagamento em nome de outra pessoa)"
+      className="mt-1.5 w-full max-w-[170px] bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder-slate-600 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+    />
+  );
+};
 
 // Modal de transferência tem fundo branco: cores explícitas + color-scheme light
 // para o texto não sumir quando o celular está em modo escuro
@@ -20,10 +48,21 @@ const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded te
 // Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
 const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, userSession, transferSettings, onUpdateTransferSettings }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes'>('lista');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const [showTransferSettings, setShowTransferSettings] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<TransferSettings>({ transferDeadline: undefined, transfersBlocked: false });
   const [savingSettings, setSavingSettings] = useState(false);
@@ -138,18 +177,21 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const handleExportCSV = () => {
     // Cabeçalhos das colunas
     const headers = [
-      'ID', 
-      'Nome Completo', 
-      'CPF', 
-      'Data Nascimento', 
+      'ID',
+      'Nome Completo',
+      'CPF',
+      'Telefone',
+      'Data Nascimento',
       'Idade',
       'Modalidade',
       'Categoria',
       'Gênero',
       'Cidade',
       'Equipe',
+      'Observação',
       'Tamanho Camiseta',
       'Email',
+      'Valor Pago (R$)',
       'Data Inscrição',
       'Pagamento Confirmado'
     ];
@@ -161,19 +203,27 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       // Formatar data de inscrição
       const regDateFormatted = new Date(runner.registrationDate).toLocaleDateString('pt-BR');
 
+      // Valor pago pelo atleta (considera meia, apoiador, cupom e contribuição extra)
+      const valorPago = getRunnerPaidValue(runner).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      // Escapa aspas dentro de campos livres (nome, observação) para não quebrar o CSV
+      const esc = (v: string) => (v || '').replace(/"/g, '""');
+
       return [
         `"${runner.id}"`,
-        `"${runner.fullName}"`,
+        `"${esc(runner.fullName)}"`,
         `"${runner.cpf}"`,
+        `"${esc(runner.phone || '')}"`,
         `"${birthDateFormatted}"`,
         `"${runner.age}"`,
         `"${modalityLabel(runner.modality)}"`,
         `"${getRunnerCategory(runner.birthDate, runner.modality)}"`,
         `"${runner.gender}"`,
-        `"${runner.city}"`,
-        `"${runner.teamName}"`,
+        `"${esc(runner.city)}"`,
+        `"${esc(runner.teamName)}"`,
+        `"${esc(runner.note || '')}"`,
         `"${runner.shirtSize}"`,
-        `"${runner.email}"`,
+        `"${esc(runner.email)}"`,
+        `"${valorPago}"`,
         `"${regDateFormatted}"`,
         `"${runner.isPaid ? 'SIM' : 'NÃO'}"`
       ].join(',');
@@ -333,6 +383,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
               <Users className="text-indigo-400" />
               Participantes ({runners.length})
             </h2>
+            {onRefresh && (
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg text-xs font-bold hover:bg-indigo-500/20 transition-colors disabled:opacity-60 disabled:cursor-wait"
+                title="Buscar novas inscrições sem recarregar a página"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {refreshing ? 'Atualizando...' : 'Atualizar'}
+              </button>
+            )}
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-colors"
@@ -658,7 +718,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Atleta</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Local/CPF</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Idade/Gênero</th>
-                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipe</th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1">Equipe <span className="text-slate-600">/</span> <StickyNote size={12} className="text-slate-500" /> Obs</span>
+                </th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Pagto</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
               </tr>
@@ -701,7 +763,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         )}
                       </div>
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 align-top">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         runner.teamName === 'Avulso' ? 'bg-slate-800 text-slate-300' : 'bg-indigo-500/10 text-indigo-400'
                       }`}>
@@ -710,6 +772,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                       <div className="mt-1 text-xs text-slate-500">
                         👕 {runner.shirtSize}
                       </div>
+                      {onUpdate && (
+                        <NoteCell runner={runner} onSave={(note) => onUpdate({ ...runner, note })} />
+                      )}
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col gap-2">
