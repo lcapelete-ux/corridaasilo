@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked } from './services/storageService';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -17,13 +17,14 @@ import { CouponsManager } from './components/CouponsManager';
 import { SettingsManager } from './components/SettingsManager';
 import { KitDelivery } from './components/KitDelivery';
 import { SponsorLogosManager } from './components/SponsorLogosManager';
+import { RaffleManager } from './components/RaffleManager';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { nightMusic } from './services/nightMusic';
 import sicrediLogo from './assets/sicredi-logo.jpg';
 import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const [sponsorLogos, setSponsorLogos] = useState<SponsorLogo[]>([]);
   // Bloqueio geral de cupons de desconto (interruptor do admin em Configurações)
   const [couponsBlocked, setCouponsBlockedState] = useState(false);
+  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', link: '' });
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -233,7 +235,23 @@ const App: React.FC = () => {
     refreshRegistrationDeadline();
     refreshSponsorLogos();
     refreshCouponsBlocked();
+    refreshRaffleSettings();
   }, []);
+
+  // Rifa solidária: leitura pública. Se a migração ainda não rodou, engole o
+  // erro e a seção simplesmente não aparece na página inicial.
+  const refreshRaffleSettings = async () => {
+    try {
+      setRaffleSettings(await getRaffleSettings());
+    } catch {
+      // Mantém o valor atual (oculta por padrão)
+    }
+  };
+
+  const handleUpdateRaffleSettings = async (settings: Partial<RaffleSettings>) => {
+    await updateRaffleSettings(settings); // erro propaga para o manager avisar
+    await refreshRaffleSettings();
+  };
 
   // Logos do rodapé: leitura pública. Se a migração ainda não rodou, engole o
   // erro e o rodapé segue só com o Sicredi.
@@ -670,6 +688,7 @@ const App: React.FC = () => {
           raceGroupName={raceGroupName}
           promoDeadline={promoDeadline}
           sponsorLogos={sponsorLogos}
+          raffleSettings={raffleSettings}
           startIntro={revealIntro}
         />
         {showCourse && (
@@ -833,6 +852,7 @@ const App: React.FC = () => {
                 <div className="h-px bg-slate-800/80 w-full" />
               </div>
               <NavItem target="sponsor_logos" icon={ImageIcon} label="Logos do Site" />
+              <NavItem target="raffle" icon={Gift} label="Rifa Solidária" />
               <NavItem target="settings" icon={Settings} label="Configurações" />
             </>
           )}
@@ -990,6 +1010,13 @@ const App: React.FC = () => {
                 logos={sponsorLogos}
                 onAdd={handleAddSponsorLogo}
                 onDelete={handleDeleteSponsorLogo}
+              />
+            )}
+
+            {currentView === 'raffle' && (
+              <RaffleManager
+                settings={raffleSettings}
+                onUpdate={handleUpdateRaffleSettings}
               />
             )}
           </div>

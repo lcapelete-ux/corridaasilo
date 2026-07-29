@@ -1,4 +1,4 @@
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings } from '../types';
 import { supabase } from './supabaseClient';
 
 // Todos os dados agora vivem no Supabase (banco central), não mais no
@@ -692,6 +692,45 @@ export const updateRegistrationDeadline = async (date: string): Promise<void> =>
     .update({ registration_deadline: date || null })
     .eq('id', true);
   if (error) throw friendlyError(error, 'Erro ao salvar prazo de inscrição');
+};
+
+// --- Rifa solidária: prêmio sorteado à parte da inscrição (mostrado na página inicial) ---
+
+interface RaffleSettingsRow {
+  raffle_enabled: boolean | null;
+  raffle_prize_name: string | null;
+  raffle_image_url: string | null;
+  raffle_link: string | null;
+}
+
+export const getRaffleSettings = async (): Promise<RaffleSettings> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('raffle_enabled, raffle_prize_name, raffle_image_url, raffle_link')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar a rifa');
+  const row = data as RaffleSettingsRow | null;
+  return {
+    enabled: row?.raffle_enabled ?? false,
+    prizeName: row?.raffle_prize_name || '',
+    imageUrl: row?.raffle_image_url || '',
+    link: row?.raffle_link || '',
+  };
+};
+
+export const updateRaffleSettings = async (settings: Partial<RaffleSettings>): Promise<void> => {
+  const payload: Record<string, unknown> = {};
+  if (settings.enabled !== undefined) payload.raffle_enabled = settings.enabled;
+  if (settings.prizeName !== undefined) payload.raffle_prize_name = settings.prizeName.trim() || null;
+  if (settings.imageUrl !== undefined) payload.raffle_image_url = settings.imageUrl || null;
+  if (settings.link !== undefined) payload.raffle_link = settings.link.trim() || null;
+
+  const { error } = await supabase
+    .from('app_settings')
+    .update(payload)
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar a rifa');
 };
 
 // --- Equipes/Academias oficiais (lista usada pelos formulários) ---

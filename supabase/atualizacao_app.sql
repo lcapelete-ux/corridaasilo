@@ -826,6 +826,23 @@ $$;
 
 grant execute on function public.find_coupon_by_code(text) to anon, authenticated;
 
+-- 19. Rifa solidária: prêmio (ex.: relógio) sorteado à parte da inscrição,
+--     com link para a plataforma externa onde o número é comprado. Mesmo
+--     padrão singleton de app_settings; imagem via Cloudinary (URL), como os
+--     demais uploads do app.
+alter table public.app_settings add column if not exists raffle_enabled boolean not null default false;
+alter table public.app_settings add column if not exists raffle_prize_name text;
+alter table public.app_settings add column if not exists raffle_image_url text;
+alter table public.app_settings add column if not exists raffle_link text;
+comment on column public.app_settings.raffle_enabled is
+  'Quando true, a seção da rifa aparece na página inicial';
+comment on column public.app_settings.raffle_prize_name is
+  'Nome/descrição do prêmio da rifa (ex.: "Relógio Garmin Forerunner 965")';
+comment on column public.app_settings.raffle_image_url is
+  'URL (Cloudinary) da foto do prêmio da rifa';
+comment on column public.app_settings.raffle_link is
+  'Link da plataforma externa onde o número da rifa é comprado';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
