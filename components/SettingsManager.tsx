@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket } from 'lucide-react';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy } from 'lucide-react';
 import { TransferSettings } from '../types';
 import { formatBrDate, MAX_ATHLETES } from '../constants';
 
@@ -15,9 +15,11 @@ interface SettingsManagerProps {
   totalRunners?: number;
   couponsBlocked?: boolean;
   onUpdateCouponsBlocked?: (blocked: boolean) => Promise<void>;
+  teamRankingEnabled?: boolean;
+  onUpdateTeamRankingEnabled?: (enabled: boolean) => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +45,22 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
 
   const [savingCoupons, setSavingCoupons] = useState(false);
   const [couponsError, setCouponsError] = useState('');
+
+  const [savingRanking, setSavingRanking] = useState(false);
+  const [rankingError, setRankingError] = useState('');
+
+  const handleToggleTeamRanking = async (enabled: boolean) => {
+    if (!onUpdateTeamRankingEnabled) return;
+    setSavingRanking(true);
+    setRankingError('');
+    try {
+      await onUpdateTeamRankingEnabled(enabled);
+    } catch (err: any) {
+      setRankingError(err?.message || 'Erro ao salvar a configuração do ranking.');
+    } finally {
+      setSavingRanking(false);
+    }
+  };
 
   const handleToggleCouponsBlocked = async (blocked: boolean) => {
     if (!onUpdateCouponsBlocked) return;
@@ -394,6 +412,51 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mt-4">
             <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
             <p className="text-red-700 font-medium text-sm">{couponsError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Ranking de Equipes */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className={`p-3 rounded-lg ${teamRankingEnabled ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+            <Trophy size={24} className={teamRankingEnabled ? 'text-emerald-600' : 'text-slate-500'} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-800">Ranking de Equipes</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Status: <span className={`font-bold ${teamRankingEnabled ? 'text-emerald-600' : 'text-slate-500'}`}>
+                {teamRankingEnabled ? '✓ Visível na página inicial' : '✗ Oculto'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-slate-600 text-sm mb-6">
+          Mostra na página inicial as <strong>5 equipes com mais inscritos</strong>, atualizado automaticamente
+          conforme novas inscrições chegam.
+        </p>
+
+        <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all">
+          <input
+            type="checkbox"
+            checked={teamRankingEnabled}
+            disabled={savingRanking || !onUpdateTeamRankingEnabled}
+            onChange={(e) => handleToggleTeamRanking(e.target.checked)}
+            className="w-5 h-5 rounded border-slate-300 accent-emerald-500 cursor-pointer disabled:opacity-50"
+          />
+          <div className="flex-1">
+            <span className="text-sm font-bold text-slate-800 block">Mostrar ranking das equipes no site</span>
+            <span className="text-xs text-slate-600">
+              {savingRanking ? 'Salvando...' : teamRankingEnabled ? 'O ranking está visível para todos.' : 'Marque para exibir o top 5 na página inicial.'}
+            </span>
+          </div>
+        </label>
+
+        {rankingError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mt-4">
+            <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+            <p className="text-red-700 font-medium text-sm">{rankingError}</p>
           </div>
         )}
       </div>
