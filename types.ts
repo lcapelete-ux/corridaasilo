@@ -126,7 +126,9 @@ export interface RaffleSettings {
   enabled: boolean;      // Liga/desliga a seção na página inicial
   prizeName: string;     // Nome/descrição do prêmio
   imageUrl: string;      // URL (Cloudinary) da foto do prêmio
+  imageHeight: number;   // Altura de exibição da foto na página inicial (px)
   link: string;          // Link da plataforma externa onde se compra o número
+  whatsappLink: string;  // Link do grupo de WhatsApp da rifa (dúvidas e resultados)
 }
 
 export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos' | 'raffle';

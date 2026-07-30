@@ -700,13 +700,15 @@ interface RaffleSettingsRow {
   raffle_enabled: boolean | null;
   raffle_prize_name: string | null;
   raffle_image_url: string | null;
+  raffle_image_height: number | null;
   raffle_link: string | null;
+  raffle_whatsapp_link: string | null;
 }
 
 export const getRaffleSettings = async (): Promise<RaffleSettings> => {
   const { data, error } = await supabase
     .from('app_settings')
-    .select('raffle_enabled, raffle_prize_name, raffle_image_url, raffle_link')
+    .select('raffle_enabled, raffle_prize_name, raffle_image_url, raffle_image_height, raffle_link, raffle_whatsapp_link')
     .limit(1)
     .maybeSingle();
   if (error) throw friendlyError(error, 'Erro ao carregar a rifa');
@@ -715,7 +717,9 @@ export const getRaffleSettings = async (): Promise<RaffleSettings> => {
     enabled: row?.raffle_enabled ?? false,
     prizeName: row?.raffle_prize_name || '',
     imageUrl: row?.raffle_image_url || '',
+    imageHeight: row?.raffle_image_height ?? 160,
     link: row?.raffle_link || '',
+    whatsappLink: row?.raffle_whatsapp_link || '',
   };
 };
 
@@ -724,7 +728,9 @@ export const updateRaffleSettings = async (settings: Partial<RaffleSettings>): P
   if (settings.enabled !== undefined) payload.raffle_enabled = settings.enabled;
   if (settings.prizeName !== undefined) payload.raffle_prize_name = settings.prizeName.trim() || null;
   if (settings.imageUrl !== undefined) payload.raffle_image_url = settings.imageUrl || null;
+  if (settings.imageHeight !== undefined) payload.raffle_image_height = settings.imageHeight;
   if (settings.link !== undefined) payload.raffle_link = settings.link.trim() || null;
+  if (settings.whatsappLink !== undefined) payload.raffle_whatsapp_link = settings.whatsappLink.trim() || null;
 
   const { error } = await supabase
     .from('app_settings')

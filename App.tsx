@@ -59,7 +59,7 @@ const App: React.FC = () => {
   const [sponsorLogos, setSponsorLogos] = useState<SponsorLogo[]>([]);
   // Bloqueio geral de cupons de desconto (interruptor do admin em Configurações)
   const [couponsBlocked, setCouponsBlockedState] = useState(false);
-  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', link: '' });
+  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', imageHeight: 160, link: '', whatsappLink: '' });
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -715,7 +715,7 @@ const App: React.FC = () => {
 
   // RENDER: TELA DE SUCESSO DO PIX
   if (mode === 'registration_success') {
-    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} cpf={lastRegisteredCpf} isMinor={lastRegisteredIsMinor} />;
+    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} cpf={lastRegisteredCpf} isMinor={lastRegisteredIsMinor} raffleSettings={raffleSettings} />;
   }
 
   // RENDER: FORMULÁRIO PÚBLICO

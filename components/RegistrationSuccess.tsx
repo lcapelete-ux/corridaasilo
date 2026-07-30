@@ -4,6 +4,8 @@ import { Copy, Check, Timer, QrCode, Tag, AlertCircle, Upload, FileText, CheckCi
 import { REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR } from '../constants';
 import { prepareProofFile } from '../services/imageUtils';
 import { attachPaymentProof } from '../services/storageService';
+import { RafflePromo } from './RafflePromo';
+import { RaffleSettings } from '../types';
 
 interface RegistrationSuccessProps {
   onBack: () => void;
@@ -13,9 +15,10 @@ interface RegistrationSuccessProps {
   extraDonation?: number; // Contribuição extra opcional somada à inscrição
   cpf?: string; // CPF do inscrito (permite enviar o comprovante aqui mesmo)
   isMinor?: boolean; // Menor de 18 no dia do evento: exige autorização junto
+  raffleSettings?: RaffleSettings;
 }
 
-export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false, extraDonation = 0, cpf, isMinor = false }) => {
+export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack, isSenior, discount = 0, seniorFullPrice = false, extraDonation = 0, cpf, isMinor = false, raffleSettings }) => {
   const [copied, setCopied] = useState(false);
   const pixKey = "corridaasilo@gmail.com";
 
@@ -92,7 +95,8 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-slate-200 relative">
+      <div className="w-full max-w-md">
+      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 relative">
         
         {/* Header Visual */}
         <div className="bg-slate-900 p-8 text-center relative overflow-hidden">
@@ -300,13 +304,21 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
 
         {/* Footer Action */}
         <div className="bg-slate-50 p-6 border-t border-slate-100">
-          <button 
+          <button
             onClick={onBack}
             className="w-full bg-slate-900 text-yellow-400 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
           >
             <Timer size={20} /> Voltar ao Início
           </button>
         </div>
+      </div>
+
+      {/* Rifa Solidária: divulgada também após a inscrição */}
+      {raffleSettings?.enabled && raffleSettings.imageUrl && raffleSettings.link && (
+        <div className="mt-6">
+          <RafflePromo settings={raffleSettings} variant="light" />
+        </div>
+      )}
       </div>
     </div>
   );

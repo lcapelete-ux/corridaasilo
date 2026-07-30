@@ -843,6 +843,15 @@ comment on column public.app_settings.raffle_image_url is
 comment on column public.app_settings.raffle_link is
   'Link da plataforma externa onde o número da rifa é comprado';
 
+-- 20. Rifa solidária: tamanho da foto ajustável pelo admin + link do grupo de
+--     WhatsApp (dúvidas e resultados), mostrado como botão abaixo de "Participar da Rifa".
+alter table public.app_settings add column if not exists raffle_image_height smallint not null default 160;
+alter table public.app_settings add column if not exists raffle_whatsapp_link text;
+comment on column public.app_settings.raffle_image_height is
+  'Altura de exibição da foto do prêmio na página inicial, em pixels (ajustável pelo admin)';
+comment on column public.app_settings.raffle_whatsapp_link is
+  'Link do grupo de WhatsApp da rifa (dúvidas e resultados); botão só aparece se preenchido';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
