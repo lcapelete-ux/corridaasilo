@@ -1,15 +1,21 @@
 
 import React, { useMemo } from 'react';
-import { Runner, ShirtSize } from '../types';
-import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar } from 'lucide-react';
-import { SENIOR_AGE } from '../constants';
+import { Runner, ShirtSize, Expense } from '../types';
+import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar, FileDown } from 'lucide-react';
+import { SENIOR_AGE, EVENT_DATE, formatBrDate } from '../constants';
 import { StatsCard } from './StatsCard';
+import { escapeHtml as esc, printHtml } from '../services/printReport';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface DashboardProps {
   runners: Runner[];
   totalRevenue?: number; // Soma de Inscrições pagas + Patrocínios + Extras
   totalExpenses?: number;
+  totalRegistrationRevenue?: number;
+  totalSponsorRevenue?: number;
+  totalExtraRevenue?: number;
+  expenses?: Expense[];
+  raceGroupName?: string;
 }
 
 const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -55,7 +61,7 @@ const DonutCard: React.FC<{ title: string; data: { name: string; value: number }
   </div>
 );
 
-export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0 }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0, totalRegistrationRevenue = 0, totalSponsorRevenue = 0, totalExtraRevenue = 0, expenses = [], raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
 
   const stats = useMemo(() => {
     const totalRunners = runners.length;
@@ -99,10 +105,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       if (r.age >= SENIOR_AGE) seniorCount++;
     });
 
-    const sortedTeams = Object.entries(teamCounts)
+    const allTeamsSorted = Object.entries(teamCounts)
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .sort((a, b) => b.count - a.count);
+    const sortedTeams = allTeamsSorted.slice(0, 5);
 
     const uniqueTeams = Object.keys(teamCounts).filter(t => t !== 'Avulso').length;
 
@@ -123,7 +129,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
     });
     const ageData = Object.entries(ageGroups).map(([name, value]) => ({ name, value }));
 
-    const topCities = Object.values(cityCounts).sort((a, b) => b.count - a.count).slice(0, 8);
+    const allCitiesSorted = Object.values(cityCounts).sort((a, b) => b.count - a.count);
+    const topCities = allCitiesSorted.slice(0, 8);
     const distinctCities = Object.keys(cityCounts).length;
 
     const pendingCount = totalRunners - paidCount;
@@ -143,6 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       totalRunners, uniqueTeams, sizeCounts, genderData, ageData, sortedTeams,
       topCities, distinctCities, paidCount, pendingCount, pctPaid, avgAge,
       seniorCount, m5, m3, paidNoProofCount, paymentData, modalityData,
+      allTeamsSorted, allCitiesSorted,
     };
   }, [runners]);
 
@@ -150,8 +158,85 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
   const PAYMENT_COLORS = ['#10b981', '#f59e0b'];
   const MODALITY_COLORS = ['#6366f1', '#0ea5e9'];
 
+  const generatePdf = () => {
+    const fmtMoney = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    const dataStr = new Date().toLocaleString('pt-BR');
+
+    const expensesByCategory = new Map<string, number>();
+    expenses.forEach(e => expensesByCategory.set(e.category, (expensesByCategory.get(e.category) || 0) + e.amount));
+    const expenseCategoryRows = Array.from(expensesByCategory.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, amount]) => `<tr><td>${esc(cat)}</td><td class="total-col">${esc(fmtMoney(amount))}</td></tr>`)
+      .join('');
+
+    const teamRows = stats.allTeamsSorted.map(t => `<tr><td>${esc(t.name)}</td><td class="total-col">${t.count}</td></tr>`).join('');
+    const cityRows = stats.allCitiesSorted.map(c => `<tr><td>${esc(c.name)}</td><td class="total-col">${c.count}</td></tr>`).join('');
+    const genderRows = stats.genderData.map(g => `<tr><td>${esc(g.name)}</td><td class="total-col">${g.value}</td></tr>`).join('');
+    const ageRows = stats.ageData.map(a => `<tr><td>${esc(a.name)} anos</td><td class="total-col">${a.value}</td></tr>`).join('');
+    const sizeRows = Object.entries(stats.sizeCounts).map(([size, count]) => `<tr><td>${esc(size)}</td><td class="total-col">${count}</td></tr>`).join('');
+
+    const html = `
+      <h1>${esc(raceGroupName)}</h1>
+      <p class="sub">Relatório da corrida · Data da prova: ${esc(formatBrDate(EVENT_DATE, true))} · Gerado em ${esc(dataStr)}</p>
+
+      <h2>Resumo Financeiro</h2>
+      <table><tbody>
+        <tr><td>Receita de Inscrições</td><td class="total-col">${esc(fmtMoney(totalRegistrationRevenue))}</td></tr>
+        <tr><td>Receita de Patrocínios</td><td class="total-col">${esc(fmtMoney(totalSponsorRevenue))}</td></tr>
+        <tr><td>Receita Extra</td><td class="total-col">${esc(fmtMoney(totalExtraRevenue))}</td></tr>
+        <tr><td><strong>Receita Total</strong></td><td class="total-col"><strong>${esc(fmtMoney(totalRevenue))}</strong></td></tr>
+        <tr><td>Despesas Totais</td><td class="total-col">${esc(fmtMoney(totalExpenses))}</td></tr>
+        <tr><td><strong>Balanço Final</strong></td><td class="total-col"><strong>${esc(fmtMoney(balance))}</strong></td></tr>
+      </tbody></table>
+
+      ${expenseCategoryRows ? `
+      <h2>Despesas por Categoria</h2>
+      <table><thead><tr><th>Categoria</th><th class="size">Valor</th></tr></thead><tbody>${expenseCategoryRows}</tbody></table>
+      ` : ''}
+
+      <h2>Participação</h2>
+      <table><tbody>
+        <tr><td>Total de Inscritos</td><td class="total-col">${stats.totalRunners}</td></tr>
+        <tr><td>Pagamentos Confirmados</td><td class="total-col">${stats.paidCount} (${stats.pctPaid}%)</td></tr>
+        <tr><td>Pagamentos Pendentes</td><td class="total-col">${stats.pendingCount}</td></tr>
+        <tr><td>Corrida 5 km</td><td class="total-col">${stats.m5}</td></tr>
+        <tr><td>Caminhada 3 km</td><td class="total-col">${stats.m3}</td></tr>
+        <tr><td>Idade Média</td><td class="total-col">${stats.avgAge} anos</td></tr>
+        <tr><td>Atletas 60+</td><td class="total-col">${stats.seniorCount}</td></tr>
+        <tr><td>Equipes</td><td class="total-col">${stats.uniqueTeams}</td></tr>
+        <tr><td>Cidades</td><td class="total-col">${stats.distinctCities}</td></tr>
+      </tbody></table>
+
+      <h2>Camisetas por Tamanho</h2>
+      <table><thead><tr><th>Tamanho</th><th class="size">Quantidade</th></tr></thead><tbody>${sizeRows}</tbody></table>
+
+      <h2>Inscritos por Equipe</h2>
+      <table><thead><tr><th>Equipe</th><th class="size">Atletas</th></tr></thead><tbody>${teamRows || '<tr><td colspan="2">Nenhuma equipe registrada.</td></tr>'}</tbody></table>
+
+      <h2>Inscritos por Cidade</h2>
+      <table><thead><tr><th>Cidade</th><th class="size">Atletas</th></tr></thead><tbody>${cityRows || '<tr><td colspan="2">Nenhuma cidade registrada.</td></tr>'}</tbody></table>
+
+      <h2>Distribuição por Gênero</h2>
+      <table><thead><tr><th>Gênero</th><th class="size">Atletas</th></tr></thead><tbody>${genderRows}</tbody></table>
+
+      <h2>Faixa Etária</h2>
+      <table><thead><tr><th>Faixa</th><th class="size">Atletas</th></tr></thead><tbody>${ageRows}</tbody></table>
+    `;
+    printHtml(html, `Relatório - ${raceGroupName}`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Ação: baixar relatório completo */}
+      <div className="flex justify-end">
+        <button
+          onClick={generatePdf}
+          className="flex items-center gap-2 bg-yellow-400 text-slate-900 px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all shadow-lg shadow-yellow-400/20"
+        >
+          <FileDown size={18} /> Baixar Relatório (PDF)
+        </button>
+      </div>
+
       {/* Linha 1 — Financeiro */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard

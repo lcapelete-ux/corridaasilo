@@ -918,6 +918,11 @@ const App: React.FC = () => {
                   runners={runners}
                   totalRevenue={grandTotalRevenue}
                   totalExpenses={totalExpensesValue}
+                  totalRegistrationRevenue={totalRegistrationRevenue}
+                  totalSponsorRevenue={totalSponsorRevenue}
+                  totalExtraRevenue={totalExtraRevenue}
+                  expenses={expenses}
+                  raceGroupName={raceGroupName}
                 />
               </Suspense>
             )}
