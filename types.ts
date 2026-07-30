@@ -121,4 +121,12 @@ export interface TransferSettings {
   transfersBlocked: boolean; // Bloqueio manual imediato definido pelo admin
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos';
+// Rifa solidária (prêmio sorteado à parte da inscrição, ex.: relógio)
+export interface RaffleSettings {
+  enabled: boolean;      // Liga/desliga a seção na página inicial
+  prizeName: string;     // Nome/descrição do prêmio
+  imageUrl: string;      // URL (Cloudinary) da foto do prêmio
+  link: string;          // Link da plataforma externa onde se compra o número
+}
+
+export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos' | 'raffle';
