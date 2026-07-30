@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings } from './services/storageService';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -60,6 +60,8 @@ const App: React.FC = () => {
   // Bloqueio geral de cupons de desconto (interruptor do admin em Configurações)
   const [couponsBlocked, setCouponsBlockedState] = useState(false);
   const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', imageHeight: 160, link: '', whatsappLink: '' });
+  const [teamRankingEnabled, setTeamRankingEnabled] = useState(false);
+  const [teamRanking, setTeamRanking] = useState<TeamRankingEntry[]>([]);
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -236,7 +238,32 @@ const App: React.FC = () => {
     refreshSponsorLogos();
     refreshCouponsBlocked();
     refreshRaffleSettings();
+    refreshTeamRankingEnabled();
+    refreshTeamRanking();
   }, []);
+
+  // Ranking de equipes: leitura pública (RPC). Se a migração ainda não rodou,
+  // engole o erro e a seção simplesmente não aparece na página inicial.
+  const refreshTeamRankingEnabled = async () => {
+    try {
+      setTeamRankingEnabled(await getTeamRankingEnabled());
+    } catch {
+      // Mantém oculto por padrão
+    }
+  };
+
+  const refreshTeamRanking = async () => {
+    try {
+      setTeamRanking(await getTeamRanking());
+    } catch {
+      // Mantém vazio (seção não aparece)
+    }
+  };
+
+  const handleUpdateTeamRankingEnabled = async (enabled: boolean) => {
+    await updateTeamRankingEnabled(enabled); // erro propaga para o SettingsManager avisar
+    await refreshTeamRankingEnabled();
+  };
 
   // Rifa solidária: leitura pública. Se a migração ainda não rodou, engole o
   // erro e a seção simplesmente não aparece na página inicial.
@@ -689,6 +716,8 @@ const App: React.FC = () => {
           promoDeadline={promoDeadline}
           sponsorLogos={sponsorLogos}
           raffleSettings={raffleSettings}
+          teamRankingEnabled={teamRankingEnabled}
+          teamRanking={teamRanking}
           startIntro={revealIntro}
         />
         {showCourse && (
@@ -1002,6 +1031,8 @@ const App: React.FC = () => {
                 totalRunners={runners.length}
                 couponsBlocked={couponsBlocked}
                 onUpdateCouponsBlocked={handleUpdateCouponsBlocked}
+                teamRankingEnabled={teamRankingEnabled}
+                onUpdateTeamRankingEnabled={handleUpdateTeamRankingEnabled}
               />
             )}
 

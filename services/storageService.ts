@@ -1,4 +1,4 @@
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings, TeamRankingEntry } from '../types';
 import { supabase } from './supabaseClient';
 
 // Todos os dados agora vivem no Supabase (banco central), não mais no
@@ -737,6 +737,37 @@ export const updateRaffleSettings = async (settings: Partial<RaffleSettings>): P
     .update(payload)
     .eq('id', true);
   if (error) throw friendlyError(error, 'Erro ao salvar a rifa');
+};
+
+// --- Ranking de equipes (top 5 por inscritos, mostrado na página inicial) ---
+
+export const getTeamRankingEnabled = async (): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('team_ranking_enabled')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw friendlyError(error, 'Erro ao carregar configuração do ranking');
+  return (data as { team_ranking_enabled: boolean | null } | null)?.team_ranking_enabled ?? false;
+};
+
+export const updateTeamRankingEnabled = async (enabled: boolean): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ team_ranking_enabled: enabled })
+    .eq('id', true);
+  if (error) throw friendlyError(error, 'Erro ao salvar configuração do ranking');
+};
+
+// Leitura pública (RPC security definer): só nome da equipe + quantidade,
+// nunca dados de corredores. Ver função get_team_ranking() no SQL.
+export const getTeamRanking = async (): Promise<TeamRankingEntry[]> => {
+  const { data, error } = await supabase.rpc('get_team_ranking');
+  if (error) throw friendlyError(error, 'Erro ao carregar o ranking de equipes');
+  return (data as { team_name: string; runner_count: number }[] || []).map(r => ({
+    teamName: r.team_name,
+    count: Number(r.runner_count),
+  }));
 };
 
 // --- Equipes/Academias oficiais (lista usada pelos formulários) ---

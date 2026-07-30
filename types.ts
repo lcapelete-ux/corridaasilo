@@ -132,3 +132,9 @@ export interface RaffleSettings {
 }
 
 export type ViewState = 'dashboard' | 'registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos' | 'raffle';
+
+// Uma linha do ranking público de equipes (só nome + quantidade — nunca dados de corredores)
+export interface TeamRankingEntry {
+  teamName: string;
+  count: number;
+}

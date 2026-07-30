@@ -8,7 +8,7 @@ import { SoundToggle } from './SoundToggle';
 import { RafflePromo } from './RafflePromo';
 import { formatBrDate } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
-import { SponsorLogo, RaffleSettings } from '../types';
+import { SponsorLogo, RaffleSettings, TeamRankingEntry } from '../types';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -19,12 +19,14 @@ interface LandingPageProps {
   promoDeadline?: string;
   sponsorLogos?: SponsorLogo[];
   raffleSettings?: RaffleSettings;
+  teamRankingEnabled?: boolean;
+  teamRanking?: TeamRankingEntry[];
   // A vinheta só começa quando o loader inicial libera (crossfade sem gap).
   // Default true para funcionar caso a landing seja usada fora do fluxo de boot.
   startIntro?: boolean;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [], raffleSettings, startIntro = true }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [], raffleSettings, teamRankingEnabled, teamRanking = [], startIntro = true }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
   // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
@@ -241,6 +243,41 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         <p className="mt-1 text-[11px] text-slate-600 uppercase tracking-widest font-bold animate-fade-in-up animation-delay-300">
           Toque para ver o local no mapa
         </p>
+
+        {/* Ranking de Equipes: top 5 por número de inscritos */}
+        {teamRankingEnabled && teamRanking.length > 0 && (
+          <div className="mt-12 w-full max-w-2xl animate-fade-in-up animation-delay-300">
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-6 md:p-8 shadow-lg">
+              <span className="inline-flex items-center gap-1.5 text-yellow-400 text-[10px] md:text-xs uppercase tracking-[0.25em] font-bold border border-yellow-400/60 px-3 py-1 rounded-full mb-5">
+                <Trophy size={12} aria-hidden="true" /> Ranking de Equipes
+              </span>
+              <h3 className="text-xl font-black italic text-white mb-5">Quem mais inscreveu até agora</h3>
+
+              <div className="space-y-3">
+                {teamRanking.map((entry, i) => {
+                  const maxCount = teamRanking[0]?.count || 1;
+                  const pct = Math.max(8, Math.round((entry.count / maxCount) * 100));
+                  const medalColor = i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-600' : 'text-slate-600';
+                  const barColor = i === 0 ? 'bg-yellow-400' : 'bg-slate-600';
+                  return (
+                    <div key={entry.teamName} className="flex items-center gap-3">
+                      <span className={`w-6 shrink-0 text-center font-black italic text-lg ${medalColor}`}>{i + 1}º</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                          <span className="text-white font-bold text-sm truncate">{entry.teamName}</span>
+                          <span className="text-slate-400 text-xs font-bold shrink-0">{entry.count} {entry.count === 1 ? 'inscrito' : 'inscritos'}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Rifa Solidária: prêmio sorteado à parte da inscrição, ajuda extra ao Lar São Cristóvão */}
         {raffleSettings?.enabled && raffleSettings.imageUrl && raffleSettings.link && (

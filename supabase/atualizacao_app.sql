@@ -852,6 +852,33 @@ comment on column public.app_settings.raffle_image_height is
 comment on column public.app_settings.raffle_whatsapp_link is
   'Link do grupo de WhatsApp da rifa (dúvidas e resultados); botão só aparece se preenchido';
 
+-- 21. Ranking de equipes: mostra na página inicial as 5 equipes com mais
+--     inscritos. A tabela runners não tem leitura pública (dados pessoais:
+--     CPF, telefone etc.), então a contagem é exposta por uma função
+--     security definer que devolve só nome da equipe + quantidade —
+--     nunca as linhas de corredores.
+alter table public.app_settings add column if not exists team_ranking_enabled boolean not null default false;
+comment on column public.app_settings.team_ranking_enabled is
+  'Quando true, o ranking das 5 equipes com mais inscritos aparece na página inicial';
+
+drop function if exists public.get_team_ranking();
+create or replace function public.get_team_ranking()
+returns table (team_name text, runner_count bigint)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.team_name, count(*) as runner_count
+  from public.runners r
+  where r.team_name is not null and btrim(r.team_name) <> ''
+  group by r.team_name
+  order by runner_count desc, r.team_name asc
+  limit 5;
+$$;
+
+grant execute on function public.get_team_ranking() to anon, authenticated;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
