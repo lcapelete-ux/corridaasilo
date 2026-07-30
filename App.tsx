@@ -715,7 +715,7 @@ const App: React.FC = () => {
 
   // RENDER: TELA DE SUCESSO DO PIX
   if (mode === 'registration_success') {
-    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} cpf={lastRegisteredCpf} isMinor={lastRegisteredIsMinor} />;
+    return <RegistrationSuccess onBack={() => setMode('landing')} isSenior={lastRegisteredAge >= 60} discount={lastRegisteredDiscount} seniorFullPrice={lastRegisteredSeniorFullPrice} extraDonation={lastRegisteredExtraDonation} cpf={lastRegisteredCpf} isMinor={lastRegisteredIsMinor} raffleSettings={raffleSettings} />;
   }
 
   // RENDER: FORMULÁRIO PÚBLICO

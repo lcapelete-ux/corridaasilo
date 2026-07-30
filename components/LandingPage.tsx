@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink, Route, Gift, MessageCircle } from 'lucide-react';
+import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink, Route } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import rondontexLogo from '../assets/rondontex-logo.png';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 import { SoundToggle } from './SoundToggle';
+import { RafflePromo } from './RafflePromo';
 import { formatBrDate } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
 import { SponsorLogo, RaffleSettings } from '../types';
@@ -244,51 +245,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         {/* Rifa Solidária: prêmio sorteado à parte da inscrição, ajuda extra ao Lar São Cristóvão */}
         {raffleSettings?.enabled && raffleSettings.imageUrl && raffleSettings.link && (
           <div className="mt-12 w-full max-w-2xl animate-fade-in-up animation-delay-300">
-            <div className="bg-gradient-to-br from-amber-500/10 via-slate-900/60 to-slate-900/60 backdrop-blur-md border border-yellow-400/30 rounded-2xl p-6 md:p-8 shadow-lg">
-              <span className="inline-flex items-center gap-1.5 text-yellow-400 text-[10px] md:text-xs uppercase tracking-[0.25em] font-bold border border-yellow-400/60 px-3 py-1 rounded-full mb-5">
-                <Gift size={12} aria-hidden="true" /> Rifa Solidária
-              </span>
-
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="bg-white rounded-xl p-3 shrink-0">
-                  <img
-                    src={raffleSettings.imageUrl}
-                    alt={raffleSettings.prizeName || 'Prêmio da rifa'}
-                    style={{ height: raffleSettings.imageHeight || 160 }}
-                    className="w-auto max-w-full object-contain rounded-lg"
-                  />
-                </div>
-                <div className="text-center sm:text-left">
-                  <p className="text-slate-400 text-xs font-bold uppercase mb-1">Concorra a</p>
-                  <h3 className="text-2xl font-black italic text-white mb-2">{raffleSettings.prizeName}</h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    A renda ajuda o Lar São Cristóvão. Participe pela plataforma oficial da rifa.
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <a
-                      href={raffleSettings.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group inline-flex items-center gap-2 bg-yellow-400 text-slate-900 px-6 py-3 rounded-xl font-black italic uppercase tracking-wider hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_20px_rgba(250,204,21,0.3)]"
-                    >
-                      Participar da Rifa
-                      <ChevronRight className="group-hover:translate-x-1 transition-transform" strokeWidth={3} size={18} aria-hidden="true" />
-                    </a>
-                    {raffleSettings.whatsappLink && (
-                      <a
-                        href={raffleSettings.whatsappLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-sm hover:bg-emerald-500/20 hover:border-emerald-400 transition-all duration-300"
-                      >
-                        <MessageCircle size={16} aria-hidden="true" />
-                        Grupo do WhatsApp
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <RafflePromo settings={raffleSettings} variant="dark" />
           </div>
         )}
 
