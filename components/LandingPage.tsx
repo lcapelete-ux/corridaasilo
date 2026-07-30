@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink, Route, Gift } from 'lucide-react';
+import { Timer, MapPin, Trophy, ChevronRight, Star, LogIn, Upload, Utensils, Music, ExternalLink, Route, Gift, MessageCircle } from 'lucide-react';
 import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import rondontexLogo from '../assets/rondontex-logo.png';
@@ -254,7 +254,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
                   <img
                     src={raffleSettings.imageUrl}
                     alt={raffleSettings.prizeName || 'Prêmio da rifa'}
-                    className="max-h-40 w-auto object-contain rounded-lg"
+                    style={{ height: raffleSettings.imageHeight || 160 }}
+                    className="w-auto max-w-full object-contain rounded-lg"
                   />
                 </div>
                 <div className="text-center sm:text-left">
@@ -263,15 +264,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
                   <p className="text-slate-400 text-sm mb-4">
                     A renda ajuda o Lar São Cristóvão. Participe pela plataforma oficial da rifa.
                   </p>
-                  <a
-                    href={raffleSettings.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group inline-flex items-center gap-2 bg-yellow-400 text-slate-900 px-6 py-3 rounded-xl font-black italic uppercase tracking-wider hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_20px_rgba(250,204,21,0.3)]"
-                  >
-                    Participar da Rifa
-                    <ChevronRight className="group-hover:translate-x-1 transition-transform" strokeWidth={3} size={18} aria-hidden="true" />
-                  </a>
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <a
+                      href={raffleSettings.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex items-center gap-2 bg-yellow-400 text-slate-900 px-6 py-3 rounded-xl font-black italic uppercase tracking-wider hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_0_20px_rgba(250,204,21,0.3)]"
+                    >
+                      Participar da Rifa
+                      <ChevronRight className="group-hover:translate-x-1 transition-transform" strokeWidth={3} size={18} aria-hidden="true" />
+                    </a>
+                    {raffleSettings.whatsappLink && (
+                      <a
+                        href={raffleSettings.whatsappLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-sm hover:bg-emerald-500/20 hover:border-emerald-400 transition-all duration-300"
+                      >
+                        <MessageCircle size={16} aria-hidden="true" />
+                        Grupo do WhatsApp
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Gift, Image as ImageIcon, Upload, Trash2, Save, ExternalLink, Ticket } from 'lucide-react';
+import { Gift, Image as ImageIcon, Upload, Trash2, Save, ExternalLink, Ticket, Maximize2, MessageCircle } from 'lucide-react';
 import { RaffleSettings } from '../types';
 import { prepareProofFile } from '../services/imageUtils';
 
@@ -8,9 +8,14 @@ interface RaffleManagerProps {
   onUpdate: (settings: Partial<RaffleSettings>) => Promise<void>;
 }
 
+const MIN_IMAGE_HEIGHT = 100;
+const MAX_IMAGE_HEIGHT = 360;
+
 export const RaffleManager: React.FC<RaffleManagerProps> = ({ settings, onUpdate }) => {
   const [prizeName, setPrizeName] = useState(settings.prizeName);
   const [link, setLink] = useState(settings.link);
+  const [whatsappLink, setWhatsappLink] = useState(settings.whatsappLink);
+  const [imageHeight, setImageHeight] = useState(settings.imageHeight);
   const [savingDetails, setSavingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [detailsSuccess, setDetailsSuccess] = useState(false);
@@ -53,7 +58,12 @@ export const RaffleManager: React.FC<RaffleManagerProps> = ({ settings, onUpdate
     setDetailsError('');
     setDetailsSuccess(false);
     try {
-      await onUpdate({ prizeName: prizeName.trim(), link: link.trim() });
+      await onUpdate({
+        prizeName: prizeName.trim(),
+        link: link.trim(),
+        whatsappLink: whatsappLink.trim(),
+        imageHeight,
+      });
       setDetailsSuccess(true);
       setTimeout(() => setDetailsSuccess(false), 3000);
     } catch (err: any) {
@@ -110,7 +120,8 @@ export const RaffleManager: React.FC<RaffleManagerProps> = ({ settings, onUpdate
             <img
               src={settings.imageUrl}
               alt={settings.prizeName || 'Prêmio da rifa'}
-              className="max-h-48 w-auto max-w-full object-contain rounded-lg"
+              style={{ height: imageHeight }}
+              className="w-auto max-w-full max-h-[60vh] object-contain rounded-lg transition-[height] duration-100"
             />
             <button
               onClick={handleRemoveImage}
@@ -140,12 +151,33 @@ export const RaffleManager: React.FC<RaffleManagerProps> = ({ settings, onUpdate
             {uploadError}
           </div>
         )}
+
+        {settings.imageUrl && (
+          <div className="mt-5 pt-5 border-t border-slate-800/60">
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-2">
+              <Maximize2 size={14} className="text-yellow-400" /> Tamanho da foto na página inicial
+              <span className="text-yellow-400 normal-case font-mono">{imageHeight}px</span>
+            </label>
+            <input
+              type="range"
+              min={MIN_IMAGE_HEIGHT}
+              max={MAX_IMAGE_HEIGHT}
+              step={10}
+              value={imageHeight}
+              onChange={(e) => setImageHeight(Number(e.target.value))}
+              className="w-full accent-yellow-400 cursor-pointer"
+            />
+            <p className="text-xs text-slate-600 mt-1">
+              Arraste para ver o tamanho na hora, depois clique em "Salvar" abaixo para publicar.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Nome do prêmio + link da plataforma */}
+      {/* Nome do prêmio + links */}
       <form onSubmit={handleSaveDetails} className="bg-slate-900 rounded-xl border border-slate-800/60 p-6 space-y-4">
         <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-          <Ticket size={16} className="text-yellow-400" /> Nome do Prêmio e Link
+          <Ticket size={16} className="text-yellow-400" /> Nome do Prêmio e Links
         </h3>
 
         <div>
@@ -178,6 +210,20 @@ export const RaffleManager: React.FC<RaffleManagerProps> = ({ settings, onUpdate
               Testar link <ExternalLink size={12} />
             </a>
           )}
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1.5">
+            <MessageCircle size={14} className="text-emerald-400" /> Link do grupo de WhatsApp (dúvidas e resultados)
+          </label>
+          <input
+            type="url"
+            value={whatsappLink}
+            onChange={(e) => setWhatsappLink(e.target.value)}
+            placeholder="https://chat.whatsapp.com/..."
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+          />
+          <p className="text-xs text-slate-600 mt-1.5">Opcional. Se preenchido, aparece um botão na página inicial abaixo de "Participar da Rifa".</p>
         </div>
 
         {detailsError && (

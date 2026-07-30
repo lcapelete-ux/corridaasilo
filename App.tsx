@@ -59,7 +59,7 @@ const App: React.FC = () => {
   const [sponsorLogos, setSponsorLogos] = useState<SponsorLogo[]>([]);
   // Bloqueio geral de cupons de desconto (interruptor do admin em Configurações)
   const [couponsBlocked, setCouponsBlockedState] = useState(false);
-  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', link: '' });
+  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', imageHeight: 160, link: '', whatsappLink: '' });
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
