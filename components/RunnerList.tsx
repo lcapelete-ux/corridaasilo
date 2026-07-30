@@ -721,6 +721,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   <span className="inline-flex items-center gap-1">Equipe <span className="text-slate-600">/</span> <StickyNote size={12} className="text-slate-500" /> Obs</span>
                 </th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Valor</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Pagto</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
               </tr>
@@ -775,6 +776,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                       {onUpdate && (
                         <NoteCell runner={runner} onSave={(note) => onUpdate({ ...runner, note })} />
                       )}
+                    </td>
+                    <td className="p-4">
+                      <span className="font-mono font-bold text-slate-200 text-sm">
+                        R$ {getRunnerPaidValue(runner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col gap-2">
@@ -869,7 +875,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-600">
+                  <td colSpan={7} className="p-8 text-center text-slate-600">
                     Nenhum corredor encontrado.
                   </td>
                 </tr>
