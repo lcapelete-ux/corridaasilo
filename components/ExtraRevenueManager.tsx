@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import { ExtraRevenue, Runner } from '../types';
 import { getRunnerPaidValue, SENIOR_AGE } from '../constants';
-import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag, Pencil } from 'lucide-react';
+import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface ExtraRevenueManagerProps {
   revenues: ExtraRevenue[];
   runners: Runner[];
   onSave: (revenue: ExtraRevenue) => void;
   onDelete: (id: string) => void;
+  onUpdateRunner?: (runner: Runner) => void;
 }
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete }) => {
+export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete, onUpdateRunner }) => {
+  const [valueAdjustRunner, setValueAdjustRunner] = useState<Runner | null>(null);
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -137,7 +140,20 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
                         <Calendar size={12} className="text-slate-500" /> {new Date(runner.registrationDate).toLocaleDateString('pt-BR')}
                       </span>
                     </td>
-                    <td className="p-4 font-mono font-bold text-indigo-400 text-right">+ R$ {fmt(getRunnerPaidValue(runner))}</td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="font-mono font-bold text-indigo-400">+ R$ {fmt(getRunnerPaidValue(runner))}</span>
+                        {onUpdateRunner && (
+                          <button
+                            onClick={() => setValueAdjustRunner(runner)}
+                            className="text-slate-600 hover:text-indigo-400 transition-colors"
+                            title="Ajustar valor (desconto/contribuição extra)"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -258,6 +274,14 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
           </table>
         </div>
       </div>
+
+      {valueAdjustRunner && onUpdateRunner && (
+        <ValueAdjustModal
+          runner={valueAdjustRunner}
+          onClose={() => setValueAdjustRunner(null)}
+          onSave={onUpdateRunner}
+        />
+      )}
     </div>
   );
 };

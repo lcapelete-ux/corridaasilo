@@ -3,6 +3,7 @@ import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../typ
 import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
 import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil } from 'lucide-react';
+import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
   runners: Runner[];
@@ -71,31 +72,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [transferRunner, setTransferRunner] = useState<Runner | null>(null);
   const [transferData, setTransferData] = useState<Partial<Runner>>({});
 
-  // Estados para ajuste manual do valor (ex.: atleta pagou com desconto mas
-  // esqueceu de aplicar o cupom na inscrição)
+  // Ajuste manual do valor (ex.: atleta pagou com desconto mas esqueceu de
+  // aplicar o cupom na inscrição) — modal compartilhado com Receita Extra
   const [valueAdjustRunner, setValueAdjustRunner] = useState<Runner | null>(null);
-  const [valueAdjustDiscount, setValueAdjustDiscount] = useState('0');
-  const [valueAdjustExtra, setValueAdjustExtra] = useState('0');
-  const [savingValueAdjust, setSavingValueAdjust] = useState(false);
-
-  const openValueAdjust = (runner: Runner) => {
-    setValueAdjustRunner(runner);
-    setValueAdjustDiscount(String(runner.couponDiscount || 0));
-    setValueAdjustExtra(String(runner.extraDonation || 0));
-  };
-
-  const handleSaveValueAdjust = async () => {
-    if (!valueAdjustRunner || !onUpdate) return;
-    const discount = Math.max(0, parseFloat(valueAdjustDiscount.replace(',', '.')) || 0);
-    const extra = Math.max(0, parseFloat(valueAdjustExtra.replace(',', '.')) || 0);
-    setSavingValueAdjust(true);
-    try {
-      await onUpdate({ ...valueAdjustRunner, couponDiscount: discount, extraDonation: extra });
-      setValueAdjustRunner(null);
-    } finally {
-      setSavingValueAdjust(false);
-    }
-  };
 
   // Ref para o input de arquivo (hack para abrir o seletor via botão)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -808,16 +787,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         <span className="font-mono font-bold text-slate-200 text-sm">
                           R$ {getRunnerPaidValue(runner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
-                        {onUpdate && (
-                          <button
-                            onClick={() => openValueAdjust(runner)}
-                            className="text-slate-600 hover:text-indigo-400 transition-colors"
-                            title="Ajustar valor (desconto/contribuição extra)"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                        )}
                       </div>
+                      {onUpdate && (
+                        <button
+                          onClick={() => setValueAdjustRunner(runner)}
+                          className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 hover:underline text-xs font-bold mt-1"
+                        >
+                          <Pencil size={11} /> Ajustar
+                        </button>
+                      )}
                       {(runner.couponDiscount || 0) > 0 && (
                         <div className="text-[10px] text-emerald-500 mt-0.5">− R$ {(runner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} desconto</div>
                       )}
@@ -1014,79 +992,13 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       )}
 
       {/* MODAL DE AJUSTE MANUAL DE VALOR */}
-      {valueAdjustRunner && (() => {
-        const fee = getRegistrationFee(valueAdjustRunner.age, valueAdjustRunner.seniorFullPrice);
-        const discountNum = Math.max(0, parseFloat(valueAdjustDiscount.replace(',', '.')) || 0);
-        const extraNum = Math.max(0, parseFloat(valueAdjustExtra.replace(',', '.')) || 0);
-        const finalValue = Math.max(0, fee - discountNum) + extraNum;
-        const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-              <div className="bg-indigo-600 p-6 flex justify-between items-center text-white">
-                <h3 className="font-bold text-xl flex items-center gap-2">
-                  <Pencil size={20} /> Ajustar Valor
-                </h3>
-                <button onClick={() => setValueAdjustRunner(null)} className="hover:text-indigo-200">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-900">
-                  <strong>{valueAdjustRunner.fullName}</strong>
-                  <div className="text-indigo-700/80 text-xs mt-0.5">
-                    Use quando o atleta pagou com desconto (ou algo a mais) sem ter aplicado um cupom na inscrição.
-                  </div>
-                </div>
-
-                <div className="text-sm text-slate-600 flex justify-between">
-                  <span>Valor da inscrição</span>
-                  <span className="font-mono font-bold text-slate-800">R$ {fmt(fee)}</span>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Desconto (R$)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={valueAdjustDiscount}
-                    onChange={(e) => setValueAdjustDiscount(e.target.value)}
-                    className={transferInputCls}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Contribuição extra (R$)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={valueAdjustExtra}
-                    onChange={(e) => setValueAdjustExtra(e.target.value)}
-                    className={transferInputCls}
-                  />
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                  <span className="font-bold text-slate-700">Valor Final</span>
-                  <span className="font-mono font-black text-lg text-indigo-600">R$ {fmt(finalValue)}</span>
-                </div>
-              </div>
-
-              <div className="p-6 pt-0 flex justify-end gap-3">
-                <button onClick={() => setValueAdjustRunner(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button
-                  onClick={handleSaveValueAdjust}
-                  disabled={savingValueAdjust}
-                  className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-60"
-                >
-                  <Save size={18} /> {savingValueAdjust ? 'Salvando...' : 'Salvar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {valueAdjustRunner && onUpdate && (
+        <ValueAdjustModal
+          runner={valueAdjustRunner}
+          onClose={() => setValueAdjustRunner(null)}
+          onSave={onUpdate}
+        />
+      )}
 
       {/* MODAL DE RELATÓRIO COMPLETO */}
       {selectedRunner && (

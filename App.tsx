@@ -990,6 +990,7 @@ const App: React.FC = () => {
                 runners={runners}
                 onSave={handleSaveExtraRevenue}
                 onDelete={handleDeleteExtraRevenue}
+                onUpdateRunner={handleUpdateRunner}
               />
             )}
 
