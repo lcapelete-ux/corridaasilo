@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { getRegistrationFee, getRunnerPaidValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE } from '../constants';
+import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -13,6 +13,7 @@ interface RunnerListProps {
   userSession?: UserSession | null;
   transferSettings?: TransferSettings | null;
   onUpdateTransferSettings?: (settings: TransferSettings) => void;
+  promoDeadline?: string; // Prazo do lote promocional — também vale como validade dos cupons
 }
 
 // Célula de observação editável (salva ao sair do campo). Uso do organizador:
@@ -49,7 +50,7 @@ const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded te
 // Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
 const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes'>('lista');
@@ -208,8 +209,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       // Formatar data de inscrição
       const regDateFormatted = new Date(runner.registrationDate).toLocaleDateString('pt-BR');
 
-      // Valor pago pelo atleta (considera meia, apoiador, cupom e contribuição extra)
-      const valorPago = getRunnerPaidValue(runner).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      // Valor devido pelo atleta (considera meia, apoiador, cupom, contribuição extra
+      // e se o cupom já venceu — quem já pagou mantém o valor histórico)
+      const valorPago = getRunnerDueValue(runner, promoDeadline).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       // Escapa aspas dentro de campos livres (nome, observação) para não quebrar o CSV
       const esc = (v: string) => (v || '').replace(/"/g, '""');
 
@@ -785,7 +787,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono font-bold text-slate-200 text-sm">
-                          R$ {getRunnerPaidValue(runner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {getRunnerDueValue(runner, promoDeadline).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                       {onUpdate && (
@@ -796,7 +798,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           <Pencil size={11} /> Ajustar
                         </button>
                       )}
-                      {(runner.couponDiscount || 0) > 0 && (
+                      {getRunnerDueValue(runner, promoDeadline) > getRunnerPaidValue(runner) ? (
+                        <div className="text-[10px] text-amber-500 mt-0.5 flex items-center gap-1" title="O cupom aplicado na inscrição venceu junto com o lote promocional">
+                          <Tag size={9} /> cupom expirado
+                        </div>
+                      ) : (runner.couponDiscount || 0) > 0 && (
                         <div className="text-[10px] text-emerald-500 mt-0.5">− R$ {(runner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} desconto</div>
                       )}
                     </td>
@@ -1111,8 +1117,14 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <div className="mb-4 pb-3 border-b border-slate-200">
                       <p className="text-xs text-slate-500 font-bold">Valor da Inscrição</p>
                       <p className="text-slate-800 font-black text-2xl">
-                        R$ {getRunnerPaidValue(selectedRunner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {getRunnerDueValue(selectedRunner, promoDeadline).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
+                      {getRunnerDueValue(selectedRunner, promoDeadline) > getRunnerPaidValue(selectedRunner) && (
+                        <p className="text-xs text-amber-600 font-bold mt-0.5 flex items-center gap-1">
+                          <Tag size={11} /> Cupom {selectedRunner.couponCode ? `"${selectedRunner.couponCode}"` : ''} venceu junto com o lote promocional
+                          {promoDeadline ? ` (${formatBrDate(promoDeadline, true)})` : ''} — era R$ {getRunnerPaidValue(selectedRunner).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} com desconto, agora R$ {getRunnerDueValue(selectedRunner, promoDeadline).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
                       {selectedRunner.couponCode ? (
                         <p className="text-xs text-emerald-600 font-bold mt-0.5">
                           Cupom {selectedRunner.couponCode} aplicado: R$ {getRegistrationFee(selectedRunner.age).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} − R$ {(selectedRunner.couponDiscount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

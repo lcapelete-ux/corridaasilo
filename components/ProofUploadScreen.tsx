@@ -1,16 +1,17 @@
 
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck, QrCode, Copy, Check, Tag } from 'lucide-react';
 import { findRunnerByCpf, attachPaymentProof, reportPaidWithoutProof } from '../services/storageService';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { isMinorAtEvent } from '../constants';
+import { isMinorAtEvent, getRunnerDueValue, getRunnerPaidValue, formatBrDate } from '../constants';
 import { Runner } from '../types';
 
 interface ProofUploadScreenProps {
   onBack: () => void;
+  promoDeadline?: string;
 }
 
-export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) => {
+export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack, promoDeadline }) => {
   const [step, setStep] = useState<'search' | 'view' | 'success'>('search');
   const [successKind, setSuccessKind] = useState<'proof' | 'notice'>('proof');
   const [cpf, setCpf] = useState('');
@@ -108,6 +109,19 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
   const isMinor = isMinorAtEvent(runner?.birthDate || '');
   // Menor sem autorização (nem nova nem já enviada) não pode enviar
   const needsAuth = isMinor && !authFile && !existingHasAuth;
+
+  // Valor a pagar: só dá para calcular se a migração de idade/cupom já rodou
+  const [pixCopied, setPixCopied] = useState(false);
+  const pixKey = 'corridaasilo@gmail.com';
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText(pixKey);
+    setPixCopied(true);
+    setTimeout(() => setPixCopied(false), 2000);
+  };
+  const canShowValue = runner != null && runner.age != null;
+  const originalValue = canShowValue ? getRunnerPaidValue(runner as Runner) : 0;
+  const dueValue = canShowValue ? getRunnerDueValue(runner as Runner, promoDeadline) : 0;
+  const couponExpired = canShowValue && dueValue > originalValue;
 
   const handleSubmitProof = async () => {
     if (!runner || !proofFile) return;
@@ -235,6 +249,43 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack }) 
                 </p>
               </div>
             </div>
+
+            {/* Valor a pagar + PIX (só quando ainda não pago) */}
+            {!isPaid && canShowValue && (
+              <div className="mb-4">
+                {couponExpired && (
+                  <div className="rounded-xl p-3 mb-3 border bg-amber-500/10 border-amber-500/30 flex items-start gap-2">
+                    <Tag size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-200/90">
+                      <strong>O desconto do cupom {runner?.couponCode ? `"${runner.couponCode}"` : ''} venceu</strong>
+                      {promoDeadline ? ` em ${formatBrDate(promoDeadline, true)}` : ''} junto com o lote promocional.
+                      Valor anterior: <span className="line-through opacity-70">R$ {originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>.
+                      Fale com a organização se você já tinha pago dentro do prazo.
+                    </p>
+                  </div>
+                )}
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <QrCode size={18} className="text-yellow-400" />
+                    <span className="font-bold text-sm text-slate-200">Pagamento via PIX</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-3">
+                    <span className="text-sm text-slate-400">Valor a pagar:</span>
+                    <span className="font-black text-xl text-white">R$ {dueValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex flex-col gap-1.5 relative">
+                    <span className="text-xs text-yellow-700 font-bold uppercase">Chave PIX (E-mail)</span>
+                    <p className="font-mono text-slate-900 font-bold break-all pr-8">{pixKey}</p>
+                    <button
+                      onClick={handleCopyPix}
+                      className={`absolute right-3 top-3 p-1.5 rounded-lg transition-all ${pixCopied ? 'bg-green-500 text-white' : 'bg-white text-slate-500 hover:text-slate-900 shadow-sm'}`}
+                    >
+                      {pixCopied ? <Check size={16} /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Comprovante já enviado */}
             {existingProof && !proofFile && (

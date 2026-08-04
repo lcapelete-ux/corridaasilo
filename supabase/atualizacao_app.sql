@@ -879,6 +879,46 @@ $$;
 
 grant execute on function public.get_team_ranking() to anon, authenticated;
 
+-- 22. find_runner_by_cpf passa a trazer também os campos usados para calcular
+--     o valor devido (idade, cupom aplicado, desconto, contribuição extra,
+--     apoiador 60+) — a tela pública de comprovante mostra quanto falta pagar
+--     e avisa se o cupom já venceu (prazo do lote promocional).
+drop function if exists public.find_runner_by_cpf(text);
+create or replace function public.find_runner_by_cpf(p_cpf text)
+returns table (
+  id uuid,
+  full_name text,
+  cpf text,
+  team_name text,
+  city text,
+  is_paid boolean,
+  payment_proof text,
+  birth_date date,
+  guardian_name text,
+  has_authorization boolean,
+  paid_no_proof boolean,
+  age int,
+  coupon_code text,
+  coupon_discount numeric,
+  extra_donation numeric,
+  senior_full_price boolean
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.id, r.full_name, r.cpf, r.team_name, r.city, r.is_paid, r.payment_proof,
+         r.birth_date, r.guardian_name,
+         (r.authorization_doc is not null and r.authorization_doc <> '') as has_authorization,
+         r.paid_no_proof,
+         r.age, r.coupon_code, r.coupon_discount, r.extra_donation, r.senior_full_price
+  from public.runners r
+  where regexp_replace(r.cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+$$;
+
+grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

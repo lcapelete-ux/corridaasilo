@@ -124,9 +124,37 @@ export const calcCouponDiscount = (fee: number, coupon: Pick<TeamCoupon, 'discou
 };
 
 // Valor efetivamente devido pelo inscrito (inscrição - cupom/desconto de apoiador + contribuição extra)
+// Uso: contabilidade de quem JÁ PAGOU — reflete o valor histórico, não muda com o tempo.
 export const getRunnerPaidValue = (runner: Pick<Runner, 'age' | 'couponDiscount' | 'seniorFullPrice' | 'extraDonation'>): number => {
   const fee = getRegistrationFee(runner.age, runner.seniorFullPrice);
   const afterDiscount = Math.max(0, fee - (runner.couponDiscount || 0));
+  return Math.round((afterDiscount + (runner.extraDonation || 0)) * 100) / 100;
+};
+
+// Desconto de cupom que ainda vale, considerando o prazo do lote promocional:
+// quem já pagou mantém o desconto histórico (não mexe em contabilidade fechada);
+// quem ainda não pagou perde o desconto se hoje já passou do prazo — o cupom "venceu".
+export const getEffectiveCouponDiscount = (
+  runner: Pick<Runner, 'isPaid' | 'couponDiscount'>,
+  promoDeadline?: string
+): number => {
+  if (runner.isPaid) return runner.couponDiscount || 0;
+  if (!promoDeadline) return runner.couponDiscount || 0;
+  const today = new Date().toISOString().split('T')[0];
+  if (today > promoDeadline) return 0;
+  return runner.couponDiscount || 0;
+};
+
+// Valor que o inscrito deve pagar AGORA, considerando se o prazo do cupom já
+// venceu. Uso: telas que mostram "quanto falta pagar" (pública e admin) — ao
+// contrário de getRunnerPaidValue, este pode aumentar com o tempo se o prazo passar.
+export const getRunnerDueValue = (
+  runner: Pick<Runner, 'age' | 'couponDiscount' | 'seniorFullPrice' | 'extraDonation' | 'isPaid'>,
+  promoDeadline?: string
+): number => {
+  const fee = getRegistrationFee(runner.age, runner.seniorFullPrice);
+  const effectiveDiscount = getEffectiveCouponDiscount(runner, promoDeadline);
+  const afterDiscount = Math.max(0, fee - effectiveDiscount);
   return Math.round((afterDiscount + (runner.extraDonation || 0)) * 100) / 100;
 };
 
