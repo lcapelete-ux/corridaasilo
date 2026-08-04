@@ -230,6 +230,12 @@ export const findRunnerByCpf = async (cpf: string): Promise<RunnerLookup | null>
     guardianName: row.guardian_name || undefined,
     hasAuthorization: row.has_authorization ?? undefined,
     paidNoProof: row.paid_no_proof ?? undefined,
+    // Usados para calcular o valor devido (podem não vir se a migração ainda não rodou)
+    age: row.age ?? undefined,
+    couponCode: row.coupon_code || undefined,
+    couponDiscount: row.coupon_discount != null ? Number(row.coupon_discount) : undefined,
+    extraDonation: row.extra_donation != null ? Number(row.extra_donation) : undefined,
+    seniorFullPrice: row.senior_full_price ?? undefined,
   };
 };
 

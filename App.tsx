@@ -734,7 +734,7 @@ const App: React.FC = () => {
 
   // RENDER: TELA DE UPLOAD DE COMPROVANTE
   if (mode === 'proof_upload') {
-    return <ProofUploadScreen onBack={() => setMode('landing')} />;
+    return <ProofUploadScreen onBack={() => setMode('landing')} promoDeadline={promoDeadline} />;
   }
 
   // RENDER: TELA DE LOGIN
@@ -953,6 +953,7 @@ const App: React.FC = () => {
                 userSession={userSession}
                 transferSettings={transferSettings}
                 onUpdateTransferSettings={handleUpdateTransferSettings}
+                promoDeadline={promoDeadline}
               />
             )}
             
