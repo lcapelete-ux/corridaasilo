@@ -4,7 +4,7 @@ import { Runner, ShirtSize, Expense } from '../types';
 import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar, FileDown } from 'lucide-react';
 import { SENIOR_AGE, EVENT_DATE, formatBrDate } from '../constants';
 import { StatsCard } from './StatsCard';
-import { escapeHtml as esc, printHtml } from '../services/printReport';
+import { escapeHtml as esc, printHtml, svgDonut, donutLegend, svgBars } from '../services/printReport';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface DashboardProps {
@@ -20,6 +20,28 @@ interface DashboardProps {
 
 const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'];
 const tooltipStyle = { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' } as const;
+
+// CSS extra do relatório em PDF (colorido, cards e gráficos) — somado ao
+// estilo base de printHtml, que cobre só tabelas simples.
+const REPORT_STYLE = `
+  .header-band { background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 24px 28px; border-radius: 14px; margin-bottom: 18px; }
+  .header-band .badge { display: inline-block; color: #facc15; font-size: 10px; font-weight: 800; letter-spacing: .15em; border: 1px solid rgba(250,204,21,.5); padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+  .header-band h1 { color: #fff; margin: 0 0 4px; }
+  .header-band .sub { color: #cbd5e1; margin: 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  .kpi-card { border-radius: 10px; padding: 12px 14px; color: #fff; page-break-inside: avoid; }
+  .kpi-card .label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; opacity: .9; }
+  .kpi-card .value { font-size: 17px; font-weight: 900; margin-top: 4px; }
+  .section-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; page-break-inside: avoid; }
+  .section-card table { background: transparent; }
+  .section-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 12px; }
+  .two-col { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: center; }
+  .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .chart-block .chart-label { font-size: 11px; font-weight: 700; color: #475569; text-align: center; margin: 0 0 8px; }
+  .chart-row { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  table.mt { margin-top: 14px; }
+  .highlight-row td { background: #fef9c3 !important; }
+`;
 
 // Donut com total no centro e legenda com contagem/percentual ao lado
 const DonutCard: React.FC<{ title: string; data: { name: string; value: number }[]; colors: string[]; total: number }> = ({ title, data, colors, total }) => (
@@ -161,68 +183,122 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
   const generatePdf = () => {
     const fmtMoney = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     const dataStr = new Date().toLocaleString('pt-BR');
+    const CYCLE = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#0ea5e9', '#ef4444', '#14b8a6'];
+    const withCycleColors = (items: { name: string; count: number }[]) =>
+      items.map((it, i) => ({ label: it.name, value: it.count, color: CYCLE[i % CYCLE.length] }));
 
     const expensesByCategory = new Map<string, number>();
     expenses.forEach(e => expensesByCategory.set(e.category, (expensesByCategory.get(e.category) || 0) + e.amount));
-    const expenseCategoryRows = Array.from(expensesByCategory.entries())
-      .sort((a, b) => b[1] - a[1])
+    const expenseEntries = Array.from(expensesByCategory.entries()).sort((a, b) => b[1] - a[1]);
+    const expenseCategoryRows = expenseEntries
       .map(([cat, amount]) => `<tr><td>${esc(cat)}</td><td class="total-col">${esc(fmtMoney(amount))}</td></tr>`)
       .join('');
 
-    const teamRows = stats.allTeamsSorted.map(t => `<tr><td>${esc(t.name)}</td><td class="total-col">${t.count}</td></tr>`).join('');
-    const cityRows = stats.allCitiesSorted.map(c => `<tr><td>${esc(c.name)}</td><td class="total-col">${c.count}</td></tr>`).join('');
-    const genderRows = stats.genderData.map(g => `<tr><td>${esc(g.name)}</td><td class="total-col">${g.value}</td></tr>`).join('');
-    const ageRows = stats.ageData.map(a => `<tr><td>${esc(a.name)} anos</td><td class="total-col">${a.value}</td></tr>`).join('');
-    const sizeRows = Object.entries(stats.sizeCounts).map(([size, count]) => `<tr><td>${esc(size)}</td><td class="total-col">${count}</td></tr>`).join('');
+    const paymentSegments = [
+      { label: 'Pagos', value: stats.paidCount, color: '#10b981' },
+      { label: 'Pendentes', value: stats.pendingCount, color: '#f59e0b' },
+    ];
+    const modalitySegments = [
+      { label: 'Corrida 5 km', value: stats.m5, color: '#6366f1' },
+      { label: 'Caminhada 3 km', value: stats.m3, color: '#0ea5e9' },
+    ];
+    const genderSegments = stats.genderData.map((g, i) => ({ label: g.name, value: g.value, color: [COLORS[0], COLORS[1]][i % 2] }));
+
+    const balanceColor = balance >= 0 ? '#3b82f6, #2563eb' : '#ef4444, #dc2626';
 
     const html = `
-      <h1>${esc(raceGroupName)}</h1>
-      <p class="sub">Relatório da corrida · Data da prova: ${esc(formatBrDate(EVENT_DATE, true))} · Gerado em ${esc(dataStr)}</p>
+      <div class="header-band">
+        <span class="badge">RELATÓRIO OFICIAL</span>
+        <h1>${esc(raceGroupName)}</h1>
+        <p class="sub">Data da prova: ${esc(formatBrDate(EVENT_DATE, true))} · Gerado em ${esc(dataStr)}</p>
+      </div>
 
-      <h2>Resumo Financeiro</h2>
-      <table><tbody>
-        <tr><td>Receita de Inscrições</td><td class="total-col">${esc(fmtMoney(totalRegistrationRevenue))}</td></tr>
-        <tr><td>Receita de Patrocínios</td><td class="total-col">${esc(fmtMoney(totalSponsorRevenue))}</td></tr>
-        <tr><td>Receita Extra</td><td class="total-col">${esc(fmtMoney(totalExtraRevenue))}</td></tr>
-        <tr><td><strong>Receita Total</strong></td><td class="total-col"><strong>${esc(fmtMoney(totalRevenue))}</strong></td></tr>
-        <tr><td>Despesas Totais</td><td class="total-col">${esc(fmtMoney(totalExpenses))}</td></tr>
-        <tr><td><strong>Balanço Final</strong></td><td class="total-col"><strong>${esc(fmtMoney(balance))}</strong></td></tr>
-      </tbody></table>
+      <div class="kpi-grid">
+        <div class="kpi-card" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+          <div class="label">Total de Inscritos</div>
+          <div class="value">${stats.totalRunners}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+          <div class="label">Receita Total</div>
+          <div class="value">${esc(fmtMoney(totalRevenue))}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+          <div class="label">Despesas</div>
+          <div class="value">${esc(fmtMoney(totalExpenses))}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, ${balanceColor});">
+          <div class="label">Balanço Final</div>
+          <div class="value">${esc(fmtMoney(balance))}</div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">💰 Resumo Financeiro</div>
+        <table><tbody>
+          <tr><td>Receita de Inscrições</td><td class="total-col">${esc(fmtMoney(totalRegistrationRevenue))}</td></tr>
+          <tr><td>Receita de Patrocínios</td><td class="total-col">${esc(fmtMoney(totalSponsorRevenue))}</td></tr>
+          <tr><td>Receita Extra</td><td class="total-col">${esc(fmtMoney(totalExtraRevenue))}</td></tr>
+          <tr class="highlight-row"><td><strong>Receita Total</strong></td><td class="total-col"><strong>${esc(fmtMoney(totalRevenue))}</strong></td></tr>
+          <tr><td>Despesas Totais</td><td class="total-col">${esc(fmtMoney(totalExpenses))}</td></tr>
+          <tr class="highlight-row"><td><strong>Balanço Final</strong></td><td class="total-col"><strong>${esc(fmtMoney(balance))}</strong></td></tr>
+        </tbody></table>
+      </div>
 
       ${expenseCategoryRows ? `
-      <h2>Despesas por Categoria</h2>
-      <table><thead><tr><th>Categoria</th><th class="size">Valor</th></tr></thead><tbody>${expenseCategoryRows}</tbody></table>
+      <div class="section-card">
+        <div class="section-title">📊 Despesas por Categoria</div>
+        <div class="two-col">
+          <table><thead><tr><th>Categoria</th><th class="size">Valor</th></tr></thead><tbody>${expenseCategoryRows}</tbody></table>
+          ${svgBars(expenseEntries.map(([cat, amount], i) => ({ label: cat, value: amount, color: CYCLE[i % CYCLE.length] })), { width: 300, labelWidth: 80, valueWidth: 90, color: '#ef4444', valueFormatter: (v) => fmtMoney(v) })}
+        </div>
+      </div>
       ` : ''}
 
-      <h2>Participação</h2>
-      <table><tbody>
-        <tr><td>Total de Inscritos</td><td class="total-col">${stats.totalRunners}</td></tr>
-        <tr><td>Pagamentos Confirmados</td><td class="total-col">${stats.paidCount} (${stats.pctPaid}%)</td></tr>
-        <tr><td>Pagamentos Pendentes</td><td class="total-col">${stats.pendingCount}</td></tr>
-        <tr><td>Corrida 5 km</td><td class="total-col">${stats.m5}</td></tr>
-        <tr><td>Caminhada 3 km</td><td class="total-col">${stats.m3}</td></tr>
-        <tr><td>Idade Média</td><td class="total-col">${stats.avgAge} anos</td></tr>
-        <tr><td>Atletas 60+</td><td class="total-col">${stats.seniorCount}</td></tr>
-        <tr><td>Equipes</td><td class="total-col">${stats.uniqueTeams}</td></tr>
-        <tr><td>Cidades</td><td class="total-col">${stats.distinctCities}</td></tr>
-      </tbody></table>
+      <div class="section-card">
+        <div class="section-title">🏅 Participação</div>
+        <div class="three-col">
+          <div class="chart-block">
+            <p class="chart-label">Status de Pagamento</p>
+            <div class="chart-row">${svgDonut(paymentSegments, 150, 22)}<div>${donutLegend(paymentSegments)}</div></div>
+          </div>
+          <div class="chart-block">
+            <p class="chart-label">Modalidade</p>
+            <div class="chart-row">${svgDonut(modalitySegments, 150, 22)}<div>${donutLegend(modalitySegments)}</div></div>
+          </div>
+          <div class="chart-block">
+            <p class="chart-label">Gênero</p>
+            <div class="chart-row">${svgDonut(genderSegments, 150, 22)}<div>${donutLegend(genderSegments)}</div></div>
+          </div>
+        </div>
+        <table class="mt"><tbody>
+          <tr><td>Idade Média</td><td class="total-col">${stats.avgAge} anos</td></tr>
+          <tr><td>Atletas 60+</td><td class="total-col">${stats.seniorCount}</td></tr>
+          <tr><td>Equipes</td><td class="total-col">${stats.uniqueTeams}</td></tr>
+          <tr><td>Cidades</td><td class="total-col">${stats.distinctCities}</td></tr>
+        </tbody></table>
+      </div>
 
-      <h2>Camisetas por Tamanho</h2>
-      <table><thead><tr><th>Tamanho</th><th class="size">Quantidade</th></tr></thead><tbody>${sizeRows}</tbody></table>
+      <div class="section-card">
+        <div class="section-title">🎂 Faixa Etária</div>
+        ${svgBars(stats.ageData.map(a => ({ label: `${a.name} anos`, value: a.value })), { color: '#8b5cf6' })}
+      </div>
 
-      <h2>Inscritos por Equipe</h2>
-      <table><thead><tr><th>Equipe</th><th class="size">Atletas</th></tr></thead><tbody>${teamRows || '<tr><td colspan="2">Nenhuma equipe registrada.</td></tr>'}</tbody></table>
+      <div class="section-card">
+        <div class="section-title">👕 Camisetas por Tamanho</div>
+        ${svgBars(Object.entries(stats.sizeCounts).map(([size, count]) => ({ label: size, value: count })), { color: '#f59e0b', labelWidth: 60 })}
+      </div>
 
-      <h2>Inscritos por Cidade</h2>
-      <table><thead><tr><th>Cidade</th><th class="size">Atletas</th></tr></thead><tbody>${cityRows || '<tr><td colspan="2">Nenhuma cidade registrada.</td></tr>'}</tbody></table>
+      <div class="section-card">
+        <div class="section-title">🏆 Inscritos por Equipe</div>
+        ${svgBars(withCycleColors(stats.allTeamsSorted))}
+      </div>
 
-      <h2>Distribuição por Gênero</h2>
-      <table><thead><tr><th>Gênero</th><th class="size">Atletas</th></tr></thead><tbody>${genderRows}</tbody></table>
-
-      <h2>Faixa Etária</h2>
-      <table><thead><tr><th>Faixa</th><th class="size">Atletas</th></tr></thead><tbody>${ageRows}</tbody></table>
+      <div class="section-card">
+        <div class="section-title">📍 Inscritos por Cidade</div>
+        ${svgBars(withCycleColors(stats.allCitiesSorted))}
+      </div>
     `;
-    printHtml(html, `Relatório - ${raceGroupName}`);
+    printHtml(html, `Relatório - ${raceGroupName}`, REPORT_STYLE);
   };
 
   return (
@@ -248,21 +324,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         />
         <StatsCard
           title="Receita Total"
-          value={`R$ ${totalRevenue.toLocaleString('pt-BR', { notation: 'compact' })}`}
+          value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={DollarSign}
           color="bg-emerald-500"
           description="Inscrições + Patrocínios + Extras"
         />
         <StatsCard
           title="Despesas"
-          value={`R$ ${totalExpenses.toLocaleString('pt-BR', { notation: 'compact' })}`}
+          value={`R$ ${totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={TrendingDown}
           color="bg-red-500"
           description="Gastos totais"
         />
         <StatsCard
           title="Balanço Final"
-          value={`R$ ${balance.toLocaleString('pt-BR', { notation: 'compact' })}`}
+          value={`R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={Wallet}
           color={balance >= 0 ? "bg-blue-500" : "bg-red-600"}
           description="Lucro líquido"
