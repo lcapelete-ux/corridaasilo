@@ -197,6 +197,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
             <ChevronRight className="group-hover:translate-x-1 transition-transform relative z-10" strokeWidth={3} aria-hidden="true" />
           </button>
 
+          {/* Já se inscreveu? Mesmo destaque do CTA principal, em outra cor */}
+          <button
+            onClick={onOpenProofUpload}
+            className="group relative inline-flex items-center justify-center gap-3 bg-emerald-500 text-white px-8 py-5 md:px-12 md:py-6 rounded-xl font-black italic text-xl md:text-2xl uppercase tracking-wider hover:bg-emerald-400 hover:scale-105 transition-all duration-300 shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] w-full md:w-auto overflow-hidden"
+          >
+            <div className="absolute top-0 left-[-100%] w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-25deg] group-hover:animate-shimmer" aria-hidden="true"></div>
+
+            <Upload size={22} className="relative z-10 shrink-0" aria-hidden="true" />
+            <span className="relative z-10">Já me Inscrevi, Enviar Comprovante</span>
+          </button>
+
           {/* Ver o mapa 3D do percurso */}
           <button
             onClick={onOpenCourse}
@@ -205,14 +216,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
             <Route size={18} className="text-yellow-400 group-hover:scale-110 transition-transform" aria-hidden="true" />
             Ver mapa do percurso
             <span className="text-[10px] text-slate-500 font-bold normal-case tracking-normal">5 km</span>
-          </button>
-
-          <button
-            onClick={onOpenProofUpload}
-            className="group flex items-center gap-2 text-slate-500 hover:text-white text-sm font-bold uppercase tracking-wider px-6 py-2 rounded-lg border border-transparent hover:border-slate-700 hover:bg-slate-900/50 transition-all"
-          >
-            <Upload size={16} className="text-yellow-500 group-hover:text-yellow-400 group-hover:animate-bounce" aria-hidden="true"/>
-            Já me inscrevi, enviar comprovante
           </button>
         </div>
 
