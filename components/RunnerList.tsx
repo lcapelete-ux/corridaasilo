@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate } from '../constants';
+import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -53,7 +53,9 @@ const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg 
 export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
-  const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes'>('lista');
+  const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes' | 'autorizacoes'>('lista');
+  const minorRunners = runners.filter(r => isMinorAtEvent(r.birthDate));
+  const minorsMissingAuth = minorRunners.filter(r => !r.authorizationDoc);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -466,6 +468,25 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
               </span>
             )}
           </button>
+          {minorRunners.length > 0 && (
+            <button
+              onClick={() => setActiveTab('autorizacoes')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                activeTab === 'autorizacoes'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <ShieldCheck size={15} /> Autorizações
+              {minorsMissingAuth.length > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${
+                  activeTab === 'autorizacoes' ? 'bg-white/20' : 'bg-amber-500/20 text-amber-400'
+                }`}>
+                  {minorsMissingAuth.length} pendente{minorsMissingAuth.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -639,6 +660,113 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         className="w-full rounded-lg border border-slate-800 object-contain max-h-64 bg-slate-950 cursor-zoom-in"
                         onClick={() => setSelectedRunner(runner)}
                         title="Clique para ver a ficha completa"
+                      />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Autorizações View (menores de idade) */}
+      {activeTab === 'autorizacoes' && (
+        <div className="space-y-4">
+          {/* Summary bar */}
+          <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-4 flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Autorizações de menores</p>
+              <p className="text-white font-bold text-2xl">
+                {minorRunners.length - minorsMissingAuth.length}
+                <span className="text-slate-600 font-normal text-base"> de {minorRunners.length} menor(es) inscrito(s)</span>
+              </p>
+            </div>
+            <div className="flex gap-4 text-sm">
+              <div className="text-center">
+                <p className="text-emerald-400 font-bold text-lg">{minorRunners.length - minorsMissingAuth.length}</p>
+                <p className="text-slate-500 text-xs">Recebidas</p>
+              </div>
+              <div className="text-center">
+                <p className="text-amber-400 font-bold text-lg">{minorsMissingAuth.length}</p>
+                <p className="text-slate-500 text-xs">Pendentes</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pendentes */}
+          {minorsMissingAuth.length > 0 && (
+            <div className="bg-slate-900 rounded-xl border border-amber-500/30 overflow-hidden">
+              <div className="p-4 border-b border-slate-800 flex items-center gap-2">
+                <ShieldAlert size={16} className="text-amber-400" />
+                <h3 className="text-sm font-bold text-white">Aguardando autorização ({minorsMissingAuth.length})</h3>
+              </div>
+              <div className="divide-y divide-slate-800/60">
+                {minorsMissingAuth.map(runner => (
+                  <div key={runner.id} className="p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-white truncate">{runner.fullName}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{runner.cpf} · {runner.teamName}</p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedRunner(runner)}
+                      className="text-xs text-slate-500 hover:text-indigo-400 flex items-center gap-1 transition-colors shrink-0"
+                    >
+                      <Eye size={12} /> Ver ficha
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recebidas */}
+          {minorRunners.length === 0 ? (
+            <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-12 text-center">
+              <ShieldCheck size={40} className="text-slate-700 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">Nenhum inscrito menor de idade ainda.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {minorRunners.filter(r => r.authorizationDoc).map(runner => (
+                <div key={runner.id} className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden hover:border-emerald-500/30 transition-all">
+                  <div className="p-4 flex items-start justify-between gap-3 border-b border-slate-800">
+                    <div className="min-w-0">
+                      <p className="font-bold text-white truncate">{runner.fullName}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{runner.cpf}</p>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 mt-1.5">
+                        {runner.teamName}
+                      </span>
+                    </div>
+                    <a
+                      href={runner.authorizationDoc}
+                      download={`autorizacao-${runner.fullName.replace(/\s+/g, '_')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold"
+                      title="Baixar autorização"
+                    >
+                      <Download size={12} /> Baixar
+                    </a>
+                  </div>
+                  <div className="p-3 bg-slate-950/40">
+                    {isPdfProof(runner.authorizationDoc) ? (
+                      <a
+                        href={runner.authorizationDoc}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 py-8 flex flex-col items-center text-slate-300 cursor-pointer hover:border-emerald-500/30 transition-all"
+                      >
+                        <FileText size={32} />
+                        <span className="text-xs font-bold mt-2">Autorização (PDF)</span>
+                      </a>
+                    ) : (
+                      <img
+                        src={runner.authorizationDoc}
+                        alt={`Autorização de ${runner.fullName}`}
+                        className="w-full rounded-lg border border-slate-800 object-contain max-h-64 bg-slate-950 cursor-zoom-in"
+                        onClick={() => setSelectedRunner(runner)}
+                        title="Clique para ampliar"
                       />
                     )}
                   </div>
