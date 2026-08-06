@@ -54,7 +54,12 @@ export interface ChartSlice {
 
 // Gráfico de rosca em SVG puro (sem lib externa) — imprime bem e escala sem perder nitidez.
 // Usa a técnica clássica de stroke-dasharray por segmento de círculo.
-export const svgDonut = (segments: ChartSlice[], size = 176, strokeWidth = 26): string => {
+export const svgDonut = (
+  segments: ChartSlice[],
+  size = 176,
+  strokeWidth = 26,
+  valueFormatter: (v: number) => string = (v) => String(v)
+): string => {
   const total = segments.reduce((a, s) => a + s.value, 0);
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
@@ -69,21 +74,28 @@ export const svgDonut = (segments: ChartSlice[], size = 176, strokeWidth = 26): 
     offset += dash;
     return el;
   }).join('');
+  const totalLabel = escapeHtml(valueFormatter(total));
+  // Valores formatados (ex.: "R$ 8.350,00") são mais longos que uma contagem
+  // simples, então a fonte diminui para não vazar do círculo.
+  const totalFontSize = totalLabel.length > 8 ? 15 : totalLabel.length > 5 ? 20 : 26;
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     ${arcs}
-    <text x="${center}" y="${center - 3}" text-anchor="middle" font-size="26" font-weight="900" fill="#0f172a">${total}</text>
+    <text x="${center}" y="${center - 3}" text-anchor="middle" font-size="${totalFontSize}" font-weight="900" fill="#0f172a">${totalLabel}</text>
     <text x="${center}" y="${center + 16}" text-anchor="middle" font-size="9" fill="#64748b" letter-spacing="1.5">TOTAL</text>
   </svg>`;
 };
 
 // Legenda HTML para acompanhar um svgDonut (mesma lista de segmentos)
-export const donutLegend = (segments: ChartSlice[]): string => {
+export const donutLegend = (
+  segments: ChartSlice[],
+  valueFormatter: (v: number) => string = (v) => String(v)
+): string => {
   const total = segments.reduce((a, s) => a + s.value, 0);
   return segments.map(s => `
     <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:7px;">
       <span style="width:10px;height:10px;border-radius:50%;background:${s.color};display:inline-block;flex-shrink:0;"></span>
       <span style="flex:1;color:#334155;">${escapeHtml(s.label)}</span>
-      <span style="font-weight:700;color:#0f172a;">${s.value} <span style="color:#94a3b8;font-weight:400;">(${total ? Math.round((s.value / total) * 100) : 0}%)</span></span>
+      <span style="font-weight:700;color:#0f172a;">${escapeHtml(valueFormatter(s.value))} <span style="color:#94a3b8;font-weight:400;">(${total ? Math.round((s.value / total) * 100) : 0}%)</span></span>
     </div>
   `).join('');
 };

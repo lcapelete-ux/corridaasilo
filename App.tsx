@@ -977,11 +977,12 @@ const App: React.FC = () => {
             )}
 
             {currentView === 'sponsors' && (
-              <SponsorsManager 
-                sponsors={sponsors} 
-                onSave={handleSaveSponsor} 
+              <SponsorsManager
+                sponsors={sponsors}
+                onSave={handleSaveSponsor}
                 onUpdate={handleUpdateSponsor}
                 onDelete={handleDeleteSponsor}
+                raceGroupName={raceGroupName}
               />
             )}
 
