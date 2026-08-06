@@ -41,15 +41,22 @@ const REGULATION_TEXT: string[] = [
   'O evento terá duração máxima de 1h30min, sendo a linha de chegada e seus serviços desativados após esse período.',
   'O atleta deverá observar o trajeto balizado, não sendo permitido qualquer meio auxiliar para obter vantagem ou cortar o percurso indicado. O atleta fora do trajeto poderá ser convidado a se retirar da competição.',
 
-  '## 8. Responsabilidade e Uso de Imagem',
+  '## 8. Condições de Saúde e Avaliação Médica',
+  'Ao se inscrever, o atleta DECLARA estar em plenas condições físicas e de saúde para participar da prova, tendo se submetido a avaliação médica prévia que o considerou APTO à prática de atividade física, e afirma não possuir qualquer contraindicação ou recomendação médica que o impeça de participar.',
+  'A organização recomenda enfaticamente que todo participante realize avaliação médica e treinamento adequado antes da prova. A responsabilidade por essa avaliação é exclusiva do atleta, que responde civil e criminalmente pela veracidade desta declaração.',
+  'O atleta que apresentar qualquer sintoma ou alteração no estado de saúde antes ou durante a prova — como dor no peito, tontura, falta de ar, náusea ou mal-estar — deve interromper imediatamente sua participação e procurar a equipe de apoio ou o serviço médico do evento.',
+  'A organização disponibilizará serviço de primeiros socorros no local. Em caso de emergência, o atleta autoriza o atendimento e, se necessário, a remoção para unidade de saúde, ficando as despesas médicas ou hospitalares posteriores sob responsabilidade do próprio atleta.',
+  'A organização se reserva o direito de impedir a largada ou determinar a retirada do percurso de qualquer participante que apresente condições de saúde incompatíveis com a atividade, visando exclusivamente à sua segurança.',
+
+  '## 9. Responsabilidade e Uso de Imagem',
   'A participação do atleta é individual e por livre e espontânea vontade. Ao participar, o atleta assume total responsabilidade pelos dados fornecidos, aceita integralmente o regulamento e declara estar em condições de saúde e preparo para o evento.',
   'O atleta cede os direitos de uso de sua imagem para divulgação do evento, em qualquer mídia e tempo, sem ônus para a organização.',
-  'A organização, patrocinadores, apoiadores e realizadores não se responsabilizam por perdas, danos, extravios ou prejuízos sofridos ou causados pelo atleta antes, durante ou depois do evento.',
+  'A organização, patrocinadores, apoiadores e realizadores não se responsabilizam por perdas, danos, extravios ou prejuízos sofridos ou causados pelo atleta antes, durante ou depois do evento, inclusive os decorrentes de seu estado de saúde.',
 
-  '## 9. Classificação',
+  '## 10. Classificação',
   'A classificação será definida pela colocação (tempo / ordem de chegada) e publicada no site de inscrição da corrida. Não está autorizada a divulgação dos resultados por outros meios sem prévia autorização da organização.',
 
-  '## 10. Cancelamento e Alterações',
+  '## 11. Cancelamento e Alterações',
   'Em caso de cancelamento por motivo de força maior (condições meteorológicas, determinações governamentais, etc.), a organização fica isenta de qualquer indenização além da devolução da taxa de inscrição. A organização poderá suspender ou prorrogar prazos e limitar o número de inscrições por necessidades técnicas ou estruturais, sem aviso prévio.',
 
   'Realização: Lar São Cristóvão · Laranjal Paulista/SP. Em caso de dúvidas, procure a organização do evento.',

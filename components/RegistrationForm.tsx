@@ -1096,7 +1096,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSave, exis
                   className="mt-0.5 w-5 h-5 rounded accent-yellow-400 shrink-0 cursor-pointer"
                 />
                 <span className="text-sm text-slate-300">
-                  Li e <strong className="text-white">estou de acordo com o regulamento</strong> da 2ª Corrida Noturna LSC.
+                  Li e <strong className="text-white">estou de acordo com o regulamento</strong> da 2ª Corrida Noturna LSC
+                  e <strong className="text-white">declaro estar apto(a) à prática de atividade física</strong>, conforme
+                  avaliação médica, não havendo qualquer contraindicação para minha participação na prova.
                 </span>
               </label>
               <button
