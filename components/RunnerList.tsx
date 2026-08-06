@@ -201,7 +201,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       'Email',
       'Valor Pago (R$)',
       'Data Inscrição',
-      'Pagamento Confirmado'
+      'Pagamento Confirmado',
+      'Pago Por (se não foi o atleta)'
     ];
 
     // Mapear dados para linhas do CSV
@@ -234,7 +235,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         `"${esc(runner.email)}"`,
         `"${valorPago}"`,
         `"${regDateFormatted}"`,
-        `"${runner.isPaid ? 'SIM' : 'NÃO'}"`
+        `"${runner.isPaid ? 'SIM' : 'NÃO'}"`,
+        `"${esc(runner.payerName || '')}"`
       ].join(',');
     });
 
@@ -602,6 +604,14 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                             <ArrowRightLeft size={10} /> Transferida
                           </span>
                         )}
+                        {runner.payerName && (
+                          <span
+                            className="inline-flex items-center gap-1 bg-sky-500/15 text-sky-300 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            title={`O pagamento foi feito por ${runner.payerName}, não pelo próprio atleta`}
+                          >
+                            <Users size={10} className="shrink-0" /> Pago por: {runner.payerName}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
@@ -955,6 +965,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           </span>
                         )}
 
+                        {runner.payerName && (
+                          <span
+                            className="inline-flex items-center gap-1 w-fit bg-sky-500/15 text-sky-300 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            title={`O pagamento foi feito por ${runner.payerName}, não pelo próprio atleta`}
+                          >
+                            <Users size={10} className="shrink-0" /> Pago por: {runner.payerName}
+                          </span>
+                        )}
+
                         {runner.paymentProof ? (
                           <button
                             onClick={() => setSelectedRunner(runner)}
@@ -1281,6 +1300,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                               title={selectedRunner.paidNoProofAt ? `Avisado em ${new Date(selectedRunner.paidNoProofAt).toLocaleString('pt-BR')}` : undefined}
                             >
                               <AlertCircle size={10} /> Alega ter pago
+                            </span>
+                          )}
+                          {selectedRunner.payerName && (
+                            <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-sky-300">
+                              <Users size={10} /> Pago por: {selectedRunner.payerName}
                             </span>
                           )}
                           {canEditFinancials && (
