@@ -2,20 +2,43 @@
 import React, { useState, useRef } from 'react';
 import { Sponsor, SponsorType } from '../types';
 import { prepareProofFile, migrateBase64ToCloudinary } from '../services/imageUtils';
-import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase } from 'lucide-react';
+import { escapeHtml as esc, printHtml, svgDonut, donutLegend } from '../services/printReport';
+import { EVENT_DATE, formatBrDate } from '../constants';
+import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase, FileDown } from 'lucide-react';
 
 interface SponsorsManagerProps {
   sponsors: Sponsor[];
   onSave: (sponsor: Sponsor) => void;
   onUpdate: (sponsor: Sponsor) => void;
   onDelete: (id: string) => void;
+  raceGroupName?: string;
 }
+
+// CSS extra do relatório de patrocínios (mesmo padrão visual do relatório do Dashboard)
+const REPORT_STYLE = `
+  .header-band { background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 24px 28px; border-radius: 14px; margin-bottom: 18px; }
+  .header-band .badge { display: inline-block; color: #facc15; font-size: 10px; font-weight: 800; letter-spacing: .15em; border: 1px solid rgba(250,204,21,.5); padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+  .header-band h1 { color: #fff; margin: 0 0 4px; }
+  .header-band .sub { color: #cbd5e1; margin: 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .kpi-card { border-radius: 10px; padding: 12px 14px; color: #fff; page-break-inside: avoid; }
+  .kpi-card .label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; opacity: .9; }
+  .kpi-card .value { font-size: 17px; font-weight: 900; margin-top: 4px; }
+  .section-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; page-break-inside: avoid; }
+  .section-card table { background: transparent; }
+  .section-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 12px; }
+  .chart-row { display: flex; align-items: center; gap: 28px; justify-content: center; }
+  .status-pago { color: #047857; font-weight: 700; }
+  .status-pendente { color: #b45309; font-weight: 700; }
+  tfoot td { font-weight: 800; background: #f1f5f9; }
+  .pending-card { background: #fffbeb; border-color: #fcd34d; }
+`;
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm";
 const selectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm [color-scheme:dark]";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSave, onUpdate, onDelete }) => {
+export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSave, onUpdate, onDelete, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -89,6 +112,94 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
   const totalRevenue = sponsors.reduce((acc, curr) => acc + (curr.isPaid ? curr.amount : 0), 0);
   const potentialRevenue = sponsors.reduce((acc, curr) => acc + curr.amount, 0);
 
+  const generatePdf = () => {
+    const fmtMoney = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    const dataStr = new Date().toLocaleString('pt-BR');
+    const paid = sponsors.filter(s => s.isPaid);
+    const pending = sponsors.filter(s => !s.isPaid);
+    const pendingTotal = potentialRevenue - totalRevenue;
+
+    // Ordena: pendentes primeiro (é o que precisa de ação), depois por valor
+    const ordered = [...sponsors].sort((a, b) =>
+      (a.isPaid === b.isPaid) ? b.amount - a.amount : (a.isPaid ? 1 : -1)
+    );
+
+    const rows = ordered.map(s => `
+      <tr>
+        <td>${esc(s.name)}</td>
+        <td>${esc(s.type)}${s.position && s.position !== 'N/A' ? ` · ${esc(s.position)}` : ''}</td>
+        <td class="total-col">${esc(fmtMoney(s.amount))}</td>
+        <td class="size ${s.isPaid ? 'status-pago' : 'status-pendente'}">${s.isPaid ? '✓ PAGO' : '✗ PENDENTE'}</td>
+        <td class="size">${s.receiptImage ? 'Sim' : '—'}</td>
+      </tr>`).join('');
+
+    const pendingRows = pending
+      .sort((a, b) => b.amount - a.amount)
+      .map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.type)}</td><td class="total-col">${esc(fmtMoney(s.amount))}</td></tr>`)
+      .join('');
+
+    const statusSegments = [
+      { label: `Pagos (${paid.length})`, value: totalRevenue, color: '#10b981' },
+      { label: `Pendentes (${pending.length})`, value: pendingTotal, color: '#f59e0b' },
+    ];
+
+    const html = `
+      <div class="header-band">
+        <span class="badge">RELATÓRIO DE PATROCÍNIOS</span>
+        <h1>${esc(raceGroupName)}</h1>
+        <p class="sub">Data da prova: ${esc(formatBrDate(EVENT_DATE, true))} · Gerado em ${esc(dataStr)}</p>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+          <div class="label">Recebido</div>
+          <div class="value">${esc(fmtMoney(totalRevenue))}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+          <div class="label">A Receber</div>
+          <div class="value">${esc(fmtMoney(pendingTotal))}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+          <div class="label">Total Previsto</div>
+          <div class="value">${esc(fmtMoney(potentialRevenue))}</div>
+        </div>
+      </div>
+
+      ${sponsors.length > 0 ? `
+      <div class="section-card">
+        <div class="section-title">💰 Situação dos Pagamentos</div>
+        <div class="chart-row">
+          ${svgDonut(statusSegments, 160, 22, fmtMoney)}
+          <div style="min-width:250px;">${donutLegend(statusSegments, fmtMoney)}</div>
+        </div>
+      </div>` : ''}
+
+      ${pendingRows ? `
+      <div class="section-card pending-card">
+        <div class="section-title">⚠️ Pendentes de pagamento (${pending.length}) — ${esc(fmtMoney(pendingTotal))}</div>
+        <table>
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Valor</th></tr></thead>
+          <tbody>${pendingRows}</tbody>
+        </table>
+      </div>` : ''}
+
+      <div class="section-card">
+        <div class="section-title">📋 Todos os Patrocinadores (${sponsors.length})</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Patrocinador</th><th>Tipo / Posição</th>
+              <th class="size">Valor</th><th class="size">Status</th><th class="size">Comprovante</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="5">Nenhum patrocinador cadastrado.</td></tr>'}</tbody>
+          ${sponsors.length > 0 ? `<tfoot><tr><td colspan="2">TOTAL</td><td class="total-col">${esc(fmtMoney(potentialRevenue))}</td><td colspan="2"></td></tr></tfoot>` : ''}
+        </table>
+      </div>
+    `;
+    printHtml(html, `Patrocínios - ${raceGroupName}`, REPORT_STYLE);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header Cards */}
@@ -119,12 +230,23 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
           <Briefcase className="text-yellow-400" size={20} />
           Patrocinadores ({sponsors.length})
         </h2>
-        <button
-          onClick={() => setIsFormVisible(!isFormVisible)}
-          className="bg-slate-800 text-yellow-400 border border-slate-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-700 transition-all"
-        >
-          <Plus size={18} /> Novo Patrocinador
-        </button>
+        <div className="flex items-center gap-2">
+          {sponsors.length > 0 && (
+            <button
+              onClick={generatePdf}
+              className="bg-slate-800 text-slate-300 border border-slate-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-700 hover:text-white transition-all"
+              title="Gerar relatório de patrocínios em PDF"
+            >
+              <FileDown size={18} /> Relatório (PDF)
+            </button>
+          )}
+          <button
+            onClick={() => setIsFormVisible(!isFormVisible)}
+            className="bg-slate-800 text-yellow-400 border border-slate-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-700 transition-all"
+          >
+            <Plus size={18} /> Novo Patrocinador
+          </button>
+        </div>
       </div>
 
       {/* Recibos antigos: aviso + migração pro Cloudinary */}
