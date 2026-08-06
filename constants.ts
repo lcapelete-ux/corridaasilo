@@ -15,6 +15,13 @@ export const GRANTABLE_VIEWS: { key: string; label: string }[] = [
   { key: 'kits', label: 'Entrega de Kits' },
 ];
 
+// Logos de patrocinadores no rodapé: altura do "chip" branco e altura base do
+// logo dentro dele (100% do ajuste). Cada logo pode ter um scale próprio, então
+// esses números são o ponto de partida compartilhado entre o rodapé e a tela
+// de ajuste do admin — precisam ficar iguais nos dois lugares.
+export const FOOTER_CHIP_HEIGHT = 64;
+export const FOOTER_LOGO_BASE_HEIGHT = 44;
+
 // Valores da inscrição da 2ª Corrida Noturna LSC
 export const REGISTRATION_PRICE = 74.90;
 export const REGISTRATION_PRICE_SENIOR = 37.45; // Idoso 60+: metade de 74,90 (não acumula cupom)

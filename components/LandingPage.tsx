@@ -6,7 +6,7 @@ import rondontexLogo from '../assets/rondontex-logo.png';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
 import { SoundToggle } from './SoundToggle';
 import { RafflePromo } from './RafflePromo';
-import { formatBrDate } from '../constants';
+import { formatBrDate, FOOTER_CHIP_HEIGHT, FOOTER_LOGO_BASE_HEIGHT } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
 import { SponsorLogo, RaffleSettings, TeamRankingEntry } from '../types';
 
@@ -295,15 +295,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
       <footer className="relative z-10 py-6 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center px-6 gap-4">
            {/* Sicredi + logos dos patrocinadores (quebram em 2-3 linhas se houver muitos).
-               Chips de altura fixa; os logos são aparados (e_trim no Cloudinary) e
-               centralizados, para ficarem no mesmo tamanho visual, sem "moldura branca". */}
+               Chips de altura fixa; cada logo tem seu próprio ajuste de tamanho e de
+               recorte de moldura (definidos pelo admin em "Logos do Site"), porque
+               arquivos com fundo/moldura embutidos ficariam pequenos no padrão. */}
            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-              <div className="bg-white rounded-lg h-12 md:h-14 px-4 flex items-center justify-center">
-                <img src={sicrediLogo} alt="Sicredi" className="max-h-8 md:max-h-10 w-auto object-contain" />
+              <div
+                className="bg-white rounded-lg px-4 flex items-center justify-center"
+                style={{ height: FOOTER_CHIP_HEIGHT }}
+              >
+                <img
+                  src={sicrediLogo}
+                  alt="Sicredi"
+                  style={{ maxHeight: FOOTER_LOGO_BASE_HEIGHT }}
+                  className="w-auto max-w-[170px] object-contain"
+                />
               </div>
               {sponsorLogos.map(logo => (
-                <div key={logo.id} className="bg-white rounded-lg h-12 md:h-14 px-4 flex items-center justify-center">
-                  <img src={cloudinaryLogoUrl(logo.imageData)} alt={logo.name || 'Patrocinador'} className="max-h-8 md:max-h-10 w-auto object-contain" />
+                <div
+                  key={logo.id}
+                  className="bg-white rounded-lg px-4 flex items-center justify-center"
+                  style={{ height: FOOTER_CHIP_HEIGHT }}
+                >
+                  <img
+                    src={cloudinaryLogoUrl(logo.imageData, 200, logo.trimEdges ?? true)}
+                    alt={logo.name || 'Patrocinador'}
+                    style={{ maxHeight: Math.round((FOOTER_LOGO_BASE_HEIGHT * (logo.scale ?? 100)) / 100) }}
+                    className="w-auto max-w-[170px] object-contain"
+                  />
                 </div>
               ))}
            </div>
