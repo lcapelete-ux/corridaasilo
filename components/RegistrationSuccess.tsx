@@ -5,6 +5,7 @@ import { REGISTRATION_PRICE, REGISTRATION_PRICE_SENIOR } from '../constants';
 import { prepareProofFile } from '../services/imageUtils';
 import { attachPaymentProof } from '../services/storageService';
 import { RafflePromo } from './RafflePromo';
+import { PayerSelector } from './PayerSelector';
 import { RaffleSettings } from '../types';
 
 interface RegistrationSuccessProps {
@@ -32,6 +33,10 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [proofError, setProofError] = useState('');
+
+  // Quem pagou: o próprio atleta ou outra pessoa
+  const [payerName, setPayerName] = useState('');
+  const [payerIsThirdParty, setPayerIsThirdParty] = useState(false);
 
   const needsAuth = isMinor && !authFile; // menor precisa anexar a autorização
 
@@ -71,10 +76,14 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
       setProofError('Atleta menor de 18: anexe também a autorização assinada do responsável.');
       return;
     }
+    if (payerIsThirdParty && !payerName.trim()) {
+      setProofError('Informe o nome de quem fez o pagamento.');
+      return;
+    }
     setBusy(true);
     setProofError('');
     try {
-      await attachPaymentProof(cpf, proofFile, authFile || undefined);
+      await attachPaymentProof(cpf, proofFile, authFile || undefined, payerIsThirdParty ? payerName : undefined);
       setSent(true);
     } catch (err: any) {
       setProofError(err?.message || 'Erro ao enviar o comprovante. Tente novamente.');
@@ -269,6 +278,17 @@ export const RegistrationSuccess: React.FC<RegistrationSuccessProps> = ({ onBack
                           )}
                         </div>
                       </div>
+                    )}
+
+                    {/* Quem pagou (só faz sentido quando há um comprovante para enviar) */}
+                    {proofFile && (
+                      <PayerSelector
+                        payerName={payerName}
+                        onChange={setPayerName}
+                        isThirdParty={payerIsThirdParty}
+                        onChangeIsThirdParty={setPayerIsThirdParty}
+                        variant="light"
+                      />
                     )}
 
                     {proofError && (

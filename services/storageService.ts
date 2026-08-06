@@ -85,6 +85,7 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   kitDeliveredAt: (r as any).kit_delivered_at || undefined,
   paidNoProof: (r as any).paid_no_proof ?? undefined,
   paidNoProofAt: (r as any).paid_no_proof_at || undefined,
+  payerName: (r as any).payer_name || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -119,6 +120,8 @@ const runnerToRow = (r: Runner) => {
   if (r.extraDonation != null) row.extra_donation = r.extraDonation;
   // Observação: enviada mesmo vazia (permite limpar) — null quando em branco
   if (r.note !== undefined) row.note = r.note.trim() ? r.note.trim() : null;
+  // Pagador: mesma lógica — enviado mesmo vazio para permitir corrigir/limpar
+  if (r.payerName !== undefined) row.payer_name = r.payerName.trim() ? r.payerName.trim() : null;
   return row;
 };
 
@@ -128,7 +131,7 @@ const runnerToRow = (r: Runner) => {
 const MIGRATION_COLUMNS = [
   'phone', 'modality', 'transferred_from', 'transferred_at',
   'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
-  'senior_full_price', 'extra_donation', 'note',
+  'senior_full_price', 'extra_donation', 'note', 'payer_name',
 ];
 
 const isUnknownColumnError = (error: any): boolean =>
@@ -236,6 +239,7 @@ export const findRunnerByCpf = async (cpf: string): Promise<RunnerLookup | null>
     couponDiscount: row.coupon_discount != null ? Number(row.coupon_discount) : undefined,
     extraDonation: row.extra_donation != null ? Number(row.extra_donation) : undefined,
     seniorFullPrice: row.senior_full_price ?? undefined,
+    payerName: row.payer_name || undefined,
   };
 };
 
@@ -248,24 +252,38 @@ export const reportPaidWithoutProof = async (cpf: string): Promise<void> => {
 };
 
 // Anexa o comprovante e, para menores de 18, também a autorização do responsável.
-export const attachPaymentProof = async (cpf: string, proof: string, authorization?: string): Promise<void> => {
+// payerName: nome de quem pagou, quando não foi o próprio atleta.
+export const attachPaymentProof = async (
+  cpf: string,
+  proof: string,
+  authorization?: string,
+  payerName?: string,
+): Promise<void> => {
+  const isMissingFn = (e: { code?: string; message?: string } | null) =>
+    e?.code === 'PGRST202'
+    || /could not find the function|attach_payment_proof/i.test(e?.message || '');
+
   const { error } = await supabase.rpc('attach_payment_proof', {
     p_cpf: cpf,
     p_proof: proof,
     p_authorization: authorization || null,
+    p_payer_name: payerName?.trim() || null,
   });
   if (!error) return;
+  if (!isMissingFn(error)) throw friendlyError(error, 'Erro ao enviar comprovante');
 
-  // Se a migração ainda não rodou, o banco só tem a versão de 2 parâmetros.
-  // Faz o fallback (sem autorização) para não travar o envio dos demais.
-  const missingFn = error.code === 'PGRST202'
-    || /could not find the function|attach_payment_proof/i.test(error.message || '');
-  if (missingFn) {
-    const retry = await supabase.rpc('attach_payment_proof', { p_cpf: cpf, p_proof: proof });
-    if (retry.error) throw friendlyError(retry.error, 'Erro ao enviar comprovante');
-    return;
-  }
-  throw friendlyError(error, 'Erro ao enviar comprovante');
+  // Migrações antigas: tenta a versão de 3 parâmetros (sem o pagador) e, se
+  // ainda faltar, a de 2 (sem autorização). O comprovante nunca deixa de subir.
+  const retry3 = await supabase.rpc('attach_payment_proof', {
+    p_cpf: cpf,
+    p_proof: proof,
+    p_authorization: authorization || null,
+  });
+  if (!retry3.error) return;
+  if (!isMissingFn(retry3.error)) throw friendlyError(retry3.error, 'Erro ao enviar comprovante');
+
+  const retry2 = await supabase.rpc('attach_payment_proof', { p_cpf: cpf, p_proof: proof });
+  if (retry2.error) throw friendlyError(retry2.error, 'Erro ao enviar comprovante');
 };
 
 // --- Sponsors ---
@@ -851,6 +869,8 @@ interface SponsorLogoRow {
   name: string | null;
   image_data: string;
   sort_order: number | null;
+  scale?: number | null;
+  trim_edges?: boolean | null;
 }
 
 const sponsorLogoFromRow = (l: SponsorLogoRow): SponsorLogo => ({
@@ -858,6 +878,8 @@ const sponsorLogoFromRow = (l: SponsorLogoRow): SponsorLogo => ({
   name: l.name || undefined,
   imageData: l.image_data,
   sortOrder: l.sort_order ?? 0,
+  scale: l.scale ?? 100,
+  trimEdges: l.trim_edges ?? true,
 });
 
 export const getSponsorLogos = async (): Promise<SponsorLogo[]> => {
@@ -870,11 +892,29 @@ export const getSponsorLogos = async (): Promise<SponsorLogo[]> => {
   return (data as SponsorLogoRow[]).map(sponsorLogoFromRow);
 };
 
-export const addSponsorLogo = async (imageData: string, name?: string): Promise<void> => {
-  const { error } = await supabase
+// Insere e devolve o logo criado (o id é usado para já abrir a tela de ajuste)
+export const addSponsorLogo = async (imageData: string, name?: string): Promise<SponsorLogo | null> => {
+  const { data, error } = await supabase
     .from('sponsor_logos')
-    .insert({ image_data: imageData, name: name?.trim() || null });
+    .insert({ image_data: imageData, name: name?.trim() || null })
+    .select()
+    .maybeSingle();
   if (error) throw friendlyError(error, 'Erro ao salvar o logo');
+  return data ? sponsorLogoFromRow(data as SponsorLogoRow) : null;
+};
+
+// Ajuste fino do logo no rodapé (tamanho e recorte de borda)
+export const updateSponsorLogo = async (
+  id: string,
+  changes: { scale?: number; trimEdges?: boolean; name?: string },
+): Promise<void> => {
+  const payload: Record<string, unknown> = {};
+  if (changes.scale !== undefined) payload.scale = changes.scale;
+  if (changes.trimEdges !== undefined) payload.trim_edges = changes.trimEdges;
+  if (changes.name !== undefined) payload.name = changes.name.trim() || null;
+
+  const { error } = await supabase.from('sponsor_logos').update(payload).eq('id', id);
+  if (error) throw friendlyError(error, 'Erro ao salvar o ajuste do logo');
 };
 
 export const deleteSponsorLogo = async (id: string): Promise<void> => {

@@ -52,10 +52,14 @@ export const isPdfProof = (url?: string | null): boolean =>
 // e_trim e ajustam a altura — assim logos com moldura branca ou muito
 // espaçamento passam a preencher o espaço igual aos demais, SEM re-enviar.
 // URLs que não são do Cloudinary (base64 legado, assets do site) voltam iguais.
-export const cloudinaryLogoUrl = (url?: string | null, height = 160): string => {
+//
+// trim=false: mantém a imagem inteira. Necessário para logos cujo fundo
+// colorido faz parte da marca — aparar cortaria o próprio desenho.
+export const cloudinaryLogoUrl = (url?: string | null, height = 160, trim = true): string => {
   if (!url || !url.includes('res.cloudinary.com') || !url.includes('/upload/')) return url || '';
   // e_trim: remove borda de cor uniforme · c_fit,h_: normaliza a altura
-  return url.replace('/upload/', `/upload/e_trim/c_fit,h_${height}/`);
+  const transform = trim ? `e_trim/c_fit,h_${height}` : `c_fit,h_${height}`;
+  return url.replace('/upload/', `/upload/${transform}/`);
 };
 
 const canvasToPng = (canvas: HTMLCanvasElement): Promise<Blob> =>

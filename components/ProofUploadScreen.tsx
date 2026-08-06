@@ -4,6 +4,7 @@ import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Cl
 import { findRunnerByCpf, attachPaymentProof, reportPaidWithoutProof } from '../services/storageService';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
 import { isMinorAtEvent, getRunnerDueValue, getRunnerPaidValue, formatBrDate } from '../constants';
+import { PayerSelector } from './PayerSelector';
 import { Runner } from '../types';
 
 interface ProofUploadScreenProps {
@@ -34,6 +35,10 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack, pr
   const [preparingAuth, setPreparingAuth] = useState(false);
   const authInputRef = useRef<HTMLInputElement>(null);
 
+  // Quem pagou: o próprio atleta ou outra pessoa
+  const [payerName, setPayerName] = useState('');
+  const [payerIsThirdParty, setPayerIsThirdParty] = useState(false);
+
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length > 11) value = value.slice(0, 11);
@@ -63,6 +68,9 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack, pr
         setProofFile(null);
         setAuthFile(null);
         setReportNoProof(false);
+        // Mantém o que já foi declarado antes (quem reenvia não perde a escolha)
+        setPayerName(found.payerName || '');
+        setPayerIsThirdParty(!!found.payerName);
         setStep('view');
       } else {
         setError('Inscrição não encontrada para este CPF.');
@@ -129,10 +137,14 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack, pr
       setError('Atleta menor de 18 anos: anexe também a autorização assinada do responsável para enviar.');
       return;
     }
+    if (payerIsThirdParty && !payerName.trim()) {
+      setError('Informe o nome de quem fez o pagamento.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
-      await attachPaymentProof(runner.cpf || cpf, proofFile, authFile || undefined);
+      await attachPaymentProof(runner.cpf || cpf, proofFile, authFile || undefined, payerIsThirdParty ? payerName : undefined);
       setSuccessKind('proof');
       setStep('success');
     } catch (err: any) {
@@ -439,6 +451,17 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack, pr
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Quem pagou (só faz sentido quando há um comprovante para enviar) */}
+            {proofFile && (
+              <PayerSelector
+                payerName={payerName}
+                onChange={setPayerName}
+                isThirdParty={payerIsThirdParty}
+                onChangeIsThirdParty={setPayerIsThirdParty}
+                variant="dark"
+              />
             )}
 
             {error && <p className="text-red-400 text-xs mb-3 font-bold flex items-center gap-1"><AlertCircle size={12}/> {error}</p>}

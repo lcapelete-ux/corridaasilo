@@ -44,6 +44,7 @@ export interface Runner {
   seniorFullPrice?: boolean; // Atleta 60+ que abriu mão da meia-inscrição para ajudar o Lar São Cristóvão
   extraDonation?: number;    // Contribuição extra opcional (ex.: 60+ que optou pela meia mas quis ajudar um valor à parte)
   note?: string;             // Observação livre do organizador (ex.: pagamento em nome de outra pessoa)
+  payerName?: string;        // Quem pagou, quando não foi o próprio atleta (vazio = pagou da própria conta)
 }
 
 export interface TeamCoupon {
@@ -74,6 +75,8 @@ export interface SponsorLogo {
   name?: string;        // rótulo/alt (opcional)
   imageData: string;    // data URL base64 do logo
   sortOrder?: number;
+  scale?: number;       // tamanho no rodapé, em % do padrão (ajuste fino do admin)
+  trimEdges?: boolean;  // apara a borda de cor uniforme do arquivo (padrão: true)
 }
 
 export interface Expense {

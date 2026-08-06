@@ -919,6 +919,122 @@ $$;
 
 grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
 
+-- 23. Quem pagou a inscrição: o próprio atleta ou outra pessoa. O atleta
+--     declara isso na hora de enviar o comprovante; o admin vê o nome do
+--     pagador na lista (útil quando o PIX chega em nome de terceiro).
+--     NULL = pagou da própria conta.
+alter table public.runners add column if not exists payer_name text;
+comment on column public.runners.payer_name is
+  'Nome de quem efetuou o pagamento, quando não foi o próprio atleta (NULL = pagou da própria conta)';
+
+-- attach_payment_proof passa a receber o nome do pagador (4º parâmetro).
+-- Mantém a exigência da autorização para menores de 18.
+drop function if exists public.attach_payment_proof(text, text);
+drop function if exists public.attach_payment_proof(text, text, text);
+drop function if exists public.attach_payment_proof(text, text, text, text);
+create or replace function public.attach_payment_proof(
+  p_cpf text,
+  p_proof text,
+  p_authorization text default null,
+  p_payer_name text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_birth date;
+  v_has_auth boolean;
+  v_is_minor boolean;
+begin
+  if p_proof is null or p_proof = '' then
+    raise exception 'Comprovante vazio';
+  end if;
+
+  select birth_date,
+         (authorization_doc is not null and authorization_doc <> '')
+    into v_birth, v_has_auth
+  from public.runners
+  where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g')
+  limit 1;
+
+  if not found then
+    raise exception 'CPF não encontrado';
+  end if;
+
+  v_is_minor := v_birth is not null
+    and extract(year from age(date '2026-09-19', v_birth)) < 18;
+
+  -- Menor de 18: exige a autorização (a nova enviada agora ou uma já anexada)
+  if v_is_minor
+     and (p_authorization is null or p_authorization = '')
+     and not coalesce(v_has_auth, false) then
+    raise exception 'Atleta menor de 18 anos: é obrigatório anexar a autorização do responsável junto com o comprovante.';
+  end if;
+
+  update public.runners
+  set payment_proof = p_proof,
+      authorization_doc = coalesce(nullif(p_authorization, ''), authorization_doc),
+      payer_name = nullif(btrim(coalesce(p_payer_name, '')), '')
+  where regexp_replace(cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+end;
+$$;
+
+grant execute on function public.attach_payment_proof(text, text, text, text) to anon, authenticated;
+
+-- find_runner_by_cpf devolve também o pagador, para a tela pública mostrar o
+-- que já foi declarado antes (quem reenvia o comprovante não perde a escolha).
+drop function if exists public.find_runner_by_cpf(text);
+create or replace function public.find_runner_by_cpf(p_cpf text)
+returns table (
+  id uuid,
+  full_name text,
+  cpf text,
+  team_name text,
+  city text,
+  is_paid boolean,
+  payment_proof text,
+  birth_date date,
+  guardian_name text,
+  has_authorization boolean,
+  paid_no_proof boolean,
+  age int,
+  coupon_code text,
+  coupon_discount numeric,
+  extra_donation numeric,
+  senior_full_price boolean,
+  payer_name text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.id, r.full_name, r.cpf, r.team_name, r.city, r.is_paid, r.payment_proof,
+         r.birth_date, r.guardian_name,
+         (r.authorization_doc is not null and r.authorization_doc <> '') as has_authorization,
+         r.paid_no_proof,
+         r.age, r.coupon_code, r.coupon_discount, r.extra_donation, r.senior_full_price,
+         r.payer_name
+  from public.runners r
+  where regexp_replace(r.cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+$$;
+
+grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
+
+-- 24. Ajuste fino dos logos do rodapé: alguns arquivos vêm com moldura/fundo
+--     embutido, então o logo aparece pequeno mesmo ocupando todo o espaço.
+--     scale = tamanho relativo (%) definido pelo admin; trim_edges = aparar
+--     automaticamente a borda de cor uniforme (bom para logo em fundo branco,
+--     ruim para logo cujo fundo colorido faz parte da marca).
+alter table public.sponsor_logos add column if not exists scale smallint not null default 100;
+alter table public.sponsor_logos add column if not exists trim_edges boolean not null default true;
+comment on column public.sponsor_logos.scale is
+  'Tamanho de exibição do logo no rodapé, em % do padrão (ajuste fino do admin)';
+comment on column public.sponsor_logos.trim_edges is
+  'Quando true, apara a borda de cor uniforme do arquivo (e_trim do Cloudinary)';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
