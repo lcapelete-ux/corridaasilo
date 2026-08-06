@@ -72,11 +72,11 @@ export const SponsorLogosManager: React.FC<SponsorLogosManagerProps> = ({ logos,
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {logos.map(logo => (
-            <div key={logo.id} className="relative group bg-white rounded-xl p-4 flex items-center justify-center min-h-[96px] shadow-sm">
+            <div key={logo.id} className="relative group bg-white rounded-xl p-4 pb-6 aspect-square flex items-center justify-center shadow-sm">
               <img
                 src={cloudinaryLogoUrl(logo.imageData)}
                 alt={logo.name || 'Patrocinador'}
-                className="max-h-16 w-auto max-w-full object-contain"
+                className="max-h-full max-w-full object-contain"
               />
               <button
                 onClick={() => { if (confirm('Remover este logo do rodapé?')) onDelete(logo.id); }}
@@ -86,7 +86,7 @@ export const SponsorLogosManager: React.FC<SponsorLogosManagerProps> = ({ logos,
                 <Trash2 size={14} />
               </button>
               {logo.name && (
-                <span className="absolute bottom-1 left-1 right-1 text-center text-[10px] text-slate-400 truncate">{logo.name}</span>
+                <span className="absolute bottom-1.5 left-1 right-1 text-center text-[10px] text-slate-400 truncate">{logo.name}</span>
               )}
             </div>
           ))}
