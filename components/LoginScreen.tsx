@@ -20,16 +20,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
     setLoading(true);
 
     try {
-      // 1. Aceita usuário OU e-mail: sem "@", resolve o e-mail pelo usuário
+      // 1. Aceita usuário OU e-mail: sem "@", resolve o e-mail pelo usuário.
+      //    Distinguir "usuário não existe" de "não consegui consultar" importa:
+      //    com o banco fora do ar os dois casos voltam vazios, e tratar tudo
+      //    como "usuário não encontrado" manda o admin caçar o problema errado.
       let loginEmail = email.trim();
       if (loginEmail && !loginEmail.includes('@')) {
-        const { data: resolved } = await supabase.rpc('get_login_email', {
+        const { data: resolved, error: rpcError } = await supabase.rpc('get_login_email', {
           p_username: loginEmail,
         });
+        if (rpcError) {
+          console.error('Falha ao resolver o usuário:', rpcError);
+          setError('Não foi possível consultar o servidor agora. Tente entrar com o e-mail completo ou tente novamente em instantes.');
+          setLoading(false);
+          return;
+        }
         if (resolved) {
           loginEmail = resolved as string;
         } else {
-          setError('Usuário não encontrado.');
+          setError('Usuário não encontrado. Confira o usuário ou entre com o e-mail completo.');
           setLoading(false);
           return;
         }
