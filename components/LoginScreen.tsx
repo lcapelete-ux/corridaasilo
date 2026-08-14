@@ -59,6 +59,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
       // 3. Busca o perfil (papel + equipe + telas liberadas) na tabela organizers.
       //    Resiliente: se a coluna permissions ainda não existe, busca sem ela.
       let profile: any = null;
+      let profileError: { code?: string; message?: string } | null = null;
       const withPerms = await supabase
         .from('organizers')
         .select('name, username, role, team_name, permissions')
@@ -71,13 +72,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
           .eq('id', authData.user.id)
           .single();
         profile = fallback.data;
+        profileError = fallback.error;
       } else {
         profile = withPerms.data;
       }
 
       if (!profile) {
         await supabase.auth.signOut();
-        setError('Login sem perfil de organizador. Fale com o administrador.');
+        // PGRST116 = a consulta funcionou e não achou linha: o perfil realmente
+        // não existe. Qualquer outro erro é falha de consulta (banco acordando,
+        // instabilidade) — dizer "sem perfil" nesse caso manda procurar o
+        // problema no lugar errado, como já aconteceu.
+        const semPerfil = !profileError || profileError.code === 'PGRST116';
+        if (semPerfil) {
+          setError('Seu login existe, mas não tem perfil de organizador cadastrado. Fale com o administrador.');
+        } else {
+          console.error('Falha ao carregar o perfil do organizador:', profileError);
+          setError('Login OK, mas não foi possível carregar seu perfil agora. Aguarde alguns instantes e tente de novo.');
+        }
         setLoading(false);
         return;
       }
