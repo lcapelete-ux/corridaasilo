@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -259,6 +259,79 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     URL.revokeObjectURL(url);
   };
 
+  // Backup em XML. Diferente do CSV (relatório, respeita os filtros e traz
+  // valores formatados para leitura), o backup leva SEMPRE todos os inscritos
+  // e os dados crus — datas ISO, números e booleanos sem formatação — para
+  // poder ser reimportado depois sem perda nem ambiguidade de formato.
+  const handleExportXML = () => {
+    // Escapa os 5 caracteres que quebram um XML bem formado
+    const x = (v: unknown): string =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+    // Só inclui a tag quando há valor: evita um arquivo cheio de tags vazias
+    const tag = (name: string, value: unknown): string =>
+      value === undefined || value === null || value === '' ? '' : `      <${name}>${x(value)}</${name}>\n`;
+
+    const geradoEm = new Date().toISOString();
+    const corpo = runners.map(r => {
+      const campos = [
+        tag('id', r.id),
+        tag('nomeCompleto', r.fullName),
+        tag('cpf', r.cpf),
+        tag('email', r.email),
+        tag('telefone', r.phone),
+        tag('dataNascimento', r.birthDate),
+        tag('idade', r.age),
+        tag('genero', r.gender),
+        tag('cidade', r.city),
+        tag('equipe', r.teamName),
+        tag('tamanhoCamiseta', r.shirtSize),
+        tag('modalidade', r.modality || '5k'),
+        tag('categoria', getRunnerCategory(r.birthDate, r.modality)),
+        tag('dataInscricao', r.registrationDate),
+        tag('pago', r.isPaid ? 'true' : 'false'),
+        tag('valorDevido', getRunnerDueValue(r, promoDeadline).toFixed(2)),
+        tag('cupomCodigo', r.couponCode),
+        tag('cupomDesconto', r.couponDiscount?.toFixed(2)),
+        tag('contribuicaoExtra', r.extraDonation?.toFixed(2)),
+        tag('apoiadorSenior', r.seniorFullPrice ? 'true' : ''),
+        tag('pagoPor', r.payerName),
+        tag('alegaTerPago', r.paidNoProof ? 'true' : ''),
+        tag('alegaTerPagoEm', r.paidNoProofAt),
+        tag('comprovanteUrl', r.paymentProof),
+        tag('nomeResponsavel', r.guardianName),
+        tag('autorizacaoUrl', r.authorizationDoc),
+        tag('kitEntregue', r.kitDelivered ? 'true' : ''),
+        tag('kitEntregueEm', r.kitDeliveredAt),
+        tag('transferidaDe', r.transferredFrom),
+        tag('transferidaEm', r.transferredAt),
+        tag('observacao', r.note),
+      ].join('');
+      return `    <inscrito>\n${campos}    </inscrito>`;
+    }).join('\n');
+
+    const xml =
+      `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<backup evento="2ª Corrida Noturna LSC" geradoEm="${x(geradoEm)}" totalInscritos="${runners.length}">\n` +
+      `  <inscritos>\n${corpo}\n  </inscritos>\n` +
+      `</backup>\n`;
+
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `backup_inscritos_${new Date().toISOString().slice(0, 10)}.xml`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const triggerUpload = (runnerId: string) => {
     setUploadingId(runnerId);
     if (fileInputRef.current) {
@@ -407,10 +480,19 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-colors"
-              title="Baixar Excel/CSV"
+              title="Baixar Excel/CSV (respeita os filtros da tela)"
             >
               <Download size={14} /> Exportar
             </button>
+            {userSession?.role === 'admin' && (
+              <button
+                onClick={handleExportXML}
+                className="flex items-center gap-2 px-3 py-1.5 bg-sky-500/10 text-sky-400 rounded-lg text-xs font-bold hover:bg-sky-500/20 transition-colors"
+                title={`Backup completo em XML — todos os ${runners.length} inscritos, com todos os campos`}
+              >
+                <Database size={14} /> Backup XML
+              </button>
+            )}
             {userSession?.role === 'admin' && (
               <button
                 onClick={() => showTransferSettings ? setShowTransferSettings(false) : openTransferSettings()}
