@@ -88,7 +88,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [categoryFilter, setCategoryFilter] = useState(''); // '' = todas as categorias
   const [modalityFilter, setModalityFilter] = useState<'' | '5k' | '3k'>('');
   const [paymentFilter, setPaymentFilter] = useState<'todos' | 'meia' | 'inteira' | 'apoiador' | 'pago' | 'pendente'>('todos');
-  const [sortBy, setSortBy] = useState<'padrao' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
+  const [sortBy, setSortBy] = useState<'padrao' | 'data_desc' | 'data_asc' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
 
   // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
   const isHalfPrice = (r: Runner) => r.age >= SENIOR_AGE && !r.seniorFullPrice;
@@ -130,6 +130,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     })
     .sort((a, b) => {
       switch (sortBy) {
+        // Data de inscrição: compara o timestamp cru (ISO), não o texto exibido
+        case 'data_desc': return new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime();
+        case 'data_asc': return new Date(a.registrationDate).getTime() - new Date(b.registrationDate).getTime();
         case 'idade_asc': return a.age - b.age;
         case 'idade_desc': return b.age - a.age;
         case 'nome': return a.fullName.localeCompare(b.fullName, 'pt-BR');
@@ -927,6 +930,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Ordenar por</label>
             <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className={filterSelectCls}>
               <option value="padrao">Ordem de inscrição</option>
+              <option value="data_desc">Data de inscrição (mais recentes)</option>
+              <option value="data_asc">Data de inscrição (mais antigos)</option>
               <option value="idade_asc">Idade (menor → maior)</option>
               <option value="idade_desc">Idade (maior → menor)</option>
               <option value="categoria">Categoria</option>
@@ -948,6 +953,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   <span className="inline-flex items-center gap-1">Equipe <span className="text-slate-600">/</span> <StickyNote size={12} className="text-slate-500" /> Obs</span>
                 </th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Inscrição</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Valor</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Pagto</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
@@ -1003,6 +1009,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                       {onUpdate && (
                         <NoteCell runner={runner} onSave={(note) => onUpdate({ ...runner, note })} />
                       )}
+                    </td>
+                    <td className="p-4 align-top">
+                      <div className="flex items-center gap-1.5 text-sm text-slate-300">
+                        <Calendar size={12} className="text-slate-500 shrink-0" />
+                        {new Date(runner.registrationDate).toLocaleDateString('pt-BR')}
+                      </div>
+                      {/* Hora ajuda a desempatar quem se inscreveu primeiro no mesmo dia */}
+                      <div className="text-[11px] text-slate-500 mt-0.5 ml-[18px]">
+                        {new Date(runner.registrationDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">
@@ -1128,7 +1144,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-600">
+                  <td colSpan={8} className="p-8 text-center text-slate-600">
                     Nenhum corredor encontrado.
                   </td>
                 </tr>
