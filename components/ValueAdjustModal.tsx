@@ -17,6 +17,7 @@ export const ValueAdjustModal: React.FC<ValueAdjustModalProps> = ({ runner, onCl
   const [discount, setDiscount] = useState(String(runner.couponDiscount || 0));
   const [extra, setExtra] = useState(String(runner.extraDonation || 0));
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const fee = getRegistrationFee(runner.age, runner.seniorFullPrice);
   const discountNum = Math.max(0, parseFloat(discount.replace(',', '.')) || 0);
@@ -26,9 +27,13 @@ export const ValueAdjustModal: React.FC<ValueAdjustModalProps> = ({ runner, onCl
 
   const handleSave = async () => {
     setSaving(true);
+    setError('');
     try {
       await onSave({ ...runner, couponDiscount: discountNum, extraDonation: extraNum });
       onClose();
+    } catch (e: any) {
+      // Sem isto o modal ficava aberto e mudo quando a gravação falhava
+      setError(e?.message || 'Não foi possível salvar. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -73,6 +78,9 @@ export const ValueAdjustModal: React.FC<ValueAdjustModalProps> = ({ runner, onCl
             <span className="font-bold text-slate-700">Valor Final</span>
             <span className="font-mono font-black text-lg text-indigo-600">R$ {fmt(finalValue)}</span>
           </div>
+          {error && (
+            <p className="text-red-600 text-xs font-bold pt-1">{error}</p>
+          )}
         </div>
 
         <div className="p-6 pt-0 flex justify-end gap-3">

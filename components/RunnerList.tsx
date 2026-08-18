@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -350,7 +350,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       const runner = runners.find(r => r.id === uploadingId);
       if (runner) {
         const updatedRunner = { ...runner, paymentProof: base64String, isPaid: runner.isPaid };
-        onUpdate(updatedRunner);
+        updateAndAlert(updatedRunner);
         if (selectedRunner?.id === uploadingId) {
           setSelectedRunner(updatedRunner);
         }
@@ -366,13 +366,80 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
   const togglePaidStatus = (runner: Runner) => {
     if (onUpdate) {
-      onUpdate({ ...runner, isPaid: !runner.isPaid });
+      updateAndAlert({ ...runner, isPaid: !runner.isPaid });
     }
   };
 
   // --- Lógica de Transferência ---
 
   const canTransfer = userSession?.role === 'admin' || canTransferNow(transferSettings);
+
+  // Salvar "solto" (sem formulário para exibir o erro): avisa por alerta, para
+  // uma falha de gravação nunca passar despercebida. Telas com formulário
+  // chamam onUpdate direto e mostram o erro no próprio modal.
+  const updateAndAlert = (runner: Runner) => {
+    if (!onUpdate) return;
+    Promise.resolve(onUpdate(runner)).catch((e: any) =>
+      alert(e?.message || 'Erro ao atualizar inscrição.')
+    );
+  };
+
+  // --- Correção de nome/CPF ---
+  // Separado da transferência de propósito: transferir significa que a vaga
+  // passou para OUTRA pessoa (marca "Transferida" e guarda o titular anterior,
+  // e depende do prazo estar aberto). Corrigir um nome digitado errado ou um
+  // dígito do CPF não é isso — não deve sujar o histórico nem esbarrar no prazo.
+  const [editRunner, setEditRunner] = useState<Runner | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCpf, setEditCpf] = useState('');
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditModal = (runner: Runner) => {
+    setEditRunner(runner);
+    setEditName(runner.fullName);
+    setEditCpf(runner.cpf);
+    setEditError('');
+  };
+
+  // Mesma máscara do formulário de inscrição, para o CPF não ficar em
+  // formatos diferentes conforme a tela em que foi digitado
+  const maskCpf = (value: string) => {
+    let v = value.replace(/\D/g, '').slice(0, 11);
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    return v;
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editRunner || !onUpdate) return;
+
+    const nome = editName.trim();
+    const cpf = editCpf.trim();
+    if (!nome) { setEditError('O nome não pode ficar vazio.'); return; }
+    if (cpf.replace(/\D/g, '').length !== 11) { setEditError('CPF incompleto.'); return; }
+
+    if (nome === editRunner.fullName && cpf === editRunner.cpf) {
+      setEditRunner(null);
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      // Só nome e CPF. Nada de transferredFrom/transferredAt: é correção,
+      // não troca de titular.
+      await onUpdate({ ...editRunner, fullName: nome, cpf });
+      setEditRunner(null);
+    } catch (err: any) {
+      // O banco tem CPF único — digitar um CPF já usado cai aqui
+      setEditError(err?.message || 'Não foi possível salvar. Tente novamente.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const openTransferModal = (runner: Runner) => {
     if (!canTransfer) return;
@@ -423,7 +490,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     };
 
     if (confirm(`Confirma a transferência da inscrição para ${updatedRunner.fullName}?`)) {
-      onUpdate(updatedRunner);
+      updateAndAlert(updatedRunner);
       setTransferRunner(null);
       setTransferData({});
       if (holderChanged) {
@@ -1007,7 +1074,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         👕 {runner.shirtSize}
                       </div>
                       {onUpdate && (
-                        <NoteCell runner={runner} onSave={(note) => onUpdate({ ...runner, note })} />
+                        <NoteCell runner={runner} onSave={(note) => updateAndAlert({ ...runner, note })} />
                       )}
                     </td>
                     <td className="p-4 align-top">
@@ -1092,6 +1159,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {canEditFinancials && onUpdate && (
+                          <button
+                            onClick={() => openEditModal(runner)}
+                            className="p-2 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                            title="Corrigir nome/CPF (não é transferência)"
+                          >
+                            <UserCog size={18} />
+                          </button>
+                        )}
+
                         {(userSession?.role === 'admin' || userSession?.role === 'team_leader') && (
                           canTransfer ? (
                             <button
@@ -1249,6 +1326,72 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           onClose={() => setValueAdjustRunner(null)}
           onSave={onUpdate}
         />
+      )}
+
+      {/* MODAL DE CORREÇÃO DE NOME/CPF */}
+      {editRunner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+            <div className="bg-sky-600 p-6 flex justify-between items-center text-white">
+              <h3 className="font-bold text-xl flex items-center gap-2">
+                <UserCog size={20} /> Corrigir Dados
+              </h3>
+              <button onClick={() => setEditRunner(null)} className="hover:text-sky-200">
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div className="bg-sky-50 p-3 rounded-lg text-sm text-sky-900">
+                Use para corrigir <strong>erro de digitação</strong> do próprio atleta.
+                <div className="text-sky-700/80 text-xs mt-1">
+                  A inscrição <strong>não</strong> será marcada como transferida. Se a vaga
+                  passou para outra pessoa, use o botão de transferência (↔).
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Nome completo</label>
+                <input
+                  value={editName}
+                  onChange={(e) => { setEditName(e.target.value); setEditError(''); }}
+                  className={transferInputCls}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">CPF</label>
+                <input
+                  value={editCpf}
+                  inputMode="numeric"
+                  onChange={(e) => { setEditCpf(maskCpf(e.target.value)); setEditError(''); }}
+                  placeholder="000.000.000-00"
+                  className={`${transferInputCls} font-mono`}
+                />
+              </div>
+
+              {editError && (
+                <p className="text-red-600 text-xs font-bold flex items-center gap-1">
+                  <AlertCircle size={12} /> {editError}
+                </p>
+              )}
+
+              <div className="pt-3 flex justify-end gap-3 border-t border-slate-100">
+                <button type="button" onClick={() => setEditRunner(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700 flex items-center gap-2 disabled:opacity-60"
+                >
+                  <Save size={17} /> {savingEdit ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* MODAL DE RELATÓRIO COMPLETO */}

@@ -448,13 +448,13 @@ const App: React.FC = () => {
     return true;
   };
 
+  // Propaga o erro em vez de só alertar: as telas com formulário (correção de
+  // nome/CPF, ajuste de valor) precisam saber que a gravação falhou para não
+  // fechar o modal como se tivesse dado certo — ex.: CPF já usado por outro
+  // inscrito. Quem chama sem tratar erro alerta por conta própria.
   const handleUpdateRunner = async (runner: Runner) => {
-    try {
-      await updateRunner(runner);
-      await refreshRunners();
-    } catch (e: any) {
-      alert(e?.message || 'Erro ao atualizar inscrição.');
-    }
+    await updateRunner(runner);
+    await refreshRunners();
   };
 
   const handleDeleteRunner = async (id: string) => {
