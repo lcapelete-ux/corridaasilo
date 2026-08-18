@@ -20,16 +20,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
     setLoading(true);
 
     try {
-      // 1. Aceita usuário OU e-mail: sem "@", resolve o e-mail pelo usuário
+      // 1. Aceita usuário OU e-mail: sem "@", resolve o e-mail pelo usuário.
+      //    Distinguir "usuário não existe" de "não consegui consultar" importa:
+      //    com o banco fora do ar os dois casos voltam vazios, e tratar tudo
+      //    como "usuário não encontrado" manda o admin caçar o problema errado.
       let loginEmail = email.trim();
       if (loginEmail && !loginEmail.includes('@')) {
-        const { data: resolved } = await supabase.rpc('get_login_email', {
+        const { data: resolved, error: rpcError } = await supabase.rpc('get_login_email', {
           p_username: loginEmail,
         });
+        if (rpcError) {
+          console.error('Falha ao resolver o usuário:', rpcError);
+          setError('Não foi possível consultar o servidor agora. Tente entrar com o e-mail completo ou tente novamente em instantes.');
+          setLoading(false);
+          return;
+        }
         if (resolved) {
           loginEmail = resolved as string;
         } else {
-          setError('Usuário não encontrado.');
+          setError('Usuário não encontrado. Confira o usuário ou entre com o e-mail completo.');
           setLoading(false);
           return;
         }
@@ -50,6 +59,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
       // 3. Busca o perfil (papel + equipe + telas liberadas) na tabela organizers.
       //    Resiliente: se a coluna permissions ainda não existe, busca sem ela.
       let profile: any = null;
+      let profileError: { code?: string; message?: string } | null = null;
       const withPerms = await supabase
         .from('organizers')
         .select('name, username, role, team_name, permissions')
@@ -62,13 +72,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack }) => 
           .eq('id', authData.user.id)
           .single();
         profile = fallback.data;
+        profileError = fallback.error;
       } else {
         profile = withPerms.data;
       }
 
       if (!profile) {
         await supabase.auth.signOut();
-        setError('Login sem perfil de organizador. Fale com o administrador.');
+        // PGRST116 = a consulta funcionou e não achou linha: o perfil realmente
+        // não existe. Qualquer outro erro é falha de consulta (banco acordando,
+        // instabilidade) — dizer "sem perfil" nesse caso manda procurar o
+        // problema no lugar errado, como já aconteceu.
+        const semPerfil = !profileError || profileError.code === 'PGRST116';
+        if (semPerfil) {
+          setError('Seu login existe, mas não tem perfil de organizador cadastrado. Fale com o administrador.');
+        } else {
+          console.error('Falha ao carregar o perfil do organizador:', profileError);
+          setError('Login OK, mas não foi possível carregar seu perfil agora. Aguarde alguns instantes e tente de novo.');
+        }
         setLoading(false);
         return;
       }

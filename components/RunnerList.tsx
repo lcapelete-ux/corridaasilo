@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -88,7 +88,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [categoryFilter, setCategoryFilter] = useState(''); // '' = todas as categorias
   const [modalityFilter, setModalityFilter] = useState<'' | '5k' | '3k'>('');
   const [paymentFilter, setPaymentFilter] = useState<'todos' | 'meia' | 'inteira' | 'apoiador' | 'pago' | 'pendente'>('todos');
-  const [sortBy, setSortBy] = useState<'padrao' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
+  const [sortBy, setSortBy] = useState<'padrao' | 'data_desc' | 'data_asc' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
 
   // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
   const isHalfPrice = (r: Runner) => r.age >= SENIOR_AGE && !r.seniorFullPrice;
@@ -130,6 +130,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     })
     .sort((a, b) => {
       switch (sortBy) {
+        // Data de inscrição: compara o timestamp cru (ISO), não o texto exibido
+        case 'data_desc': return new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime();
+        case 'data_asc': return new Date(a.registrationDate).getTime() - new Date(b.registrationDate).getTime();
         case 'idade_asc': return a.age - b.age;
         case 'idade_desc': return b.age - a.age;
         case 'nome': return a.fullName.localeCompare(b.fullName, 'pt-BR');
@@ -255,6 +258,79 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     link.click();
     
     // Limpeza
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Backup em XML. Diferente do CSV (relatório, respeita os filtros e traz
+  // valores formatados para leitura), o backup leva SEMPRE todos os inscritos
+  // e os dados crus — datas ISO, números e booleanos sem formatação — para
+  // poder ser reimportado depois sem perda nem ambiguidade de formato.
+  const handleExportXML = () => {
+    // Escapa os 5 caracteres que quebram um XML bem formado
+    const x = (v: unknown): string =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+    // Só inclui a tag quando há valor: evita um arquivo cheio de tags vazias
+    const tag = (name: string, value: unknown): string =>
+      value === undefined || value === null || value === '' ? '' : `      <${name}>${x(value)}</${name}>\n`;
+
+    const geradoEm = new Date().toISOString();
+    const corpo = runners.map(r => {
+      const campos = [
+        tag('id', r.id),
+        tag('nomeCompleto', r.fullName),
+        tag('cpf', r.cpf),
+        tag('email', r.email),
+        tag('telefone', r.phone),
+        tag('dataNascimento', r.birthDate),
+        tag('idade', r.age),
+        tag('genero', r.gender),
+        tag('cidade', r.city),
+        tag('equipe', r.teamName),
+        tag('tamanhoCamiseta', r.shirtSize),
+        tag('modalidade', r.modality || '5k'),
+        tag('categoria', getRunnerCategory(r.birthDate, r.modality)),
+        tag('dataInscricao', r.registrationDate),
+        tag('pago', r.isPaid ? 'true' : 'false'),
+        tag('valorDevido', getRunnerDueValue(r, promoDeadline).toFixed(2)),
+        tag('cupomCodigo', r.couponCode),
+        tag('cupomDesconto', r.couponDiscount?.toFixed(2)),
+        tag('contribuicaoExtra', r.extraDonation?.toFixed(2)),
+        tag('apoiadorSenior', r.seniorFullPrice ? 'true' : ''),
+        tag('pagoPor', r.payerName),
+        tag('alegaTerPago', r.paidNoProof ? 'true' : ''),
+        tag('alegaTerPagoEm', r.paidNoProofAt),
+        tag('comprovanteUrl', r.paymentProof),
+        tag('nomeResponsavel', r.guardianName),
+        tag('autorizacaoUrl', r.authorizationDoc),
+        tag('kitEntregue', r.kitDelivered ? 'true' : ''),
+        tag('kitEntregueEm', r.kitDeliveredAt),
+        tag('transferidaDe', r.transferredFrom),
+        tag('transferidaEm', r.transferredAt),
+        tag('observacao', r.note),
+      ].join('');
+      return `    <inscrito>\n${campos}    </inscrito>`;
+    }).join('\n');
+
+    const xml =
+      `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<backup evento="2ª Corrida Noturna LSC" geradoEm="${x(geradoEm)}" totalInscritos="${runners.length}">\n` +
+      `  <inscritos>\n${corpo}\n  </inscritos>\n` +
+      `</backup>\n`;
+
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `backup_inscritos_${new Date().toISOString().slice(0, 10)}.xml`);
+    document.body.appendChild(link);
+    link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
@@ -407,10 +483,19 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-500/20 transition-colors"
-              title="Baixar Excel/CSV"
+              title="Baixar Excel/CSV (respeita os filtros da tela)"
             >
               <Download size={14} /> Exportar
             </button>
+            {userSession?.role === 'admin' && (
+              <button
+                onClick={handleExportXML}
+                className="flex items-center gap-2 px-3 py-1.5 bg-sky-500/10 text-sky-400 rounded-lg text-xs font-bold hover:bg-sky-500/20 transition-colors"
+                title={`Backup completo em XML — todos os ${runners.length} inscritos, com todos os campos`}
+              >
+                <Database size={14} /> Backup XML
+              </button>
+            )}
             {userSession?.role === 'admin' && (
               <button
                 onClick={() => showTransferSettings ? setShowTransferSettings(false) : openTransferSettings()}
@@ -845,6 +930,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Ordenar por</label>
             <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className={filterSelectCls}>
               <option value="padrao">Ordem de inscrição</option>
+              <option value="data_desc">Data de inscrição (mais recentes)</option>
+              <option value="data_asc">Data de inscrição (mais antigos)</option>
               <option value="idade_asc">Idade (menor → maior)</option>
               <option value="idade_desc">Idade (maior → menor)</option>
               <option value="categoria">Categoria</option>
@@ -866,6 +953,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   <span className="inline-flex items-center gap-1">Equipe <span className="text-slate-600">/</span> <StickyNote size={12} className="text-slate-500" /> Obs</span>
                 </th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Inscrição</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Valor</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Pagto</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
@@ -921,6 +1009,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                       {onUpdate && (
                         <NoteCell runner={runner} onSave={(note) => onUpdate({ ...runner, note })} />
                       )}
+                    </td>
+                    <td className="p-4 align-top">
+                      <div className="flex items-center gap-1.5 text-sm text-slate-300">
+                        <Calendar size={12} className="text-slate-500 shrink-0" />
+                        {new Date(runner.registrationDate).toLocaleDateString('pt-BR')}
+                      </div>
+                      {/* Hora ajuda a desempatar quem se inscreveu primeiro no mesmo dia */}
+                      <div className="text-[11px] text-slate-500 mt-0.5 ml-[18px]">
+                        {new Date(runner.registrationDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">
@@ -1046,7 +1144,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-600">
+                  <td colSpan={8} className="p-8 text-center text-slate-600">
                     Nenhum corredor encontrado.
                   </td>
                 </tr>
