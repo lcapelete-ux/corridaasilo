@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck, QrCode, Copy, Check, Tag } from 'lucide-react';
+import { ArrowLeft, Search, Upload, CheckCircle, FileText, User, AlertCircle, Clock, Eye, ShieldAlert, ShieldCheck, QrCode, Copy, Check, Tag, Megaphone } from 'lucide-react';
 import { findRunnerByCpf, attachPaymentProof, reportPaidWithoutProof } from '../services/storageService';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
 import { isMinorAtEvent, getRunnerDueValue, getRunnerPaidValue, formatBrDate } from '../constants';
@@ -261,6 +261,19 @@ export const ProofUploadScreen: React.FC<ProofUploadScreenProps> = ({ onBack, pr
                 </p>
               </div>
             </div>
+
+            {/* Recado da organização para este atleta (ex.: valor atualizado
+                para o 2º lote porque o cupom do 1º venceu antes do pagamento).
+                Vem antes do valor de propósito: explica o número que ele vê. */}
+            {runner.paymentNotice && (
+              <div className="rounded-xl p-4 mb-4 border bg-violet-500/10 border-violet-500/30 flex items-start gap-3">
+                <Megaphone size={18} className="text-violet-300 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs uppercase font-bold text-violet-300/80 mb-1">Recado da Organização</p>
+                  <p className="text-sm text-violet-100/90 leading-relaxed whitespace-pre-line">{runner.paymentNotice}</p>
+                </div>
+              </div>
+            )}
 
             {/* Valor a pagar + PIX (só quando ainda não pago) */}
             {!isPaid && canShowValue && (

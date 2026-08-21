@@ -585,13 +585,12 @@ const App: React.FC = () => {
     }
   };
 
+  // Propaga o erro em vez de só alertar: a mudança de desconto em massa precisa
+  // saber quais cupons não gravaram para dizer exatamente quais falharam, em
+  // vez de disparar um alert por cupom. Quem chama sem tratar avisa por conta.
   const handleUpdateCoupon = async (coupon: TeamCoupon) => {
-    try {
-      await updateCoupon(coupon);
-      setCoupons(await getCoupons());
-    } catch (e: any) {
-      alert(e?.message || 'Erro ao atualizar cupom.');
-    }
+    await updateCoupon(coupon);
+    setCoupons(await getCoupons());
   };
 
   const handleDeleteCoupon = async (id: string) => {

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -94,6 +94,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   // Só faz sentido depois que o prazo passou; antes disso ainda dá tempo.
   const isPromoPending = (r: Runner): boolean => {
     if (!promoDeadline || r.isPaid) return false;
+    // Quem já teve o valor acertado à mão sai da lista: senão o admin reajusta
+    // as mesmas pessoas toda vez que abre o filtro.
+    if (r.valueAdjusted) return false;
     const hoje = new Date().toISOString().split('T')[0];
     if (hoje <= promoDeadline) return false;
     return r.registrationDate.split('T')[0] <= promoDeadline;
@@ -399,6 +402,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkValue, setBulkValue] = useState('');
+  const [bulkNotice, setBulkNotice] = useState('');
   const [bulkError, setBulkError] = useState('');
   const [bulkProgress, setBulkProgress] = useState<{ feitos: number; total: number } | null>(null);
 
@@ -410,8 +414,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     });
   };
 
+  // Recado sugerido: o caso real é sempre o mesmo (cupom do 1º lote venceu sem
+  // o pagamento), então já vem escrito — o admin só ajusta o que quiser.
+  const AVISO_SUGERIDO =
+    'Sua inscrição foi feita com o cupom de desconto do 1º lote, mas o pagamento não foi '
+    + 'realizado até o fim do prazo promocional. Por isso o valor foi atualizado para o 2º lote. '
+    + 'Faça o PIX pelo valor indicado acima e envie o comprovante por aqui mesmo.';
+
   const openBulk = () => {
     setBulkValue('');
+    setBulkNotice(AVISO_SUGERIDO);
     setBulkError('');
     setBulkProgress(null);
     setBulkOpen(true);
@@ -440,6 +452,12 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         ...r,
         couponDiscount: alvo < base ? Math.round((base - alvo) * 100) / 100 : 0,
         extraDonation: alvo > base ? Math.round((alvo - base) * 100) / 100 : 0,
+        // Marca o valor como definido à mão: assim ele vale como está e não é
+        // recalculado quando o prazo do lote promocional vence.
+        valueAdjusted: true,
+        // Recado que o atleta vê ao consultar o CPF. Em branco apaga o aviso
+        // anterior — mudar o valor de novo sem explicar seria pior.
+        paymentNotice: bulkNotice.trim(),
       };
       try {
         await onUpdate(atualizado);
@@ -1166,6 +1184,21 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           <ArrowRightLeft size={10} /> Transferida
                         </span>
                       )}
+                      {/* Aviso que o atleta vê ao consultar o CPF — clicável para tirar
+                          quando não fizer mais sentido (ex.: já pagou o novo valor) */}
+                      {runner.paymentNotice && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Aviso mostrado a ${runner.fullName}:\n\n"${runner.paymentNotice}"\n\nRemover esse aviso?`)) {
+                              updateAndAlert({ ...runner, paymentNotice: '' });
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 mt-1 ml-1 bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors"
+                          title={`Aviso na tela do atleta: ${runner.paymentNotice}`}
+                        >
+                          <Megaphone size={10} /> Com aviso
+                        </button>
+                      )}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1 text-sm text-slate-300">
@@ -1472,8 +1505,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-              <div className="bg-indigo-600 p-6 flex justify-between items-center text-white">
+            <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+              <div className="bg-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
                 <h3 className="font-bold text-xl flex items-center gap-2">
                   <Pencil size={20} /> Ajustar Valor em Lote
                 </h3>
@@ -1482,11 +1515,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 </button>
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 overflow-y-auto">
                 <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-900">
                   Definindo o valor de <strong>{alvos.length} {alvos.length === 1 ? 'atleta' : 'atletas'}</strong>.
                   <div className="text-indigo-700/80 text-xs mt-1">
-                    O valor digitado passa a ser o total devido por cada um deles.
+                    O valor digitado passa a ser o total devido por cada um deles, e o aviso abaixo aparece para todos quando consultarem o CPF.
                   </div>
                 </div>
 
@@ -1520,6 +1553,52 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                   </p>
                 )}
 
+                {/* Recado que aparece pro atleta quando ele consulta o CPF.
+                    Sem isso ele vê o valor mudar do nada e liga pra organização. */}
+                <div className="pt-3 border-t border-slate-100">
+                  <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <MessageSquare size={15} className="text-indigo-500" />
+                    Aviso para o atleta
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Aparece na tela <strong>&ldquo;Minha Inscrição&rdquo;</strong> quando o atleta digitar o CPF para enviar o comprovante.
+                    Deixe em branco para não mostrar nenhum aviso.
+                  </p>
+                  <textarea
+                    rows={5}
+                    value={bulkNotice}
+                    onChange={(e) => { setBulkNotice(e.target.value); setBulkError(''); }}
+                    disabled={!!bulkProgress}
+                    placeholder="Ex: o cupom do 1º lote venceu antes do pagamento, então o valor passou para o 2º lote."
+                    className={`${transferInputCls} text-sm leading-relaxed resize-none`}
+                  />
+                  <div className="flex justify-between items-center mt-1.5">
+                    <span className="text-[11px] text-slate-400">{bulkNotice.trim().length} caracteres</span>
+                    <div className="flex gap-2">
+                      {bulkNotice !== AVISO_SUGERIDO && (
+                        <button
+                          type="button"
+                          onClick={() => setBulkNotice(AVISO_SUGERIDO)}
+                          disabled={!!bulkProgress}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                        >
+                          Usar texto sugerido
+                        </button>
+                      )}
+                      {bulkNotice.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setBulkNotice('')}
+                          disabled={!!bulkProgress}
+                          className="text-[11px] font-bold text-slate-400 hover:text-red-500 disabled:opacity-50"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {bulkProgress && (
                   <p className="text-sm text-slate-600 font-bold">
                     Salvando… {bulkProgress.feitos} de {bulkProgress.total}
@@ -1531,7 +1610,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 )}
               </div>
 
-              <div className="p-6 pt-0 flex justify-end gap-3">
+              <div className="p-6 pt-4 flex justify-end gap-3 border-t border-slate-100 bg-white shrink-0">
                 <button
                   onClick={() => setBulkOpen(false)}
                   disabled={!!bulkProgress}

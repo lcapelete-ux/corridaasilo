@@ -1035,6 +1035,66 @@ comment on column public.sponsor_logos.scale is
 comment on column public.sponsor_logos.trim_edges is
   'Quando true, apara a borda de cor uniforme do arquivo (e_trim do Cloudinary)';
 
+-- 25. Recado do organizador para um inscrito específico. Nasceu do ajuste de
+--     valor em lote: quem se inscreveu com o cupom do 1º lote e não pagou até
+--     o fim do prazo tem o valor atualizado para o 2º lote — e precisa saber
+--     por quê. O texto é escrito pelo admin na hora do ajuste e aparece na
+--     tela "Minha Inscrição", quando o atleta digita o CPF para mandar o
+--     comprovante. Vazio/null = nenhum aviso.
+alter table public.runners add column if not exists payment_notice text;
+comment on column public.runners.payment_notice is
+  'Recado do organizador exibido ao atleta na tela pública de comprovante (ex.: motivo da mudança de valor)';
+
+-- Valor acertado à mão pelo organizador (ajuste individual ou em lote). O
+-- desconto guardado deixa de ser "desconto de cupom" e passa a ser o valor
+-- combinado: não vence junto com o lote promocional, senão um ajuste para
+-- menos feito depois do prazo sumiria na hora de mostrar quanto ele deve.
+alter table public.runners add column if not exists value_adjusted boolean not null default false;
+comment on column public.runners.value_adjusted is
+  'true = valor definido manualmente pelo organizador; não é recalculado pelo vencimento do lote promocional';
+
+-- find_runner_by_cpf devolve o recado junto com o resto, para a tela pública
+-- mostrar o aviso antes do valor a pagar.
+drop function if exists public.find_runner_by_cpf(text);
+create or replace function public.find_runner_by_cpf(p_cpf text)
+returns table (
+  id uuid,
+  full_name text,
+  cpf text,
+  team_name text,
+  city text,
+  is_paid boolean,
+  payment_proof text,
+  birth_date date,
+  guardian_name text,
+  has_authorization boolean,
+  paid_no_proof boolean,
+  age int,
+  coupon_code text,
+  coupon_discount numeric,
+  extra_donation numeric,
+  senior_full_price boolean,
+  payer_name text,
+  payment_notice text,
+  value_adjusted boolean
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.id, r.full_name, r.cpf, r.team_name, r.city, r.is_paid, r.payment_proof,
+         r.birth_date, r.guardian_name,
+         (r.authorization_doc is not null and r.authorization_doc <> '') as has_authorization,
+         r.paid_no_proof,
+         r.age, r.coupon_code, r.coupon_discount, r.extra_donation, r.senior_full_price,
+         r.payer_name, r.payment_notice, r.value_adjusted
+  from public.runners r
+  where regexp_replace(r.cpf, '\D', '', 'g') = regexp_replace(p_cpf, '\D', '', 'g');
+$$;
+
+grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
