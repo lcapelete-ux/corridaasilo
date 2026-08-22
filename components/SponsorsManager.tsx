@@ -3,13 +3,14 @@ import React, { useState, useRef } from 'react';
 import { Sponsor, SponsorType } from '../types';
 import { prepareProofFile, migrateBase64ToCloudinary } from '../services/imageUtils';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend } from '../services/printReport';
-import { EVENT_DATE, formatBrDate } from '../constants';
-import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase, FileDown } from 'lucide-react';
+import { EVENT_DATE, formatBrDate, getSponsorPaidAmount, getSponsorBalance, isSponsorSettled } from '../constants';
+import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase, FileDown, Wallet } from 'lucide-react';
+import { SponsorPaymentsModal } from './SponsorPaymentsModal';
 
 interface SponsorsManagerProps {
   sponsors: Sponsor[];
   onSave: (sponsor: Sponsor) => void;
-  onUpdate: (sponsor: Sponsor) => void;
+  onUpdate: (sponsor: Sponsor) => Promise<void> | void;
   onDelete: (id: string) => void;
   raceGroupName?: string;
 }
@@ -105,37 +106,73 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
     setIsFormVisible(false);
   };
 
+  // Patrocinador com parcelas lançadas: o status vem do que já entrou, então o
+  // atalho de marcar/desmarcar sairia do lugar — abre o controle de parcelas.
+  const [paymentsSponsor, setPaymentsSponsor] = useState<Sponsor | null>(null);
+
   const togglePaymentStatus = (sponsor: Sponsor) => {
-    onUpdate({ ...sponsor, isPaid: !sponsor.isPaid });
+    if (sponsor.installments?.length) {
+      setPaymentsSponsor(sponsor);
+      return;
+    }
+    Promise.resolve(onUpdate({ ...sponsor, isPaid: !sponsor.isPaid }))
+      .catch((e: any) => alert(e?.message || 'Erro ao atualizar patrocinador.'));
   };
 
-  const totalRevenue = sponsors.reduce((acc, curr) => acc + (curr.isPaid ? curr.amount : 0), 0);
+  // Receita = o que efetivamente entrou (parcelas lançadas, ou o valor cheio
+  // de quem está marcado como pago à vista)
+  const totalRevenue = sponsors.reduce((acc, curr) => acc + getSponsorPaidAmount(curr), 0);
   const potentialRevenue = sponsors.reduce((acc, curr) => acc + curr.amount, 0);
 
   const generatePdf = () => {
     const fmtMoney = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
     const dataStr = new Date().toLocaleString('pt-BR');
-    const paid = sponsors.filter(s => s.isPaid);
-    const pending = sponsors.filter(s => !s.isPaid);
+    const paid = sponsors.filter(s => isSponsorSettled(s));
+    const pending = sponsors.filter(s => !isSponsorSettled(s));
+    const partial = pending.filter(s => getSponsorPaidAmount(s) > 0);
     const pendingTotal = potentialRevenue - totalRevenue;
 
+    // Rótulo do status: quem está pagando parcelado aparece como tal, com o
+    // número de parcelas já lançadas
+    const statusLabel = (s: Sponsor) => {
+      if (isSponsorSettled(s)) return '✓ PAGO';
+      const n = s.installments?.length || 0;
+      return n > 0 ? `◐ PARCIAL (${n}x)` : '✗ PENDENTE';
+    };
+
     // Ordena: pendentes primeiro (é o que precisa de ação), depois por valor
-    const ordered = [...sponsors].sort((a, b) =>
-      (a.isPaid === b.isPaid) ? b.amount - a.amount : (a.isPaid ? 1 : -1)
-    );
+    const ordered = [...sponsors].sort((a, b) => {
+      const pa = isSponsorSettled(a), pb = isSponsorSettled(b);
+      return pa === pb ? b.amount - a.amount : (pa ? 1 : -1);
+    });
 
     const rows = ordered.map(s => `
       <tr>
         <td>${esc(s.name)}</td>
         <td>${esc(s.type)}${s.position && s.position !== 'N/A' ? ` · ${esc(s.position)}` : ''}</td>
         <td class="total-col">${esc(fmtMoney(s.amount))}</td>
-        <td class="size ${s.isPaid ? 'status-pago' : 'status-pendente'}">${s.isPaid ? '✓ PAGO' : '✗ PENDENTE'}</td>
+        <td class="total-col">${esc(fmtMoney(getSponsorPaidAmount(s)))}</td>
+        <td class="total-col">${getSponsorBalance(s) > 0 ? esc(fmtMoney(getSponsorBalance(s))) : '—'}</td>
+        <td class="size ${isSponsorSettled(s) ? 'status-pago' : 'status-pendente'}">${statusLabel(s)}</td>
         <td class="size">${s.receiptImage ? 'Sim' : '—'}</td>
       </tr>`).join('');
 
+    // Detalhe das parcelas: o organizador precisa ver o que já entrou de quem
+    // ainda não quitou, para saber o que cobrar
+    const partialRows = partial
+      .sort((a, b) => getSponsorBalance(b) - getSponsorBalance(a))
+      .map(s => `
+        <tr>
+          <td>${esc(s.name)}</td>
+          <td>${(s.installments || []).map(p => `${esc(formatBrDate(p.date, true))} — ${esc(fmtMoney(p.amount))}${p.note ? ` (${esc(p.note)})` : ''}`).join('<br>')}</td>
+          <td class="total-col">${esc(fmtMoney(getSponsorPaidAmount(s)))}</td>
+          <td class="total-col">${esc(fmtMoney(getSponsorBalance(s)))}</td>
+        </tr>`)
+      .join('');
+
     const pendingRows = pending
-      .sort((a, b) => b.amount - a.amount)
-      .map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.type)}</td><td class="total-col">${esc(fmtMoney(s.amount))}</td></tr>`)
+      .sort((a, b) => getSponsorBalance(b) - getSponsorBalance(a))
+      .map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.type)}</td><td class="total-col">${esc(fmtMoney(getSponsorBalance(s)))}</td></tr>`)
       .join('');
 
     const statusSegments = [
@@ -176,10 +213,19 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
 
       ${pendingRows ? `
       <div class="section-card pending-card">
-        <div class="section-title">⚠️ Pendentes de pagamento (${pending.length}) — ${esc(fmtMoney(pendingTotal))}</div>
+        <div class="section-title">⚠️ Falta receber (${pending.length}) — ${esc(fmtMoney(pendingTotal))}</div>
         <table>
-          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Valor</th></tr></thead>
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Saldo a receber</th></tr></thead>
           <tbody>${pendingRows}</tbody>
+        </table>
+      </div>` : ''}
+
+      ${partialRows ? `
+      <div class="section-card">
+        <div class="section-title">📆 Pagamentos parcelados em andamento (${partial.length})</div>
+        <table>
+          <thead><tr><th>Patrocinador</th><th>Parcelas recebidas</th><th class="size">Recebido</th><th class="size">Saldo</th></tr></thead>
+          <tbody>${partialRows}</tbody>
         </table>
       </div>` : ''}
 
@@ -189,11 +235,12 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
           <thead>
             <tr>
               <th>Patrocinador</th><th>Tipo / Posição</th>
-              <th class="size">Valor</th><th class="size">Status</th><th class="size">Comprovante</th>
+              <th class="size">Combinado</th><th class="size">Recebido</th><th class="size">Saldo</th>
+              <th class="size">Status</th><th class="size">Comprovante</th>
             </tr>
           </thead>
-          <tbody>${rows || '<tr><td colspan="5">Nenhum patrocinador cadastrado.</td></tr>'}</tbody>
-          ${sponsors.length > 0 ? `<tfoot><tr><td colspan="2">TOTAL</td><td class="total-col">${esc(fmtMoney(potentialRevenue))}</td><td colspan="2"></td></tr></tfoot>` : ''}
+          <tbody>${rows || '<tr><td colspan="7">Nenhum patrocinador cadastrado.</td></tr>'}</tbody>
+          ${sponsors.length > 0 ? `<tfoot><tr><td colspan="2">TOTAL</td><td class="total-col">${esc(fmtMoney(potentialRevenue))}</td><td class="total-col">${esc(fmtMoney(totalRevenue))}</td><td class="total-col">${esc(fmtMoney(pendingTotal))}</td><td colspan="2"></td></tr></tfoot>` : ''}
         </table>
       </div>
     `;
@@ -372,6 +419,7 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Patrocinador</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Tipo/Posição</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Valor</th>
+                <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Recebido</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Comprovante</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase text-right">Ações</th>
@@ -379,9 +427,15 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {sponsors.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-slate-600">Nenhum patrocinador cadastrado.</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-slate-600">Nenhum patrocinador cadastrado.</td></tr>
               ) : (
-                sponsors.map(sponsor => (
+                sponsors.map(sponsor => {
+                  const recebido = getSponsorPaidAmount(sponsor);
+                  const saldo = getSponsorBalance(sponsor);
+                  const quitado = isSponsorSettled(sponsor);
+                  const parcelas = sponsor.installments?.length || 0;
+                  const pctPago = sponsor.amount > 0 ? Math.min(100, Math.round((recebido / sponsor.amount) * 100)) : 0;
+                  return (
                   <tr key={sponsor.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="p-4 font-medium text-white">{sponsor.name}</td>
                     <td className="p-4 text-sm text-slate-400">
@@ -389,6 +443,22 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
                       {sponsor.position && sponsor.position !== 'N/A' && <span className="text-xs">{sponsor.position}</span>}
                     </td>
                     <td className="p-4 font-mono font-medium text-slate-300">R$ {sponsor.amount.toFixed(2)}</td>
+                    <td className="p-4 min-w-[160px]">
+                      <div className="font-mono text-sm text-emerald-400 font-medium">
+                        R$ {recebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                      {parcelas > 0 && (
+                        <>
+                          <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden mt-1.5">
+                            <div className={`h-full rounded-full ${quitado ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pctPago}%` }} />
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-1">
+                            {parcelas} {parcelas === 1 ? 'parcela' : 'parcelas'}
+                            {saldo > 0 && <> · faltam <span className="text-amber-400 font-medium">R$ {saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></>}
+                          </div>
+                        </>
+                      )}
+                    </td>
                     <td className="p-4">
                       {sponsor.receiptImage ? (
                         <div className="group relative">
@@ -404,27 +474,47 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
                     <td className="p-4">
                       <button
                         onClick={() => togglePaymentStatus(sponsor)}
+                        title={parcelas > 0 ? 'Ver e lançar parcelas' : 'Marcar como pago/pendente'}
                         className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                          sponsor.isPaid
+                          quitado
                             ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                            : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                            : parcelas > 0
+                              ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                              : 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
                         }`}
                       >
-                        {sponsor.isPaid ? 'PAGO' : 'PENDENTE'}
+                        {quitado ? 'PAGO' : parcelas > 0 ? 'PARCIAL' : 'PENDENTE'}
                       </button>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => setPaymentsSponsor(sponsor)}
+                        className="text-slate-500 hover:text-emerald-400 p-2 rounded hover:bg-emerald-500/10 transition-all"
+                        title="Lançar pagamento parcelado"
+                      >
+                        <Wallet size={16} />
+                      </button>
                       <button onClick={() => onDelete(sponsor.id)} className="text-slate-600 hover:text-red-400 p-2 rounded hover:bg-red-500/10 transition-all">
                         <Trash2 size={16} />
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {paymentsSponsor && (
+        <SponsorPaymentsModal
+          // Reabre já com o que o parent recarregou depois do último lançamento
+          sponsor={sponsors.find(s => s.id === paymentsSponsor.id) || paymentsSponsor}
+          onClose={() => setPaymentsSponsor(null)}
+          onSave={onUpdate}
+        />
+      )}
     </div>
   );
 };

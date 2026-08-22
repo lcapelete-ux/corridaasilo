@@ -313,6 +313,15 @@ const sponsorFromRow = (s: SponsorRow): Sponsor => ({
   position: s.position || undefined,
   isPaid: s.is_paid,
   receiptImage: s.receipt_image || undefined,
+  // jsonb: normaliza os números, que podem voltar como texto
+  installments: Array.isArray((s as any).installments)
+    ? (s as any).installments.map((p: any) => ({
+        id: String(p.id),
+        amount: Number(p.amount) || 0,
+        date: String(p.date || ''),
+        note: p.note || undefined,
+      }))
+    : undefined,
 });
 
 const sponsorToRow = (s: Sponsor) => ({
@@ -323,7 +332,15 @@ const sponsorToRow = (s: Sponsor) => ({
   position: s.position || null,
   is_paid: s.isPaid,
   receipt_image: s.receiptImage || null,
+  installments: s.installments || [],
 });
+
+// A coluna das parcelas vem de migração: se o banco ainda não a tem, grava sem
+// ela para o cadastro de patrocinador não parar de funcionar.
+const stripSponsorInstallments = (row: Record<string, unknown>) => {
+  const { installments, ...rest } = row as any;
+  return rest;
+};
 
 export const getSponsors = async (): Promise<Sponsor[]> => {
   const { data, error } = await supabase.from('sponsors').select('*').order('created_at');
@@ -332,13 +349,25 @@ export const getSponsors = async (): Promise<Sponsor[]> => {
 };
 
 export const saveSponsor = async (sponsor: Sponsor): Promise<void> => {
-  const { error } = await supabase.from('sponsors').insert(sponsorToRow(sponsor));
+  const row = sponsorToRow(sponsor);
+  let { error } = await supabase.from('sponsors').insert(row);
+  if (error && isUnknownColumnError(error)) {
+    ({ error } = await supabase.from('sponsors').insert(stripSponsorInstallments(row)));
+  }
   if (error) throw friendlyError(error, 'Erro ao salvar patrocinador');
 };
 
 export const updateSponsor = async (sponsor: Sponsor): Promise<void> => {
   const { id, ...row } = sponsorToRow(sponsor);
-  const { error } = await supabase.from('sponsors').update(row).eq('id', id);
+  let { error } = await supabase.from('sponsors').update(row).eq('id', id);
+  if (error && isUnknownColumnError(error)) {
+    // Sem a coluna, as parcelas não têm onde ser gravadas — avisa em vez de
+    // salvar o resto e deixar o organizador achar que lançou o pagamento.
+    if (sponsor.installments?.length) {
+      throw new Error('As parcelas ainda não podem ser salvas: rode a atualização do banco (supabase/atualizacao_app.sql) e tente de novo.');
+    }
+    ({ error } = await supabase.from('sponsors').update(stripSponsorInstallments(row)).eq('id', id));
+  }
   if (error) throw friendlyError(error, 'Erro ao atualizar patrocinador');
 };
 
