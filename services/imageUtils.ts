@@ -11,8 +11,14 @@ const MAX_DIMENSION = 1600;   // maior lado da imagem, em pixels
 const JPEG_QUALITY = 0.72;
 const MAX_PASSTHROUGH_BYTES = 4 * 1024 * 1024; // 4 MB para arquivos não-imagem (ex.: PDF)
 
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+// Padrão embutido de propósito. Estes dois valores não são segredo: o preset é
+// "unsigned", feito para rodar no navegador, e vai no bundle de qualquer jeito
+// (já está em .github/workflows/deploy.yml, num repositório público). Sem o
+// padrão, um build feito fora do GitHub Actions saía sem eles e o envio de
+// comprovante quebrava com "indisponível no momento" — foi o que aconteceu com
+// o pacote gerado para o Netlify. A variável de ambiente, quando existe, manda.
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'gdvxqrfr';
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'runners_payment_proof_unsigned';
 
 // Envia o arquivo (já comprimido, se for imagem) para o Cloudinary via upload
 // unsigned e devolve a URL pública. Nada de credencial sensível no navegador:
