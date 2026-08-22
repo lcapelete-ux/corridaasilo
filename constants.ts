@@ -1,4 +1,4 @@
-import { Runner, TeamCoupon, TransferSettings, RaceModality } from './types';
+import { Runner, TeamCoupon, TransferSettings, RaceModality, Sponsor } from './types';
 
 // Modalidades da prova (seleção no topo da inscrição)
 export const MODALITIES: { value: RaceModality; label: string; distance: string; emoji: string }[] = [
@@ -168,6 +168,28 @@ export const getRunnerDueValue = (
   const afterDiscount = Math.max(0, fee - effectiveDiscount);
   return Math.round((afterDiscount + (runner.extraDonation || 0)) * 100) / 100;
 };
+
+// --- Patrocínios parcelados ---
+// Quanto do patrocínio já entrou. Quem não tem parcela lançada continua como
+// era antes: o interruptor "pago" vale por tudo. A partir da primeira parcela,
+// quem manda é a soma do que foi lançado.
+export const getSponsorPaidAmount = (s: Pick<Sponsor, 'amount' | 'isPaid' | 'installments'>): number => {
+  if (s.installments?.length) {
+    const total = s.installments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+    return Math.round(total * 100) / 100;
+  }
+  return s.isPaid ? s.amount : 0;
+};
+
+// Quanto ainda falta receber (nunca negativo: patrocinador que pagou a mais
+// não vira saldo devedor da corrida)
+export const getSponsorBalance = (s: Pick<Sponsor, 'amount' | 'isPaid' | 'installments'>): number =>
+  Math.max(0, Math.round((s.amount - getSponsorPaidAmount(s)) * 100) / 100);
+
+// Quitado. A margem de 1 centavo evita que arredondamento de parcela (ex.:
+// 3x de 33,33 para 100,00) deixe o patrocínio eternamente "quase pago".
+export const isSponsorSettled = (s: Pick<Sponsor, 'amount' | 'isPaid' | 'installments'>): boolean =>
+  s.installments?.length ? getSponsorPaidAmount(s) >= s.amount - 0.01 : s.isPaid;
 
 // Se, agora, um líder de equipe pode transferir inscrições (admin sempre pode,
 // independente destas configurações — a regra só limita o líder)

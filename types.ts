@@ -61,14 +61,24 @@ export interface TeamCoupon {
 
 export type SponsorType = 'Camiseta' | 'Medalha';
 
+// Uma parcela recebida de um patrocinador. O patrocínio combinado fica em
+// Sponsor.amount; aqui entra o que realmente entrou, uma linha por pagamento.
+export interface SponsorPayment {
+  id: string;
+  amount: number;
+  date: string;          // yyyy-mm-dd
+  note?: string;         // Ex: "1ª parcela", "PIX Banco X"
+}
+
 export interface Sponsor {
   id: string;
   name: string;
-  amount: number;
+  amount: number;        // Valor total combinado
   type: SponsorType;
   position?: string; // Ex: Costas, Manga, Peito
-  isPaid: boolean;
+  isPaid: boolean;   // Derivado das parcelas quando há parcelas lançadas
   receiptImage?: string; // URL do arquivo no Cloudinary
+  installments?: SponsorPayment[]; // Pagamentos parcelados, na ordem em que entraram
 }
 
 // Logo de patrocinador exibido no rodapé do site (só imagem, leitura pública)

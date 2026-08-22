@@ -1095,6 +1095,17 @@ $$;
 
 grant execute on function public.find_runner_by_cpf(text) to anon, authenticated;
 
+-- 26. Patrocínio pago parcelado. Vários patrocinadores fecham um valor e
+--     pagam em partes, então "pago sim/não" não dava conta: o painel mostrava
+--     o valor cheio como recebido ou nada. Cada pagamento vira uma entrada
+--     em installments (id, amount, date, note) e o total recebido é a soma
+--     delas. is_paid continua existindo e passa a ser derivado: fica true
+--     quando as parcelas cobrem o valor combinado. Quem não tem parcela
+--     lançada continua exatamente como antes.
+alter table public.sponsors add column if not exists installments jsonb not null default '[]'::jsonb;
+comment on column public.sponsors.installments is
+  'Pagamentos recebidos do patrocinador: [{id, amount, date, note}]. Vazio = pagamento à vista, controlado por is_paid';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

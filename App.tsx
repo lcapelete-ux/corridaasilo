@@ -3,7 +3,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
 import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking } from './services/storageService';
 import { supabase } from './services/supabaseClient';
-import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent } from './constants';
+import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -478,13 +478,12 @@ const App: React.FC = () => {
     }
   };
 
+  // Propaga o erro: o lançamento de parcelas precisa saber que a gravação
+  // falhou para não fechar o modal como se o pagamento tivesse entrado.
+  // Quem chama sem tratar erro alerta por conta própria.
   const handleUpdateSponsor = async (sponsor: Sponsor) => {
-    try {
-      await updateSponsor(sponsor);
-      setSponsors(await getSponsors());
-    } catch (e: any) {
-      alert(e?.message || 'Erro ao atualizar patrocinador.');
-    }
+    await updateSponsor(sponsor);
+    setSponsors(await getSponsors());
   };
 
   const handleDeleteSponsor = async (id: string) => {
@@ -675,7 +674,9 @@ const App: React.FC = () => {
   };
 
   // Totals Calculation
-  const totalSponsorRevenue = sponsors.reduce((acc, curr) => acc + (curr.isPaid ? curr.amount : 0), 0);
+  // Conta o que efetivamente entrou: patrocínio parcelado soma só as parcelas
+  // já lançadas, não o valor combinado inteiro.
+  const totalSponsorRevenue = sponsors.reduce((acc, curr) => acc + getSponsorPaidAmount(curr), 0);
   const totalExtraRevenue = extraRevenues.reduce((acc, curr) => acc + curr.amount, 0);
   const totalRegistrationRevenue = runners.reduce((acc, r) => acc + (r.isPaid ? getRunnerPaidValue(r) : 0), 0);
   const totalExpensesValue = expenses.reduce((acc, curr) => acc + curr.amount, 0);
