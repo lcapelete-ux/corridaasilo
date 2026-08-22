@@ -999,6 +999,7 @@ const App: React.FC = () => {
                 onSave={handleSaveExtraRevenue}
                 onDelete={handleDeleteExtraRevenue}
                 onUpdateRunner={handleUpdateRunner}
+                raceGroupName={raceGroupName}
               />
             )}
 

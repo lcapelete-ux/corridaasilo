@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ExtraRevenue, Runner } from '../types';
-import { getRunnerPaidValue, SENIOR_AGE } from '../constants';
-import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag, Pencil } from 'lucide-react';
+import { getRunnerPaidValue, SENIOR_AGE, EVENT_DATE, formatBrDate } from '../constants';
+import { escapeHtml as esc, printHtml, svgDonut, donutLegend, svgBars } from '../services/printReport';
+import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag, Pencil, FileDown } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface ExtraRevenueManagerProps {
@@ -10,12 +11,32 @@ interface ExtraRevenueManagerProps {
   onSave: (revenue: ExtraRevenue) => void;
   onDelete: (id: string) => void;
   onUpdateRunner?: (runner: Runner) => void;
+  raceGroupName?: string;
 }
+
+// Mesmo padrão visual do relatório de patrocínios
+const REPORT_STYLE = `
+  .header-band { background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 24px 28px; border-radius: 14px; margin-bottom: 18px; }
+  .header-band .badge { display: inline-block; color: #34d399; font-size: 10px; font-weight: 800; letter-spacing: .15em; border: 1px solid rgba(52,211,153,.5); padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+  .header-band h1 { color: #fff; margin: 0 0 4px; }
+  .header-band .sub { color: #cbd5e1; margin: 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .kpi-card { border-radius: 10px; padding: 12px 14px; color: #fff; page-break-inside: avoid; }
+  .kpi-card .label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; opacity: .9; }
+  .kpi-card .value { font-size: 17px; font-weight: 900; margin-top: 4px; }
+  .section-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; page-break-inside: avoid; }
+  .section-card table { background: transparent; }
+  .section-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 12px; }
+  .chart-row { display: flex; align-items: center; gap: 28px; justify-content: center; }
+  .lista-longa { page-break-inside: auto; }
+  tfoot td { font-weight: 800; background: #f1f5f9; }
+  .tag { display: inline-block; background: #fef9c3; color: #854d0e; border-radius: 4px; padding: 0 4px; font-size: 9px; font-weight: 700; margin-left: 4px; }
+`;
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete, onUpdateRunner }) => {
+export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete, onUpdateRunner, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
   const [valueAdjustRunner, setValueAdjustRunner] = useState<Runner | null>(null);
   const [formData, setFormData] = useState({
     description: '',
@@ -54,8 +75,140 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
+  const generatePdf = () => {
+    const fmtMoney = (v: number) => `R$ ${fmt(v)}`;
+    const dataStr = new Date().toLocaleString('pt-BR');
+
+    // Quanto cada equipe trouxe em inscrições pagas — é o que responde
+    // "de onde veio o dinheiro" melhor do que a lista nome por nome
+    const porEquipe = new Map<string, { total: number; qtd: number }>();
+    for (const r of paidRunners) {
+      const eq = r.teamName || 'Avulso';
+      const atual = porEquipe.get(eq) || { total: 0, qtd: 0 };
+      atual.total += getRunnerPaidValue(r);
+      atual.qtd += 1;
+      porEquipe.set(eq, atual);
+    }
+    const equipes = Array.from(porEquipe.entries())
+      .map(([label, v]) => ({ label, ...v }))
+      .sort((a, b) => b.total - a.total);
+
+    const segmentos = [
+      { label: `Inscrições (${paidRunners.length})`, value: totalRegistrations, color: '#6366f1' },
+      { label: `Receitas extras (${revenues.length})`, value: totalExtra, color: '#10b981' },
+    ].filter(s => s.value > 0);
+
+    const linhasExtras = [...revenues]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map(r => `
+        <tr>
+          <td>${esc(r.description)}</td>
+          <td class="size">${esc(formatBrDate(r.date, true))}</td>
+          <td class="total-col">${esc(fmtMoney(r.amount))}</td>
+        </tr>`).join('');
+
+    const linhasEquipes = equipes.map(e => `
+      <tr>
+        <td>${esc(e.label)}</td>
+        <td class="size">${e.qtd}</td>
+        <td class="total-col">${esc(fmtMoney(e.total))}</td>
+      </tr>`).join('');
+
+    const linhasInscricoes = paidRunners.map(r => `
+      <tr>
+        <td>${esc(r.fullName)}${r.couponCode ? `<span class="tag">${esc(r.couponCode)}</span>` : ''}${r.age >= SENIOR_AGE ? '<span class="tag">60+</span>' : ''}</td>
+        <td>${esc(r.teamName)}</td>
+        <td class="size">${esc(new Date(r.registrationDate).toLocaleDateString('pt-BR'))}</td>
+        <td class="total-col">${esc(fmtMoney(getRunnerPaidValue(r)))}</td>
+      </tr>`).join('');
+
+    const html = `
+      <div class="header-band">
+        <span class="badge">RELATÓRIO DE ENTRADAS</span>
+        <h1>${esc(raceGroupName)}</h1>
+        <p class="sub">Data da prova: ${esc(formatBrDate(EVENT_DATE, true))} · Gerado em ${esc(dataStr)}</p>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+          <div class="label">Inscrições confirmadas (${paidRunners.length})</div>
+          <div class="value">${esc(fmtMoney(totalRegistrations))}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+          <div class="label">Receitas extras (${revenues.length})</div>
+          <div class="value">${esc(fmtMoney(totalExtra))}</div>
+        </div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, #0f172a, #334155);">
+          <div class="label">Total de entradas</div>
+          <div class="value">${esc(fmtMoney(totalGeral))}</div>
+        </div>
+      </div>
+
+      ${segmentos.length > 0 ? `
+      <div class="section-card">
+        <div class="section-title">💰 Composição das Entradas</div>
+        <div class="chart-row">
+          ${svgDonut(segmentos, 160, 22, fmtMoney)}
+          <div style="min-width:250px;">${donutLegend(segmentos, fmtMoney)}</div>
+        </div>
+      </div>` : ''}
+
+      ${equipes.length > 0 ? `
+      <div class="section-card">
+        <div class="section-title">🏳️ Inscrições por Equipe</div>
+        ${svgBars(equipes.slice(0, 10).map(e => ({ label: e.label, value: e.total })), {
+          width: 620, labelWidth: 150, valueWidth: 90, color: '#6366f1', valueFormatter: fmtMoney,
+        })}
+        <table style="margin-top:14px;">
+          <thead><tr><th>Equipe</th><th class="size">Inscritos</th><th class="size">Valor</th></tr></thead>
+          <tbody>${linhasEquipes}</tbody>
+          <tfoot><tr><td>TOTAL</td><td class="size">${paidRunners.length}</td><td class="total-col">${esc(fmtMoney(totalRegistrations))}</td></tr></tfoot>
+        </table>
+      </div>` : ''}
+
+      <div class="section-card">
+        <div class="section-title">➕ Receitas Extras (${revenues.length})</div>
+        <table>
+          <thead><tr><th>Descrição</th><th class="size">Data</th><th class="size">Valor</th></tr></thead>
+          <tbody>${linhasExtras || '<tr><td colspan="3">Nenhuma receita extra registrada.</td></tr>'}</tbody>
+          ${revenues.length > 0 ? `<tfoot><tr><td colspan="2">TOTAL</td><td class="total-col">${esc(fmtMoney(totalExtra))}</td></tr></tfoot>` : ''}
+        </table>
+      </div>
+
+      <div class="section-card lista-longa">
+        <div class="section-title">👥 Entradas de Inscrições (${paidRunners.length})</div>
+        <table>
+          <thead><tr><th>Atleta</th><th>Equipe</th><th class="size">Inscrição</th><th class="size">Valor</th></tr></thead>
+          <tbody>${linhasInscricoes || '<tr><td colspan="4">Nenhuma inscrição confirmada ainda.</td></tr>'}</tbody>
+          ${paidRunners.length > 0 ? `<tfoot><tr><td colspan="3">SUBTOTAL INSCRIÇÕES</td><td class="total-col">${esc(fmtMoney(totalRegistrations))}</td></tr></tfoot>` : ''}
+        </table>
+      </div>
+    `;
+    printHtml(html, `Entradas - ${raceGroupName}`, REPORT_STYLE);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Barra do relatório: cobre a tela inteira (inscrições + extras), por
+          isso fica no topo e não junto de uma das tabelas */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 p-5 rounded-xl border border-slate-800/60">
+        <div>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <TrendingUp className="text-emerald-400" size={20} /> Entradas
+          </h2>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Inscrições pagas e receitas extras. O PDF traz tudo, com os totais por equipe.
+          </p>
+        </div>
+        <button
+          onClick={generatePdf}
+          className="bg-slate-800 text-slate-300 border border-slate-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-700 hover:text-white transition-all shrink-0"
+          title="Gerar relatório de entradas em PDF"
+        >
+          <FileDown size={18} /> Relatório (PDF)
+        </button>
+      </div>
+
       {/* Header Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-900 p-6 rounded-xl border border-indigo-500/20 flex items-center justify-between">
