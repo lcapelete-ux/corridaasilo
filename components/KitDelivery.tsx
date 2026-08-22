@@ -52,21 +52,27 @@ export const KitDelivery: React.FC = () => {
     }
   };
 
-  const delivered = runners.filter(r => r.kitDelivered).length;
-  const total = runners.length;
+  // Só entra na entrega quem teve o pagamento confirmado. Tudo desta tela
+  // (contadores, lista, resumo de camisetas e PDF) parte daqui, para não
+  // separar kit de quem ainda não pagou.
+  const paidRunners = useMemo(() => runners.filter(r => r.isPaid), [runners]);
+  const pendingPayment = runners.length - paidRunners.length;
+
+  const delivered = paidRunners.filter(r => r.kitDelivered).length;
+  const total = paidRunners.length;
   const pct = total > 0 ? Math.round((delivered / total) * 100) : 0;
 
   // Equipes presentes (para o filtro)
   const teamsPresent = useMemo(
-    () => Array.from(new Set(runners.map(r => r.teamName).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [runners]
+    () => Array.from(new Set(paidRunners.map(r => r.teamName).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [paidRunners]
   );
 
   // Lista para a aba "Lista" (respeita busca, só pendentes, equipe e tamanho)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const digits = q.replace(/\D/g, '');
-    return runners.filter(r => {
+    return paidRunners.filter(r => {
       if (onlyPending && r.kitDelivered) return false;
       if (teamFilter && r.teamName !== teamFilter) return false;
       if (sizeFilter && r.shirtSize !== sizeFilter) return false;
@@ -75,13 +81,13 @@ export const KitDelivery: React.FC = () => {
       const cpfMatch = digits.length > 0 && r.cpf.replace(/\D/g, '').includes(digits);
       return nameMatch || cpfMatch;
     });
-  }, [runners, query, onlyPending, teamFilter, sizeFilter]);
+  }, [paidRunners, query, onlyPending, teamFilter, sizeFilter]);
 
   // Base do resumo: respeita equipe e "só pendentes" (não usa busca/tamanho,
   // para mostrar sempre a distribuição completa de tamanhos)
   const summaryBase = useMemo(
-    () => runners.filter(r => (!teamFilter || r.teamName === teamFilter) && (!onlyPending || !r.kitDelivered)),
-    [runners, teamFilter, onlyPending]
+    () => paidRunners.filter(r => (!teamFilter || r.teamName === teamFilter) && (!onlyPending || !r.kitDelivered)),
+    [paidRunners, teamFilter, onlyPending]
   );
 
   // Colunas de tamanho: as canônicas + qualquer tamanho "exótico" que apareça
@@ -113,7 +119,7 @@ export const KitDelivery: React.FC = () => {
 
   // Rótulo dos filtros ativos (vai no cabeçalho do PDF)
   const filterLabel = () => {
-    const parts: string[] = [];
+    const parts: string[] = ['Somente pagamentos confirmados'];
     parts.push(teamFilter ? `Equipe: ${teamFilter}` : 'Todas as equipes');
     if (sizeFilter && viewMode === 'lista') parts.push(`Tamanho: ${sizeFilter}`);
     if (onlyPending) parts.push(viewMode === 'lista' ? 'Somente kits pendentes' : 'Somente tamanhos ainda não entregues');
@@ -184,8 +190,20 @@ export const KitDelivery: React.FC = () => {
           <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
         </div>
         <p className="text-xs text-slate-500 mt-2">
+          Só aparecem aqui os atletas com <strong className="text-slate-300">pagamento confirmado</strong>.
           O <strong className="text-slate-300">Gerar PDF</strong> segue a visualização (Lista ou Resumo) e os filtros escolhidos abaixo.
         </p>
+        {/* Quem ainda não pagou fica de fora, mas o número aparece: senão o
+            organizador acha que sumiu inscrição e vai procurar defeito. */}
+        {pendingPayment > 0 && (
+          <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+            <Clock size={14} className="text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-200/90">
+              <strong>{pendingPayment}</strong> {pendingPayment === 1 ? 'inscrito está fora desta tela' : 'inscritos estão fora desta tela'} porque o pagamento ainda não foi confirmado.
+              {' '}Confirme em <strong>Corredores</strong> e recarregue para liberar o kit.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Alternância de visualização */}
@@ -315,7 +333,11 @@ export const KitDelivery: React.FC = () => {
         <div className="bg-slate-900 rounded-xl border border-slate-800/60 p-12 text-center">
           <Users size={36} className="text-slate-700 mx-auto mb-3" />
           <p className="text-slate-500 font-medium">
-            {query || teamFilter || sizeFilter ? 'Nenhum atleta encontrado para os filtros.' : 'Nenhum atleta para exibir.'}
+            {query || teamFilter || sizeFilter
+              ? 'Nenhum atleta encontrado para os filtros.'
+              : pendingPayment > 0
+                ? 'Nenhum pagamento confirmado ainda. Confirme os pagamentos em Corredores para os kits aparecerem aqui.'
+                : 'Nenhum atleta para exibir.'}
           </p>
         </div>
       ) : (
@@ -345,11 +367,6 @@ export const KitDelivery: React.FC = () => {
                   )}
                   <span className="text-slate-400">👕 {r.shirtSize}</span>
                   <span className="text-slate-500">{r.modality === '3k' ? '🚶 3 km' : '🏃 5 km'}</span>
-                  {!r.isPaid && (
-                    <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase text-[10px]">
-                      <Clock size={10} /> Pgto pendente
-                    </span>
-                  )}
                 </div>
               </div>
 
