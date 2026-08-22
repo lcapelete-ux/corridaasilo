@@ -29,7 +29,9 @@ export const ValueAdjustModal: React.FC<ValueAdjustModalProps> = ({ runner, onCl
     setSaving(true);
     setError('');
     try {
-      await onSave({ ...runner, couponDiscount: discountNum, extraDonation: extraNum });
+      // valueAdjusted: o valor passa a ser o que o organizador definiu — não é
+      // mais desconto de cupom, então não vence junto com o lote promocional.
+      await onSave({ ...runner, couponDiscount: discountNum, extraDonation: extraNum, valueAdjusted: true });
       onClose();
     } catch (e: any) {
       // Sem isto o modal ficava aberto e mudo quando a gravação falhava

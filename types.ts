@@ -45,6 +45,8 @@ export interface Runner {
   extraDonation?: number;    // Contribuição extra opcional (ex.: 60+ que optou pela meia mas quis ajudar um valor à parte)
   note?: string;             // Observação livre do organizador (ex.: pagamento em nome de outra pessoa)
   payerName?: string;        // Quem pagou, quando não foi o próprio atleta (vazio = pagou da própria conta)
+  paymentNotice?: string;    // Recado do organizador exibido ao atleta na tela de "Minha Inscrição" (ex.: por que o valor mudou de lote)
+  valueAdjusted?: boolean;   // Valor definido à mão pelo organizador: vale como está e não vence junto com o lote promocional
 }
 
 export interface TeamCoupon {

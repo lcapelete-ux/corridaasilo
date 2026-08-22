@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 
 interface RunnerListProps {
@@ -87,7 +87,20 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [teamFilter, setTeamFilter] = useState('');       // '' = todas as academias
   const [categoryFilter, setCategoryFilter] = useState(''); // '' = todas as categorias
   const [modalityFilter, setModalityFilter] = useState<'' | '5k' | '3k'>('');
-  const [paymentFilter, setPaymentFilter] = useState<'todos' | 'meia' | 'inteira' | 'apoiador' | 'pago' | 'pendente'>('todos');
+  const [paymentFilter, setPaymentFilter] = useState<'todos' | 'meia' | 'inteira' | 'apoiador' | 'pago' | 'pendente' | 'promo_pendente'>('todos');
+
+  // "Pendente do lote promocional": pegou o preço promocional ao se inscrever
+  // dentro do prazo, mas não pagou até a data — é de quem se cobra a diferença.
+  // Só faz sentido depois que o prazo passou; antes disso ainda dá tempo.
+  const isPromoPending = (r: Runner): boolean => {
+    if (!promoDeadline || r.isPaid) return false;
+    // Quem já teve o valor acertado à mão sai da lista: senão o admin reajusta
+    // as mesmas pessoas toda vez que abre o filtro.
+    if (r.valueAdjusted) return false;
+    const hoje = new Date().toISOString().split('T')[0];
+    if (hoje <= promoDeadline) return false;
+    return r.registrationDate.split('T')[0] <= promoDeadline;
+  };
   const [sortBy, setSortBy] = useState<'padrao' | 'data_desc' | 'data_asc' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
 
   // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
@@ -125,7 +138,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         paymentFilter === 'apoiador' ? (r.age >= SENIOR_AGE && !!r.seniorFullPrice) :
         paymentFilter === 'inteira' ? (r.age < SENIOR_AGE) :
         paymentFilter === 'pago' ? !!r.isPaid :
-        paymentFilter === 'pendente' ? !r.isPaid : true;
+        paymentFilter === 'pendente' ? !r.isPaid :
+        paymentFilter === 'promo_pendente' ? isPromoPending(r) : true;
       return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment;
     })
     .sort((a, b) => {
@@ -382,6 +396,86 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     Promise.resolve(onUpdate(runner)).catch((e: any) =>
       alert(e?.message || 'Erro ao atualizar inscrição.')
     );
+  };
+
+  // --- Ajuste de valor em lote (seleção por caixinhas) ---
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkValue, setBulkValue] = useState('');
+  const [bulkNotice, setBulkNotice] = useState('');
+  const [bulkError, setBulkError] = useState('');
+  const [bulkProgress, setBulkProgress] = useState<{ feitos: number; total: number } | null>(null);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // Recado sugerido: o caso real é sempre o mesmo (cupom do 1º lote venceu sem
+  // o pagamento), então já vem escrito — o admin só ajusta o que quiser.
+  const AVISO_SUGERIDO =
+    'Sua inscrição foi feita com o cupom de desconto do 1º lote, mas o pagamento não foi '
+    + 'realizado até o fim do prazo promocional. Por isso o valor foi atualizado para o 2º lote. '
+    + 'Faça o PIX pelo valor indicado acima e envie o comprovante por aqui mesmo.';
+
+  const openBulk = () => {
+    setBulkValue('');
+    setBulkNotice(AVISO_SUGERIDO);
+    setBulkError('');
+    setBulkProgress(null);
+    setBulkOpen(true);
+  };
+
+  // Aplica o valor digitado como o total devido de cada selecionado. O modelo
+  // guarda desconto e contribuição extra (não um preço final), então convertemos:
+  // acima da inscrição vira contribuição extra, abaixo vira desconto. A base é
+  // por pessoa, porque 60+ tem inscrição pela metade.
+  const handleBulkApply = async () => {
+    if (!onUpdate) return;
+    const alvo = Math.round((parseFloat(bulkValue.replace(',', '.')) || 0) * 100) / 100;
+    if (!bulkValue.trim() || alvo < 0 || Number.isNaN(alvo)) {
+      setBulkError('Informe um valor válido.');
+      return;
+    }
+
+    const alvos = filteredRunners.filter(r => selectedIds.has(r.id));
+    setBulkError('');
+    setBulkProgress({ feitos: 0, total: alvos.length });
+
+    const falhas: string[] = [];
+    for (const r of alvos) {
+      const base = getRegistrationFee(r.age, r.seniorFullPrice);
+      const atualizado: Runner = {
+        ...r,
+        couponDiscount: alvo < base ? Math.round((base - alvo) * 100) / 100 : 0,
+        extraDonation: alvo > base ? Math.round((alvo - base) * 100) / 100 : 0,
+        // Marca o valor como definido à mão: assim ele vale como está e não é
+        // recalculado quando o prazo do lote promocional vence.
+        valueAdjusted: true,
+        // Recado que o atleta vê ao consultar o CPF. Em branco apaga o aviso
+        // anterior — mudar o valor de novo sem explicar seria pior.
+        paymentNotice: bulkNotice.trim(),
+      };
+      try {
+        await onUpdate(atualizado);
+      } catch (e: any) {
+        falhas.push(`${r.fullName}: ${e?.message || 'erro ao salvar'}`);
+      }
+      setBulkProgress(p => (p ? { ...p, feitos: p.feitos + 1 } : p));
+    }
+
+    setBulkProgress(null);
+    if (falhas.length) {
+      // Sucesso parcial: mantém aberto e diz quem falhou, em vez de fingir que
+      // deu tudo certo. Quem salvou continua salvo.
+      setBulkError(`${falhas.length} de ${alvos.length} não foram salvos:\n${falhas.join('\n')}`);
+      return;
+    }
+    setSelectedIds(new Set());
+    setBulkOpen(false);
   };
 
   // --- Correção de nome/CPF ---
@@ -990,6 +1084,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
               <option value="inteira">Inteira (abaixo de 60)</option>
               <option value="pago">Pagamento confirmado</option>
               <option value="pendente">Pagamento pendente</option>
+              <option value="promo_pendente">⏳ Pendentes do lote promocional</option>
             </select>
           </div>
           {/* Ordenar */}
@@ -1009,11 +1104,48 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         </div>
       </div>
 
+      {/* Barra de seleção: só aparece quando há alguém marcado */}
+      {canEditFinancials && onUpdate && selectedIds.size > 0 && (
+        <div className="bg-indigo-600 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-slide-down">
+          <p className="text-white font-bold text-sm">
+            {selectedIds.size} {selectedIds.size === 1 ? 'atleta selecionado' : 'atletas selecionados'}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-2 text-indigo-100 hover:text-white hover:bg-indigo-700 rounded-lg text-sm font-bold transition-colors"
+            >
+              Limpar seleção
+            </button>
+            <button
+              onClick={openBulk}
+              className="bg-white text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-indigo-50 transition-colors"
+            >
+              <Pencil size={16} /> Ajustar valor
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-800/50 border-b border-slate-800">
+                {canEditFinancials && onUpdate && (
+                  <th className="pl-4 pr-1 w-10">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todos os visíveis"
+                      title="Selecionar todos os visíveis"
+                      checked={filteredRunners.length > 0 && filteredRunners.every(r => selectedIds.has(r.id))}
+                      onChange={e => setSelectedIds(
+                        e.target.checked ? new Set(filteredRunners.map(r => r.id)) : new Set()
+                      )}
+                      className="w-4 h-4 rounded border-slate-600 accent-indigo-500 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Atleta</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Local/CPF</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Idade/Gênero</th>
@@ -1029,7 +1161,18 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <tbody className="divide-y divide-slate-800/60">
               {filteredRunners.length > 0 ? (
                 filteredRunners.map((runner) => (
-                  <tr key={runner.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={runner.id} className={`transition-colors ${selectedIds.has(runner.id) ? 'bg-indigo-500/10' : 'hover:bg-slate-800/30'}`}>
+                    {canEditFinancials && onUpdate && (
+                      <td className="pl-4 pr-1 align-top pt-5">
+                        <input
+                          type="checkbox"
+                          aria-label={`Selecionar ${runner.fullName}`}
+                          checked={selectedIds.has(runner.id)}
+                          onChange={() => toggleSelected(runner.id)}
+                          className="w-4 h-4 rounded border-slate-600 accent-indigo-500 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="p-4">
                       <div className="font-medium text-white">{runner.fullName}</div>
                       <div className="text-xs text-slate-500">{runner.email}</div>
@@ -1040,6 +1183,21 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         >
                           <ArrowRightLeft size={10} /> Transferida
                         </span>
+                      )}
+                      {/* Aviso que o atleta vê ao consultar o CPF — clicável para tirar
+                          quando não fizer mais sentido (ex.: já pagou o novo valor) */}
+                      {runner.paymentNotice && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Aviso mostrado a ${runner.fullName}:\n\n"${runner.paymentNotice}"\n\nRemover esse aviso?`)) {
+                              updateAndAlert({ ...runner, paymentNotice: '' });
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 mt-1 ml-1 bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors"
+                          title={`Aviso na tela do atleta: ${runner.paymentNotice}`}
+                        >
+                          <Megaphone size={10} /> Com aviso
+                        </button>
                       )}
                     </td>
                     <td className="p-4">
@@ -1118,6 +1276,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                         ) : (
                           <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-bold">
                             <Clock size={14} /> Pendente
+                          </span>
+                        )}
+
+                        {isPromoPending(runner) && (
+                          <span
+                            className="inline-flex items-center gap-1 w-fit bg-orange-500/15 text-orange-300 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            title={`Inscreveu-se dentro do lote promocional (até ${formatBrDate(promoDeadline || '', true)}) e não pagou até a data — cobrar a diferença`}
+                          >
+                            <Clock size={10} className="shrink-0" /> Pendente do lote
                           </span>
                         )}
 
@@ -1221,7 +1388,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-600">
+                  <td colSpan={canEditFinancials && onUpdate ? 9 : 8} className="p-8 text-center text-slate-600">
                     Nenhum corredor encontrado.
                   </td>
                 </tr>
@@ -1327,6 +1494,142 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           onSave={onUpdate}
         />
       )}
+
+      {/* MODAL DE AJUSTE EM LOTE */}
+      {bulkOpen && (() => {
+        const alvos = filteredRunners.filter(r => selectedIds.has(r.id));
+        // 60+ paga meia, então uma base diferente no meio da seleção quase
+        // sempre é engano — avisa antes de aplicar o mesmo valor para todos.
+        const bases = new Set(alvos.map(r => getRegistrationFee(r.age, r.seniorFullPrice)));
+        const alvoNum = Math.round((parseFloat(bulkValue.replace(',', '.')) || 0) * 100) / 100;
+        const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+              <div className="bg-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
+                <h3 className="font-bold text-xl flex items-center gap-2">
+                  <Pencil size={20} /> Ajustar Valor em Lote
+                </h3>
+                <button onClick={() => setBulkOpen(false)} className="hover:text-indigo-200" disabled={!!bulkProgress}>
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4 overflow-y-auto">
+                <div className="bg-indigo-50 p-3 rounded-lg text-sm text-indigo-900">
+                  Definindo o valor de <strong>{alvos.length} {alvos.length === 1 ? 'atleta' : 'atletas'}</strong>.
+                  <div className="text-indigo-700/80 text-xs mt-1">
+                    O valor digitado passa a ser o total devido por cada um deles, e o aviso abaixo aparece para todos quando consultarem o CPF.
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Valor a pagar (R$)</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={bulkValue}
+                    onChange={(e) => { setBulkValue(e.target.value); setBulkError(''); }}
+                    placeholder="Ex: 89,90"
+                    autoFocus
+                    disabled={!!bulkProgress}
+                    className={`${transferInputCls} font-mono text-lg`}
+                  />
+                </div>
+
+                {bases.size > 1 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <span>
+                      A seleção mistura atletas com <strong>valores de inscrição diferentes</strong> (60+ paga meia).
+                      Todos ficarão com o mesmo valor. Se não for isso, separe a seleção.
+                    </span>
+                  </div>
+                )}
+
+                {alvoNum > 0 && (
+                  <p className="text-sm text-slate-600">
+                    Cada selecionado passará a dever <strong className="text-indigo-600 font-mono">R$ {fmt(alvoNum)}</strong>.
+                  </p>
+                )}
+
+                {/* Recado que aparece pro atleta quando ele consulta o CPF.
+                    Sem isso ele vê o valor mudar do nada e liga pra organização. */}
+                <div className="pt-3 border-t border-slate-100">
+                  <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <MessageSquare size={15} className="text-indigo-500" />
+                    Aviso para o atleta
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Aparece na tela <strong>&ldquo;Minha Inscrição&rdquo;</strong> quando o atleta digitar o CPF para enviar o comprovante.
+                    Deixe em branco para não mostrar nenhum aviso.
+                  </p>
+                  <textarea
+                    rows={5}
+                    value={bulkNotice}
+                    onChange={(e) => { setBulkNotice(e.target.value); setBulkError(''); }}
+                    disabled={!!bulkProgress}
+                    placeholder="Ex: o cupom do 1º lote venceu antes do pagamento, então o valor passou para o 2º lote."
+                    className={`${transferInputCls} text-sm leading-relaxed resize-none`}
+                  />
+                  <div className="flex justify-between items-center mt-1.5">
+                    <span className="text-[11px] text-slate-400">{bulkNotice.trim().length} caracteres</span>
+                    <div className="flex gap-2">
+                      {bulkNotice !== AVISO_SUGERIDO && (
+                        <button
+                          type="button"
+                          onClick={() => setBulkNotice(AVISO_SUGERIDO)}
+                          disabled={!!bulkProgress}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                        >
+                          Usar texto sugerido
+                        </button>
+                      )}
+                      {bulkNotice.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setBulkNotice('')}
+                          disabled={!!bulkProgress}
+                          className="text-[11px] font-bold text-slate-400 hover:text-red-500 disabled:opacity-50"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {bulkProgress && (
+                  <p className="text-sm text-slate-600 font-bold">
+                    Salvando… {bulkProgress.feitos} de {bulkProgress.total}
+                  </p>
+                )}
+
+                {bulkError && (
+                  <p className="text-red-600 text-xs font-bold whitespace-pre-line">{bulkError}</p>
+                )}
+              </div>
+
+              <div className="p-6 pt-4 flex justify-end gap-3 border-t border-slate-100 bg-white shrink-0">
+                <button
+                  onClick={() => setBulkOpen(false)}
+                  disabled={!!bulkProgress}
+                  className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleBulkApply}
+                  disabled={!!bulkProgress || !bulkValue.trim()}
+                  className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-60"
+                >
+                  <Save size={17} /> {bulkProgress ? 'Salvando...' : `Aplicar a ${alvos.length}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL DE CORREÇÃO DE NOME/CPF */}
       {editRunner && (

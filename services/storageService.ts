@@ -86,6 +86,8 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   paidNoProof: (r as any).paid_no_proof ?? undefined,
   paidNoProofAt: (r as any).paid_no_proof_at || undefined,
   payerName: (r as any).payer_name || undefined,
+  paymentNotice: (r as any).payment_notice || undefined,
+  valueAdjusted: (r as any).value_adjusted ?? undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -122,6 +124,9 @@ const runnerToRow = (r: Runner) => {
   if (r.note !== undefined) row.note = r.note.trim() ? r.note.trim() : null;
   // Pagador: mesma lógica — enviado mesmo vazio para permitir corrigir/limpar
   if (r.payerName !== undefined) row.payer_name = r.payerName.trim() ? r.payerName.trim() : null;
+  // Recado ao atleta: idem — mandar vazio é como o admin apaga o aviso
+  if (r.paymentNotice !== undefined) row.payment_notice = r.paymentNotice.trim() ? r.paymentNotice.trim() : null;
+  if (r.valueAdjusted !== undefined) row.value_adjusted = !!r.valueAdjusted;
   return row;
 };
 
@@ -131,7 +136,7 @@ const runnerToRow = (r: Runner) => {
 const MIGRATION_COLUMNS = [
   'phone', 'modality', 'transferred_from', 'transferred_at',
   'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
-  'senior_full_price', 'extra_donation', 'note', 'payer_name',
+  'senior_full_price', 'extra_donation', 'note', 'payer_name', 'payment_notice', 'value_adjusted',
 ];
 
 const isUnknownColumnError = (error: any): boolean =>
@@ -240,6 +245,8 @@ export const findRunnerByCpf = async (cpf: string): Promise<RunnerLookup | null>
     extraDonation: row.extra_donation != null ? Number(row.extra_donation) : undefined,
     seniorFullPrice: row.senior_full_price ?? undefined,
     payerName: row.payer_name || undefined,
+    paymentNotice: row.payment_notice || undefined,
+    valueAdjusted: row.value_adjusted ?? undefined,
   };
 };
 
