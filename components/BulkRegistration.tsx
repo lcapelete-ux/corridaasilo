@@ -42,6 +42,10 @@ export const BulkRegistration: React.FC<BulkRegistrationProps> = ({ runners, tea
   const [padraoEquipe, setPadraoEquipe] = useState('');
   const [padraoCidade, setPadraoCidade] = useState('');
   const [padraoModalidade, setPadraoModalidade] = useState<RaceModality>('5k');
+  // A camiseta não é exigida na lista, mas a coluna do banco é obrigatória
+  // (enum P/M/G/GG/EXG). Em vez de escolher escondido, o admin define aqui o
+  // tamanho que vale para quem vier sem — e vê o resultado na tabela.
+  const [padraoCamiseta, setPadraoCamiseta] = useState<string>(ShirtSize.M);
   const [marcarPago, setMarcarPago] = useState(false);
 
   const [salvando, setSalvando] = useState<{ feitos: number; total: number } | null>(null);
@@ -99,6 +103,7 @@ export const BulkRegistration: React.FC<BulkRegistrationProps> = ({ runners, tea
 
       const comPadroes = aplicarPadroes(finais, {
         teamName: padraoEquipe, city: padraoCidade, modality: padraoModalidade,
+        shirtSize: padraoCamiseta,
       });
       setRows(comPadroes);
       setFormato(viaIa ? 'interpretado por IA' : doLeitor.formato);
@@ -137,7 +142,9 @@ export const BulkRegistration: React.FC<BulkRegistrationProps> = ({ runners, tea
         age: idade,
         gender: r.gender as Gender,
         teamName: r.teamName || 'Avulso',
-        shirtSize: r.shirtSize as ShirtSize,
+        // Coluna do banco é enum obrigatório: célula limpa na conferência cai
+        // no padrão escolhido, em vez de quebrar a gravação da linha
+        shirtSize: (r.shirtSize || padraoCamiseta || ShirtSize.M) as ShirtSize,
         modality: (r.modality || '5k') as RaceModality,
         registrationDate: new Date().toISOString(),
         isPaid: marcarPago,
@@ -194,7 +201,7 @@ export const BulkRegistration: React.FC<BulkRegistrationProps> = ({ runners, tea
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
             Preencher automaticamente o que faltar
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className={labelCls}>Equipe / Academia</label>
               <input list="bulk-equipes" className={inputCls} placeholder="Ex: Academia Luso"
@@ -215,6 +222,15 @@ export const BulkRegistration: React.FC<BulkRegistrationProps> = ({ runners, tea
                 <option value="3k">Caminhada 3 km</option>
               </select>
             </div>
+            <div>
+              <label className={labelCls}>Camiseta</label>
+              <select className={selectCls} value={padraoCamiseta}
+                onChange={e => setPadraoCamiseta(e.target.value)}>
+                {[ShirtSize.S, ShirtSize.M, ShirtSize.L, ShirtSize.XL, ShirtSize.XXL].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-end">
               <label className="flex items-center gap-3 cursor-pointer bg-slate-800 p-2.5 rounded-lg w-full border border-slate-700">
                 <input type="checkbox" className="w-5 h-5 rounded border-slate-600 accent-emerald-500"
@@ -225,6 +241,7 @@ export const BulkRegistration: React.FC<BulkRegistrationProps> = ({ runners, tea
           </div>
           <p className="text-xs text-slate-600 mt-3">
             Só entram nas linhas em que o campo veio vazio — o que estiver na lista é sempre respeitado.
+            A lista <strong className="text-slate-500">não precisa</strong> trazer o tamanho da camiseta: quem vier sem fica com o tamanho acima, e dá para trocar linha a linha na conferência.
           </p>
         </div>
 
