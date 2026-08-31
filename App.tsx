@@ -18,13 +18,14 @@ import { SettingsManager } from './components/SettingsManager';
 import { KitDelivery } from './components/KitDelivery';
 import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { RaffleManager } from './components/RaffleManager';
+import { BulkRegistration } from './components/BulkRegistration';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { nightMusic } from './services/nightMusic';
 import sicrediLogo from './assets/sicredi-logo.jpg';
 import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -424,6 +425,15 @@ const App: React.FC = () => {
   };
 
   // --- Runner Actions ---
+  // Gravação vinda da inscrição em lote: salva e pronto. O caminho individual
+  // abaixo guarda o "último inscrito" e navega para a lista ao terminar — no
+  // lote isso jogaria o admin para fora da tela na primeira linha gravada.
+  // O erro sobe para a tela de lote dizer qual linha falhou.
+  const handleSaveRunnerBulk = async (runner: Runner): Promise<boolean> => {
+    await saveRunner(runner);
+    return true;
+  };
+
   const handleSaveRunner = async (runner: Runner): Promise<boolean> => {
     try {
       await saveRunner(runner);
@@ -861,6 +871,10 @@ const App: React.FC = () => {
 
           <NavItem target="registration" icon={UserPlus} label="Novo Cadastro" />
 
+          {userSession?.role === 'admin' && (
+            <NavItem target="bulk_registration" icon={Sparkles} label="Inscrição em Lote" />
+          )}
+
           {/* Entrega de Kits: admin sempre; organizador só se o admin liberou */}
           {(userSession?.role === 'admin' || userSession?.permissions?.includes('kits')) && (
             <NavItem target="kits" icon={Package} label="Entrega de Kits" />
@@ -943,6 +957,16 @@ const App: React.FC = () => {
                 userSession={userSession}
                 coupons={coupons}
                 couponsBlocked={couponsBlocked}
+              />
+            )}
+
+            {currentView === 'bulk_registration' && userSession?.role === 'admin' && (
+              <BulkRegistration
+                runners={runners}
+                teams={Array.from(new Set([...officialTeams, ...getExistingTeams()]))}
+                cities={officialCities}
+                onSaveRunner={handleSaveRunnerBulk}
+                onFinish={refreshRunners}
               />
             )}
 

@@ -39,6 +39,11 @@ jobs:
         env:
           VITE_CLOUDINARY_CLOUD_NAME: gdvxqrfr
           VITE_CLOUDINARY_UPLOAD_PRESET: runners_payment_proof_unsigned
+          # Chave do Gemini (inscrição em lote com IA). Fica em Settings >
+          # Secrets and variables > Actions, como GEMINI_API_KEY. Sem ela o
+          # site continua funcionando: a leitura da lista cai no modo por
+          # colunas, que não depende de IA.
+          API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
