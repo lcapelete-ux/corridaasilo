@@ -1106,19 +1106,6 @@ alter table public.sponsors add column if not exists installments jsonb not null
 comment on column public.sponsors.installments is
   'Pagamentos recebidos do patrocinador: [{id, amount, date, note}]. Vazio = pagamento à vista, controlado por is_paid';
 
--- 27. Abrir/encerrar inscrições na mão, por cima do prazo. Antes só a data
---     mandava: passou do prazo, o site fechava e não havia como reabrir sem
---     mexer na data. Agora:
---       'auto'   = quem manda é registration_deadline (como era antes)
---       'open'   = aberto mesmo depois do prazo
---       'closed' = fechado agora, mesmo dentro do prazo
-alter table public.app_settings add column if not exists registration_status text not null default 'auto';
-alter table public.app_settings drop constraint if exists app_settings_registration_status_check;
-alter table public.app_settings add constraint app_settings_registration_status_check
-  check (registration_status in ('auto', 'open', 'closed'));
-comment on column public.app_settings.registration_status is
-  'Inscrições no site: auto (segue o prazo), open (forçado aberto) ou closed (forçado fechado)';
-
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

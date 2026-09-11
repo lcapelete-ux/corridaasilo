@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy, DoorOpen, DoorClosed, Wand2 } from 'lucide-react';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy } from 'lucide-react';
 import { TransferSettings } from '../types';
 import { formatBrDate, MAX_ATHLETES } from '../constants';
 
@@ -17,11 +17,9 @@ interface SettingsManagerProps {
   onUpdateCouponsBlocked?: (blocked: boolean) => Promise<void>;
   teamRankingEnabled?: boolean;
   onUpdateTeamRankingEnabled?: (enabled: boolean) => Promise<void>;
-  registrationStatus?: 'auto' | 'open' | 'closed';
-  onUpdateRegistrationStatus?: (status: 'auto' | 'open' | 'closed') => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled, registrationStatus = 'auto', onUpdateRegistrationStatus }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -50,22 +48,6 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
 
   const [savingRanking, setSavingRanking] = useState(false);
   const [rankingError, setRankingError] = useState('');
-
-  const [savingStatus, setSavingStatus] = useState(false);
-  const [statusError, setStatusError] = useState('');
-
-  const handleChangeRegistrationStatus = async (status: 'auto' | 'open' | 'closed') => {
-    if (!onUpdateRegistrationStatus || status === registrationStatus) return;
-    setSavingStatus(true);
-    setStatusError('');
-    try {
-      await onUpdateRegistrationStatus(status);
-    } catch (err: any) {
-      setStatusError(err?.message || 'Não foi possível salvar.');
-    } finally {
-      setSavingStatus(false);
-    }
-  };
 
   const handleToggleTeamRanking = async (enabled: boolean) => {
     if (!onUpdateTeamRankingEnabled) return;
@@ -384,91 +366,6 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
           </button>
         </form>
       </div>
-
-      {/* Abrir/encerrar inscrições na mão, por cima do prazo */}
-      {(() => {
-        const efetivoAberto =
-          registrationStatus === 'open' ? true
-          : registrationStatus === 'closed' ? false
-          : registrationsOpen;
-        const opcoes: { valor: 'auto' | 'open' | 'closed'; titulo: string; desc: string; icone: any; cor: string }[] = [
-          { valor: 'auto', titulo: 'Automático', desc: 'Segue o prazo acima', icone: Wand2, cor: 'indigo' },
-          { valor: 'open', titulo: 'Abertas', desc: 'Aberto mesmo fora do prazo', icone: DoorOpen, cor: 'emerald' },
-          { valor: 'closed', titulo: 'Encerradas', desc: 'Fechado agora', icone: DoorClosed, cor: 'red' },
-        ];
-        return (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className={`p-3 rounded-lg ${efetivoAberto ? 'bg-emerald-100' : 'bg-red-100'}`}>
-                {efetivoAberto
-                  ? <DoorOpen size={24} className="text-emerald-600" />
-                  : <DoorClosed size={24} className="text-red-600" />}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-slate-800">Inscrições no Site</h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Agora:{' '}
-                  <span className={`font-bold ${efetivoAberto ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {efetivoAberto ? '✓ Abertas' : '✗ Encerradas'}
-                  </span>
-                  {registrationStatus === 'auto' && registrationDeadline && (
-                    <span className="text-slate-500"> · pelo prazo de {formatBrDate(registrationDeadline, true)}</span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <p className="text-slate-600 text-sm mb-6">
-              Use para <strong>abrir ou fechar na hora</strong>, sem depender da data. Em
-              <strong> Abertas</strong>, o formulário público continua aceitando inscrição mesmo
-              depois do prazo. Em <strong>Encerradas</strong>, fecha na hora, mesmo dentro do prazo.
-              Admin e líderes cadastram normalmente em qualquer situação.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {opcoes.map(op => {
-                const ativa = registrationStatus === op.valor;
-                const Icone = op.icone;
-                return (
-                  <button
-                    key={op.valor}
-                    type="button"
-                    onClick={() => handleChangeRegistrationStatus(op.valor)}
-                    disabled={savingStatus || !onUpdateRegistrationStatus}
-                    className={`text-left p-4 rounded-lg border-2 transition-all disabled:opacity-50 ${
-                      ativa
-                        ? op.cor === 'emerald' ? 'border-emerald-500 bg-emerald-50'
-                          : op.cor === 'red' ? 'border-red-500 bg-red-50'
-                          : 'border-indigo-500 bg-indigo-50'
-                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Icone size={20} className={
-                      ativa
-                        ? op.cor === 'emerald' ? 'text-emerald-600'
-                          : op.cor === 'red' ? 'text-red-600'
-                          : 'text-indigo-600'
-                        : 'text-slate-400'
-                    } />
-                    <span className={`block text-sm font-bold mt-2 ${ativa ? 'text-slate-900' : 'text-slate-700'}`}>
-                      {op.titulo}
-                    </span>
-                    <span className="block text-xs text-slate-500 mt-0.5">{op.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {savingStatus && <p className="text-sm text-slate-500 mt-4">Salvando...</p>}
-            {statusError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mt-4">
-                <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
-                <p className="text-red-700 font-medium text-sm">{statusError}</p>
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* Cupons de Desconto — bloqueio geral */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
