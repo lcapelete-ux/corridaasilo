@@ -14,6 +14,7 @@ interface RunnerListProps {
   transferSettings?: TransferSettings | null;
   onUpdateTransferSettings?: (settings: TransferSettings) => void;
   promoDeadline?: string; // Prazo do lote promocional — também vale como validade dos cupons
+  teams?: string[];       // Academias cadastradas, para sugerir ao corrigir a equipe
 }
 
 // Célula de observação editável (salva ao sair do campo). Uso do organizador:
@@ -50,7 +51,7 @@ const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded te
 // Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
 const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline, teams }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes' | 'autorizacoes'>('lista');
@@ -116,6 +117,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
   // Listas para os menus de filtro (só o que realmente existe entre os inscritos)
   const teamsPresent = Array.from(new Set(runners.map(r => r.teamName).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  // Sugestões ao corrigir a equipe: as oficiais entram mesmo sem ninguém
+  // inscrito ainda, senão não dá para mover alguém para uma academia nova
+  const equipesDisponiveis = Array.from(new Set([...(teams || []), ...teamsPresent]))
+    .filter(t => t && t !== 'Avulso')
     .sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const categoriesPresent = Array.from(new Set(
     runners.map(r => getRunnerCategory(r.birthDate, r.modality)).filter(Boolean)
@@ -486,6 +492,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [editRunner, setEditRunner] = useState<Runner | null>(null);
   const [editName, setEditName] = useState('');
   const [editCpf, setEditCpf] = useState('');
+  const [editTeam, setEditTeam] = useState('');
   const [editError, setEditError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -493,6 +500,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     setEditRunner(runner);
     setEditName(runner.fullName);
     setEditCpf(runner.cpf);
+    setEditTeam(runner.teamName);
     setEditError('');
   };
 
@@ -512,10 +520,13 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
     const nome = editName.trim();
     const cpf = editCpf.trim();
+    // Equipe em branco vira "Avulso", o mesmo que a inscrição usa para quem
+    // não pertence a nenhuma academia
+    const equipe = editTeam.trim() || 'Avulso';
     if (!nome) { setEditError('O nome não pode ficar vazio.'); return; }
     if (cpf.replace(/\D/g, '').length !== 11) { setEditError('CPF incompleto.'); return; }
 
-    if (nome === editRunner.fullName && cpf === editRunner.cpf) {
+    if (nome === editRunner.fullName && cpf === editRunner.cpf && equipe === editRunner.teamName) {
       setEditRunner(null);
       return;
     }
@@ -523,9 +534,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     setSavingEdit(true);
     setEditError('');
     try {
-      // Só nome e CPF. Nada de transferredFrom/transferredAt: é correção,
+      // Nome, CPF e equipe. Nada de transferredFrom/transferredAt: é correção,
       // não troca de titular.
-      await onUpdate({ ...editRunner, fullName: nome, cpf });
+      await onUpdate({ ...editRunner, fullName: nome, cpf, teamName: equipe });
       setEditRunner(null);
     } catch (err: any) {
       // O banco tem CPF único — digitar um CPF já usado cai aqui
@@ -1330,7 +1341,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           <button
                             onClick={() => openEditModal(runner)}
                             className="p-2 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
-                            title="Corrigir nome/CPF (não é transferência)"
+                            title="Corrigir nome, CPF ou equipe (não é transferência)"
                           >
                             <UserCog size={18} />
                           </button>
@@ -1672,6 +1683,24 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                   placeholder="000.000.000-00"
                   className={`${transferInputCls} font-mono`}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Equipe / Academia</label>
+                <input
+                  list="edit-equipes"
+                  value={editTeam}
+                  onChange={(e) => { setEditTeam(e.target.value); setEditError(''); }}
+                  placeholder="Avulso"
+                  className={transferInputCls}
+                />
+                <datalist id="edit-equipes">
+                  <option value="Avulso" />
+                  {equipesDisponiveis.map(t => <option key={t} value={t} />)}
+                </datalist>
+                <p className="text-xs text-slate-500 mt-1">
+                  Em branco fica como <strong>Avulso</strong>. Serve para quem se inscreveu na academia errada.
+                </p>
               </div>
 
               {editError && (
