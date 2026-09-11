@@ -984,6 +984,7 @@ const App: React.FC = () => {
                 transferSettings={transferSettings}
                 onUpdateTransferSettings={handleUpdateTransferSettings}
                 promoDeadline={promoDeadline}
+                teams={Array.from(new Set([...officialTeams, ...getExistingTeams()]))}
               />
             )}
             
