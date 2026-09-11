@@ -263,10 +263,7 @@ export const validarLinha = (
   else if (idade < 18 && !row.guardianName) p.push('nome do responsável (menor de 18)');
 
   if (!GENEROS.includes(row.gender)) p.push('sexo');
-  // Camiseta não trava o lote: a academia costuma mandar a lista sem tamanho e
-  // acertar depois. Em branco, entra a camiseta padrão escolhida na tela — que
-  // é o mesmo que o banco usaria (a coluna é enum obrigatório, sem "vazio").
-  if (row.shirtSize && !TAMANHOS.includes(row.shirtSize)) p.push('camiseta inválida');
+  if (!TAMANHOS.includes(row.shirtSize)) p.push('camiseta');
   if (row.modality !== '5k' && row.modality !== '3k') p.push('modalidade');
   if (!row.city) p.push('cidade');
   if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) p.push('e-mail inválido');
@@ -288,12 +285,11 @@ export const contarCpfs = (rows: BulkRow[]): Map<string, number> => {
 // linhas em que o campo veio vazio. Nunca sobrescreve o que a lista trouxe.
 export const aplicarPadroes = (
   rows: BulkRow[],
-  padroes: { teamName?: string; city?: string; modality?: RaceModality; shirtSize?: string }
+  padroes: { teamName?: string; city?: string; modality?: RaceModality }
 ): BulkRow[] =>
   rows.map(r => ({
     ...r,
     teamName: r.teamName || padroes.teamName || '',
     city: r.city || padroes.city || '',
     modality: r.modality || padroes.modality || '',
-    shirtSize: r.shirtSize || padroes.shirtSize || '',
   }));
