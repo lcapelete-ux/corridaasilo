@@ -696,6 +696,41 @@ export const setCouponsBlocked = async (blocked: boolean): Promise<void> => {
   if (error) throw friendlyError(error, 'Erro ao salvar bloqueio de cupons');
 };
 
+// --- Inscrições abertas/encerradas (interruptor do admin) ---
+// 'auto'   = quem manda é o prazo de inscrição (comportamento antigo)
+// 'open'   = abertas, mesmo depois do prazo
+// 'closed' = encerradas agora, mesmo dentro do prazo
+export type RegistrationStatus = 'auto' | 'open' | 'closed';
+
+export const getRegistrationStatus = async (): Promise<RegistrationStatus> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('registration_status')
+    .limit(1)
+    .maybeSingle();
+  // Coluna ainda não existe (migração pendente): segue no automático, que é
+  // exatamente o que o site fazia antes deste interruptor
+  if (error) {
+    if (isUnknownColumnError(error)) return 'auto';
+    throw friendlyError(error, 'Erro ao carregar a situação das inscrições');
+  }
+  const valor = (data as { registration_status: string | null } | null)?.registration_status;
+  return valor === 'open' || valor === 'closed' ? valor : 'auto';
+};
+
+export const setRegistrationStatus = async (status: RegistrationStatus): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ registration_status: status })
+    .eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('Este botão precisa da atualização do banco: rode supabase/atualizacao_app.sql e tente de novo. Enquanto isso, mude a data do prazo de inscrição acima.');
+    }
+    throw friendlyError(error, 'Erro ao salvar a situação das inscrições');
+  }
+};
+
 export const getRaceGroupName = async (): Promise<string> => {
   const { data, error } = await supabase
     .from('app_settings')
