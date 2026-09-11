@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, getRegistrationStatus, setRegistrationStatus, RegistrationStatus } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -57,6 +57,8 @@ const App: React.FC = () => {
   const [raceGroupName, setRaceGroupName] = useState('2ª CORRIDA NOTURNA LSC');
   const [promoDeadline, setPromoDeadline] = useState('2026-08-23');
   const [registrationDeadline, setRegistrationDeadline] = useState('2026-09-05');
+  // Interruptor do admin: 'auto' deixa o prazo decidir; 'open'/'closed' mandam
+  const [registrationStatus, setRegistrationStatusState] = useState<RegistrationStatus>('auto');
   const [sponsorLogos, setSponsorLogos] = useState<SponsorLogo[]>([]);
   // Bloqueio geral de cupons de desconto (interruptor do admin em Configurações)
   const [couponsBlocked, setCouponsBlockedState] = useState(false);
@@ -236,6 +238,7 @@ const App: React.FC = () => {
     refreshRaceGroupName();
     refreshPromoDeadline();
     refreshRegistrationDeadline();
+    refreshRegistrationStatus();
     refreshSponsorLogos();
     refreshCouponsBlocked();
     refreshRaffleSettings();
@@ -322,6 +325,21 @@ const App: React.FC = () => {
   const handleUpdateRegistrationDeadline = async (date: string) => {
     await updateRegistrationDeadline(date);
     await refreshRegistrationDeadline();
+  };
+
+  // Inscrições abertas/encerradas: leitura resiliente (sem a coluna, fica no
+  // automático, que é o comportamento que o site já tinha)
+  const refreshRegistrationStatus = async () => {
+    try {
+      setRegistrationStatusState(await getRegistrationStatus());
+    } catch {
+      // Mantém o valor atual
+    }
+  };
+
+  const handleUpdateRegistrationStatus = async (status: RegistrationStatus) => {
+    await setRegistrationStatus(status); // erro propaga para a tela avisar
+    await refreshRegistrationStatus();
   };
 
   const refreshRaceGroupName = async () => {
@@ -700,7 +718,12 @@ const App: React.FC = () => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
   })();
-  const registrationsClosed = !!registrationDeadline && todayIso > registrationDeadline;
+  // A escolha explícita do admin vence o prazo nos dois sentidos; em 'auto',
+  // manda a data, como era antes.
+  const registrationsClosed =
+    registrationStatus === 'closed' ? true
+    : registrationStatus === 'open' ? false
+    : (!!registrationDeadline && todayIso > registrationDeadline);
 
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState; icon: any; label: string }) => (
     <button
@@ -1067,6 +1090,8 @@ const App: React.FC = () => {
                 promoDeadline={promoDeadline}
                 onUpdatePromoDeadline={handleUpdatePromoDeadline}
                 registrationDeadline={registrationDeadline}
+                registrationStatus={registrationStatus}
+                onUpdateRegistrationStatus={handleUpdateRegistrationStatus}
                 onUpdateRegistrationDeadline={handleUpdateRegistrationDeadline}
                 totalRunners={runners.length}
                 couponsBlocked={couponsBlocked}
