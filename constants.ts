@@ -15,6 +15,14 @@ export const GRANTABLE_VIEWS: { key: string; label: string }[] = [
   { key: 'kits', label: 'Entrega de Kits' },
 ];
 
+// Acesso exclusivo à Entrega de Kits: o usuário entra e vê SÓ essa tela, sem
+// Corredores nem Novo Cadastro. Guardado junto das permissões (é só um texto
+// no array), então não precisa de coluna nova nem de papel novo no banco.
+export const KITS_ONLY = 'kits_only';
+
+export const isKitsOnly = (session?: { role?: string; permissions?: string[] } | null): boolean =>
+  !!session && session.role !== 'admin' && !!session.permissions?.includes(KITS_ONLY);
+
 // Logos de patrocinadores no rodapé: altura do "chip" branco e altura base do
 // logo dentro dele (100% do ajuste). Cada logo pode ter um scale próprio, então
 // esses números são o ponto de partida compartilhado entre o rodapé e a tela

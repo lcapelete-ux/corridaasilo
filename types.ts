@@ -46,6 +46,10 @@ export interface Runner {
   note?: string;             // Observação livre do organizador (ex.: pagamento em nome de outra pessoa)
   payerName?: string;        // Quem pagou, quando não foi o próprio atleta (vazio = pagou da própria conta)
   paymentNotice?: string;    // Recado do organizador exibido ao atleta na tela de "Minha Inscrição" (ex.: por que o valor mudou de lote)
+  // Remessa enviada à organização da prova. Vazio = ainda não foi enviado.
+  // Só entra em remessa quem está com pagamento confirmado.
+  sentBatch?: number;
+  sentAt?: string;           // Quando o atleta entrou na remessa (ISO)
   valueAdjusted?: boolean;   // Valor definido à mão pelo organizador: vale como está e não vence junto com o lote promocional
 }
 

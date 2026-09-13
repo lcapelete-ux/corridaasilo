@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
 import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone, Send } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
+import { SendBatchModal } from './SendBatchModal';
 
 interface RunnerListProps {
   runners: Runner[];
@@ -14,6 +15,8 @@ interface RunnerListProps {
   transferSettings?: TransferSettings | null;
   onUpdateTransferSettings?: (settings: TransferSettings) => void;
   promoDeadline?: string; // Prazo do lote promocional — também vale como validade dos cupons
+  onSendBatch?: (ids: string[], batch: number) => Promise<void>;  // marca remessa enviada à organização
+  onUndoBatch?: (ids: string[]) => Promise<void>;
 }
 
 // Célula de observação editável (salva ao sair do campo). Uso do organizador:
@@ -50,7 +53,7 @@ const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded te
 // Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
 const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline, onSendBatch, onUndoBatch }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes' | 'autorizacoes'>('lista');
@@ -101,6 +104,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     if (hoje <= promoDeadline) return false;
     return r.registrationDate.split('T')[0] <= promoDeadline;
   };
+  // Envio à organização: separa quem já foi de quem ainda vai
+  const [sendFilter, setSendFilter] = useState<'todos' | 'nao_enviados' | 'enviados'>('todos');
+  const [batchOpen, setBatchOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'padrao' | 'data_desc' | 'data_asc' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
 
   // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
@@ -129,6 +135,10 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         r.teamName.toLowerCase().includes(q) ||
         r.cpf.includes(searchTerm) ||
         r.city.toLowerCase().includes(q);
+      const matchesSend =
+        sendFilter === 'nao_enviados' ? !r.sentBatch
+        : sendFilter === 'enviados' ? !!r.sentBatch
+        : true;
       const matchesTeam = !teamFilter || r.teamName === teamFilter;
       const matchesCategory = !categoryFilter || getRunnerCategory(r.birthDate, r.modality) === categoryFilter;
       const matchesModality = !modalityFilter || (r.modality || '5k') === modalityFilter;
@@ -140,7 +150,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         paymentFilter === 'pago' ? !!r.isPaid :
         paymentFilter === 'pendente' ? !r.isPaid :
         paymentFilter === 'promo_pendente' ? isPromoPending(r) : true;
-      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment;
+      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment && matchesSend;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -158,7 +168,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       }
     });
 
-  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sortBy !== 'padrao');
+  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sendFilter !== 'todos' || sortBy !== 'padrao');
   const clearFilters = () => {
     setTeamFilter('');
     setCategoryFilter('');
@@ -657,6 +667,21 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <Database size={14} /> Backup XML
               </button>
             )}
+            {userSession?.role === 'admin' && onSendBatch && (() => {
+              const aEnviar = runners.filter(r => r.isPaid && !r.sentBatch).length;
+              return (
+                <button
+                  onClick={() => setBatchOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-teal-500/10 text-teal-400 rounded-lg text-xs font-bold hover:bg-teal-500/20 transition-colors"
+                  title="Gerar o arquivo para a organização e marcar quem já foi enviado"
+                >
+                  <Send size={14} /> Remessa
+                  {aEnviar > 0 && (
+                    <span className="bg-teal-500 text-white px-1.5 rounded-full text-[10px]">{aEnviar}</span>
+                  )}
+                </button>
+              );
+            })()}
             {userSession?.role === 'admin' && (
               <button
                 onClick={() => showTransferSettings ? setShowTransferSettings(false) : openTransferSettings()}
@@ -1048,7 +1073,16 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Envio à organização */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Envio</label>
+            <select value={sendFilter} onChange={e => setSendFilter(e.target.value as typeof sendFilter)} className={filterSelectCls}>
+              <option value="todos">Todos</option>
+              <option value="nao_enviados">Não enviados</option>
+              <option value="enviados">Já enviados</option>
+            </select>
+          </div>
           {/* Academia */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Academia</label>
@@ -1176,6 +1210,22 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4">
                       <div className="font-medium text-white">{runner.fullName}</div>
                       <div className="text-xs text-slate-500">{runner.email}</div>
+                      {/* Remessa: mostra se este atleta já foi enviado à organização */}
+                      {runner.sentBatch ? (
+                        <span
+                          className="inline-flex items-center gap-1 mt-1 mr-1 bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          title={`Enviado à organização na remessa ${runner.sentBatch}${runner.sentAt ? ` em ${new Date(runner.sentAt).toLocaleDateString('pt-BR')}` : ''}`}
+                        >
+                          <Send size={10} /> Remessa {runner.sentBatch}
+                        </span>
+                      ) : runner.isPaid ? (
+                        <span
+                          className="inline-flex items-center gap-1 mt-1 mr-1 bg-slate-700/60 text-slate-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          title="Pago e ainda não enviado — entra na próxima remessa"
+                        >
+                          A enviar
+                        </span>
+                      ) : null}
                       {runner.transferredFrom && (
                         <span
                           className="inline-flex items-center gap-1 mt-1 bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
@@ -1630,6 +1680,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           </div>
         );
       })()}
+
+      {batchOpen && onSendBatch && onUndoBatch && (
+        <SendBatchModal
+          runners={runners}
+          onClose={() => setBatchOpen(false)}
+          onSend={onSendBatch}
+          onUndo={onUndoBatch}
+        />
+      )}
 
       {/* MODAL DE CORREÇÃO DE NOME/CPF */}
       {editRunner && (

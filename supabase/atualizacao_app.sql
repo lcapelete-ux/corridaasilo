@@ -1106,6 +1106,19 @@ alter table public.sponsors add column if not exists installments jsonb not null
 comment on column public.sponsors.installments is
   'Pagamentos recebidos do patrocinador: [{id, amount, date, note}]. Vazio = pagamento à vista, controlado por is_paid';
 
+-- 27. Remessa para a organização da prova. O organizador exporta os inscritos
+--     pagos e manda para quem cronometra; depois chegam mais inscrições e ele
+--     precisa saber quem já foi. Cada envio recebe um número e a data, então a
+--     remessa seguinte pega só quem entrou (ou pagou) depois. Quem não pagou
+--     nunca entra: fica para a próxima, se pagar.
+--     (Também disponível avulso em supabase/remessa_organizacao.sql)
+alter table public.runners add column if not exists sent_batch smallint;
+alter table public.runners add column if not exists sent_at timestamptz;
+comment on column public.runners.sent_batch is
+  'Número da remessa enviada à organização (vazio = ainda não enviado)';
+comment on column public.runners.sent_at is
+  'Quando o atleta entrou na remessa enviada à organização';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
