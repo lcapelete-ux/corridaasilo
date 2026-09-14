@@ -23,6 +23,34 @@ export const KITS_ONLY = 'kits_only';
 export const isKitsOnly = (session?: { role?: string; permissions?: string[] } | null): boolean =>
   !!session && session.role !== 'admin' && !!session.permissions?.includes(KITS_ONLY);
 
+// Marcação colorida dos inscritos. O organizador seleciona atletas na lista e
+// pinta com uma cor para se organizar (ex.: pagamento novo, inscrição nova,
+// conferir depois). Os nomes das cores são editáveis por ele — o que cada cor
+// significa muda de evento para evento, então o sistema não fixa o sentido.
+export interface MarkerDef {
+  key: string;
+  label: string;        // nome padrão, editável pelo organizador
+  dot: string;          // cor do ponto na lista
+  chip: string;         // fundo/texto do selo
+  ring: string;         // destaque quando selecionado no seletor
+}
+
+export const MARKERS: MarkerDef[] = [
+  { key: 'verde',    label: 'Pagamento novo',  dot: 'bg-emerald-500', chip: 'bg-emerald-500/15 text-emerald-300', ring: 'ring-emerald-400' },
+  { key: 'azul',     label: 'Inscrição nova',  dot: 'bg-sky-500',     chip: 'bg-sky-500/15 text-sky-300',         ring: 'ring-sky-400' },
+  { key: 'amarelo',  label: 'Conferir',        dot: 'bg-yellow-400',  chip: 'bg-yellow-400/15 text-yellow-300',   ring: 'ring-yellow-300' },
+  { key: 'laranja',  label: 'Aguardando',      dot: 'bg-orange-500',  chip: 'bg-orange-500/15 text-orange-300',   ring: 'ring-orange-400' },
+  { key: 'vermelho', label: 'Pendência',       dot: 'bg-red-500',     chip: 'bg-red-500/15 text-red-300',         ring: 'ring-red-400' },
+  { key: 'roxo',     label: 'Outro',           dot: 'bg-violet-500',  chip: 'bg-violet-500/15 text-violet-300',   ring: 'ring-violet-400' },
+];
+
+export const getMarker = (key?: string | null): MarkerDef | undefined =>
+  key ? MARKERS.find(m => m.key === key) : undefined;
+
+// Nome em uso para a cor: o que o organizador escreveu, ou o padrão.
+export const markerLabel = (key: string, custom?: Record<string, string> | null): string =>
+  (custom && custom[key]?.trim()) || MARKERS.find(m => m.key === key)?.label || key;
+
 // Logos de patrocinadores no rodapé: altura do "chip" branco e altura base do
 // logo dentro dele (100% do ajuste). Cada logo pode ter um scale próprio, então
 // esses números são o ponto de partida compartilhado entre o rodapé e a tela

@@ -50,6 +50,7 @@ export interface Runner {
   // Só entra em remessa quem está com pagamento confirmado.
   sentBatch?: number;
   sentAt?: string;           // Quando o atleta entrou na remessa (ISO)
+  marker?: string;           // Marcação colorida do organizador (chave de MARKERS)
   valueAdjusted?: boolean;   // Valor definido à mão pelo organizador: vale como está e não vence junto com o lote promocional
 }
 

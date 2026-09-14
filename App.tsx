@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -63,6 +63,8 @@ const App: React.FC = () => {
   const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', imageHeight: 160, link: '', whatsappLink: '' });
   const [teamRankingEnabled, setTeamRankingEnabled] = useState(false);
   const [teamRanking, setTeamRanking] = useState<TeamRankingEntry[]>([]);
+  // Nomes que o organizador deu para cada cor de marcação
+  const [markerLabels, setMarkerLabels] = useState<Record<string, string>>({});
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -242,6 +244,7 @@ const App: React.FC = () => {
     refreshRaceGroupName();
     refreshPromoDeadline();
     refreshRegistrationDeadline();
+    refreshMarkerLabels();
     refreshSponsorLogos();
     refreshCouponsBlocked();
     refreshRaffleSettings();
@@ -696,6 +699,25 @@ const App: React.FC = () => {
     await refreshRunners();
   };
 
+  const handleMarkColor = async (ids: string[], marker: string | null) => {
+    await markRunnersColor(ids, marker);
+    await refreshRunners();
+  };
+
+  // Leitura resiliente: sem a coluna, ficam os nomes padrão das cores
+  const refreshMarkerLabels = async () => {
+    try {
+      setMarkerLabels(await getMarkerLabels());
+    } catch {
+      // Mantém os padrões
+    }
+  };
+
+  const handleRenameMarkers = async (labels: Record<string, string>) => {
+    await updateMarkerLabels(labels);
+    await refreshMarkerLabels();
+  };
+
   const getExistingTeams = () => {
     const teams = new Set(runners.map(r => r.teamName).filter(t => t && t !== 'Avulso'));
     return Array.from(teams);
@@ -1008,6 +1030,9 @@ const App: React.FC = () => {
                 promoDeadline={promoDeadline}
                 onSendBatch={handleSendBatch}
                 onUndoBatch={handleUndoBatch}
+                onMarkColor={handleMarkColor}
+                markerLabels={markerLabels}
+                onRenameMarkers={handleRenameMarkers}
               />
             )}
             

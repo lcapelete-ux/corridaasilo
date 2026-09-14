@@ -90,6 +90,7 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   valueAdjusted: (r as any).value_adjusted ?? undefined,
   sentBatch: (r as any).sent_batch ?? undefined,
   sentAt: (r as any).sent_at || undefined,
+  marker: (r as any).marker || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -131,6 +132,7 @@ const runnerToRow = (r: Runner) => {
   if (r.valueAdjusted !== undefined) row.value_adjusted = !!r.valueAdjusted;
   if (r.sentBatch !== undefined) row.sent_batch = r.sentBatch ?? null;
   if (r.sentAt !== undefined) row.sent_at = r.sentAt || null;
+  if (r.marker !== undefined) row.marker = r.marker || null;
   return row;
 };
 
@@ -141,7 +143,7 @@ const MIGRATION_COLUMNS = [
   'phone', 'modality', 'transferred_from', 'transferred_at',
   'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
   'senior_full_price', 'extra_donation', 'note', 'payer_name', 'payment_notice', 'value_adjusted',
-  'sent_batch', 'sent_at',
+  'sent_batch', 'sent_at', 'marker',
 ];
 
 const isUnknownColumnError = (error: any): boolean =>
@@ -195,6 +197,42 @@ export const markRunnersSent = async (ids: string[], batch: number): Promise<voi
       throw new Error('A marcação de remessa precisa da atualização do banco. Rode o comando SQL que o organizador recebeu e tente de novo.');
     }
     throw friendlyError(error, 'Erro ao marcar a remessa');
+  }
+};
+
+// Pinta (ou despinta, com marker null) vários inscritos de uma vez. Mesma
+// ideia da remessa: uma requisição só, para não parar no meio.
+export const markRunnersColor = async (ids: string[], marker: string | null): Promise<void> => {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('runners').update({ marker }).in('id', ids);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('A marcação colorida precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao marcar os inscritos');
+  }
+};
+
+// Nomes que o organizador deu para cada cor (ficam em app_settings)
+export const getMarkerLabels = async (): Promise<Record<string, string>> => {
+  const { data, error } = await supabase
+    .from('app_settings').select('marker_labels').limit(1).maybeSingle();
+  if (error) {
+    if (isUnknownColumnError(error)) return {};
+    throw friendlyError(error, 'Erro ao carregar os nomes das marcações');
+  }
+  const v = (data as { marker_labels: unknown } | null)?.marker_labels;
+  return v && typeof v === 'object' ? (v as Record<string, string>) : {};
+};
+
+export const updateMarkerLabels = async (labels: Record<string, string>): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings').update({ marker_labels: labels }).eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('Renomear as cores precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql.');
+    }
+    throw friendlyError(error, 'Erro ao salvar os nomes das marcações');
   }
 };
 
