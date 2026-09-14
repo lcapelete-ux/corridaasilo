@@ -1129,6 +1129,12 @@ comment on column public.runners.marker is
 comment on column public.app_settings.marker_labels is
   'Nome que o organizador deu para cada cor de marcação';
 
+-- 29. Limite de vagas editável pelo admin (antes era fixo em 500 no código).
+--     É o alvo mostrado no painel; não fecha o formulário sozinho.
+alter table public.app_settings add column if not exists max_athletes int not null default 500;
+comment on column public.app_settings.max_athletes is
+  'Limite de vagas exibido no painel (alvo do organizador, não bloqueia inscrição)';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
