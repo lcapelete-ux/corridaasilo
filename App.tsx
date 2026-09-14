@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes } from './services/storageService';
 import { supabase } from './services/supabaseClient';
-import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly } from './constants';
+import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly, MAX_ATHLETES } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -65,6 +65,8 @@ const App: React.FC = () => {
   const [teamRanking, setTeamRanking] = useState<TeamRankingEntry[]>([]);
   // Nomes que o organizador deu para cada cor de marcação
   const [markerLabels, setMarkerLabels] = useState<Record<string, string>>({});
+  // Limite de vagas: o do banco quando o admin já definiu um, senão o padrão
+  const [maxAthletes, setMaxAthletes] = useState<number>(MAX_ATHLETES);
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -245,6 +247,7 @@ const App: React.FC = () => {
     refreshPromoDeadline();
     refreshRegistrationDeadline();
     refreshMarkerLabels();
+    refreshMaxAthletes();
     refreshSponsorLogos();
     refreshCouponsBlocked();
     refreshRaffleSettings();
@@ -713,6 +716,20 @@ const App: React.FC = () => {
     }
   };
 
+  const refreshMaxAthletes = async () => {
+    try {
+      const v = await getMaxAthletes();
+      setMaxAthletes(v > 0 ? v : MAX_ATHLETES);
+    } catch {
+      // Mantém o padrão
+    }
+  };
+
+  const handleUpdateMaxAthletes = async (limite: number) => {
+    await updateMaxAthletes(limite);
+    await refreshMaxAthletes();
+  };
+
   const handleRenameMarkers = async (labels: Record<string, string>) => {
     await updateMarkerLabels(labels);
     await refreshMarkerLabels();
@@ -1115,6 +1132,8 @@ const App: React.FC = () => {
                 promoDeadline={promoDeadline}
                 onUpdatePromoDeadline={handleUpdatePromoDeadline}
                 registrationDeadline={registrationDeadline}
+                maxAthletes={maxAthletes}
+                onUpdateMaxAthletes={handleUpdateMaxAthletes}
                 onUpdateRegistrationDeadline={handleUpdateRegistrationDeadline}
                 totalRunners={runners.length}
                 couponsBlocked={couponsBlocked}

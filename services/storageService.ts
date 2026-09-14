@@ -213,6 +213,30 @@ export const markRunnersColor = async (ids: string[], marker: string | null): Pr
   }
 };
 
+// Limite de vagas mostrado no painel. É um alvo definido pelo organizador —
+// pode ser aumentado quando ele decide abrir mais inscrições.
+export const getMaxAthletes = async (): Promise<number> => {
+  const { data, error } = await supabase
+    .from('app_settings').select('max_athletes').limit(1).maybeSingle();
+  if (error) {
+    if (isUnknownColumnError(error)) return 0;   // 0 = usa o padrão do código
+    throw friendlyError(error, 'Erro ao carregar o limite de inscrições');
+  }
+  const v = (data as { max_athletes: number | null } | null)?.max_athletes;
+  return v && v > 0 ? Number(v) : 0;
+};
+
+export const updateMaxAthletes = async (limite: number): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings').update({ max_athletes: limite }).eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('Mudar o limite precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao salvar o limite de inscrições');
+  }
+};
+
 // Nomes que o organizador deu para cada cor (ficam em app_settings)
 export const getMarkerLabels = async (): Promise<Record<string, string>> => {
   const { data, error } = await supabase

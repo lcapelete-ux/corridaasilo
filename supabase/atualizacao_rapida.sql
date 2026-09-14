@@ -21,6 +21,11 @@ alter table public.runners add column if not exists sent_at timestamptz;
 alter table public.runners add column if not exists marker text;
 alter table public.app_settings add column if not exists marker_labels jsonb not null default '{}'::jsonb;
 
+-- Limite de vagas mostrado no painel. É um alvo do organizador: ele aumenta
+-- quando decide abrir mais inscrições. Não fecha o formulário sozinho — quem
+-- fecha as inscrições continua sendo o prazo.
+alter table public.app_settings add column if not exists max_athletes int not null default 500;
+
 comment on column public.runners.sent_batch is
   'Número da remessa enviada à organização (vazio = ainda não enviado)';
 comment on column public.runners.sent_at is
@@ -29,6 +34,8 @@ comment on column public.runners.marker is
   'Marcação colorida do organizador (verde, azul, amarelo, laranja, vermelho, roxo)';
 comment on column public.app_settings.marker_labels is
   'Nome que o organizador deu para cada cor de marcação';
+comment on column public.app_settings.max_athletes is
+  'Limite de vagas exibido no painel (alvo do organizador, não bloqueia inscrição)';
 
 -- Confirmação: mostra como está a fila de envio agora
 select

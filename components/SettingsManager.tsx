@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy } from 'lucide-react';
 import { TransferSettings } from '../types';
 import { formatBrDate, MAX_ATHLETES } from '../constants';
@@ -17,9 +17,11 @@ interface SettingsManagerProps {
   onUpdateCouponsBlocked?: (blocked: boolean) => Promise<void>;
   teamRankingEnabled?: boolean;
   onUpdateTeamRankingEnabled?: (enabled: boolean) => Promise<void>;
+  maxAthletes?: number;                                     // limite de vagas definido pelo admin
+  onUpdateMaxAthletes?: (limite: number) => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled, maxAthletes = MAX_ATHLETES, onUpdateMaxAthletes }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +50,37 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
 
   const [savingRanking, setSavingRanking] = useState(false);
   const [rankingError, setRankingError] = useState('');
+
+  // Limite de vagas: alvo do painel, ajustável quando o admin abre mais
+  const [limiteDraft, setLimiteDraft] = useState(String(maxAthletes));
+  const [savingLimite, setSavingLimite] = useState(false);
+  const [limiteError, setLimiteError] = useState('');
+  const [limiteOk, setLimiteOk] = useState(false);
+
+  // O limite vem do banco depois da montagem: sem isto o campo ficaria
+  // mostrando o padrão enquanto o valor real já era outro.
+  useEffect(() => { setLimiteDraft(String(maxAthletes)); }, [maxAthletes]);
+
+  const salvarLimite = async () => {
+    const n = parseInt(limiteDraft, 10);
+    if (!n || n < 1) { setLimiteError('Informe um número maior que zero.'); return; }
+    if (n < totalRunners) {
+      setLimiteError(`Já há ${totalRunners} inscritos. O limite não pode ser menor que isso.`);
+      return;
+    }
+    setSavingLimite(true);
+    setLimiteError('');
+    setLimiteOk(false);
+    try {
+      await onUpdateMaxAthletes?.(n);
+      setLimiteOk(true);
+      setTimeout(() => setLimiteOk(false), 3000);
+    } catch (e: any) {
+      setLimiteError(e?.message || 'Não foi possível salvar o limite.');
+    } finally {
+      setSavingLimite(false);
+    }
+  };
 
   const handleToggleTeamRanking = async (enabled: boolean) => {
     if (!onUpdateTeamRankingEnabled) return;
@@ -164,7 +197,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
 
   const todayIso = new Date().toISOString().split('T')[0];
   const registrationsOpen = !registrationDeadline || todayIso <= registrationDeadline;
-  const pct = Math.min(100, Math.round((totalRunners / MAX_ATHLETES) * 100));
+  const pct = Math.min(100, Math.round((totalRunners / (maxAthletes || MAX_ATHLETES)) * 100));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -307,7 +340,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
               <Users size={16} className="text-indigo-500" /> Inscritos
             </span>
             <span className="text-sm font-bold text-slate-800">
-              {totalRunners} <span className="text-slate-400 font-medium">de {MAX_ATHLETES}</span>
+              {totalRunners} <span className="text-slate-400 font-medium">de {maxAthletes}</span>
             </span>
           </div>
           <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
@@ -317,10 +350,46 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
             />
           </div>
           <p className="text-xs text-slate-500 mt-2">
-            {totalRunners >= MAX_ATHLETES
-              ? 'Limite de 500 atletas atingido.'
-              : `Faltam ${MAX_ATHLETES - totalRunners} vagas para o limite de ${MAX_ATHLETES}.`}
+            {totalRunners >= maxAthletes
+              ? `Limite de ${maxAthletes} atletas atingido.`
+              : `Faltam ${maxAthletes - totalRunners} vagas para o limite de ${maxAthletes}.`}
           </p>
+
+          {/* Abrir mais vagas */}
+          {onUpdateMaxAthletes && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                Limite de vagas
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={limiteDraft}
+                  onChange={e => { setLimiteDraft(e.target.value); setLimiteError(''); setLimiteOk(false); }}
+                  className="w-32 px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 font-mono font-bold outline-none focus:ring-2 focus:ring-indigo-500 [color-scheme:light]"
+                />
+                <button
+                  type="button"
+                  onClick={salvarLimite}
+                  disabled={savingLimite || limiteDraft === String(maxAthletes)}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Save size={15} /> {savingLimite ? 'Salvando...' : 'Salvar limite'}
+                </button>
+                {limiteOk && <span className="text-emerald-600 text-sm font-bold">✓ Salvo</span>}
+              </div>
+              {limiteError && (
+                <p className="text-red-700 text-xs font-bold mt-2 flex items-start gap-1.5">
+                  <AlertCircle size={12} className="shrink-0 mt-0.5" /> {limiteError}
+                </p>
+              )}
+              <p className="text-xs text-slate-500 mt-2">
+                Aumente se decidir abrir mais inscrições. Este número é o <strong>alvo mostrado aqui</strong>:
+                ele não fecha o formulário sozinho ao ser atingido — quem fecha as inscrições é o prazo acima.
+              </p>
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSaveReg} className="space-y-6">
