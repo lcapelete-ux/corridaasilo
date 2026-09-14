@@ -51,6 +51,16 @@ export const getMarker = (key?: string | null): MarkerDef | undefined =>
 export const markerLabel = (key: string, custom?: Record<string, string> | null): string =>
   (custom && custom[key]?.trim()) || MARKERS.find(m => m.key === key)?.label || key;
 
+// Inscrição isenta (valor zerado): o organizador registra por que não houve
+// pagamento, para a contabilidade não ficar com um buraco sem explicação.
+export const FREE_REASONS: { key: 'patrocinio' | 'cortesia'; label: string; chip: string }[] = [
+  { key: 'patrocinio', label: 'Patrocínio', chip: 'bg-amber-500/15 text-amber-300' },
+  { key: 'cortesia',   label: 'Cortesia',   chip: 'bg-pink-500/15 text-pink-300' },
+];
+
+export const freeReasonLabel = (key?: string): string =>
+  FREE_REASONS.find(r => r.key === key)?.label || '';
+
 // Logos de patrocinadores no rodapé: altura do "chip" branco e altura base do
 // logo dentro dele (100% do ajuste). Cada logo pode ter um scale próprio, então
 // esses números são o ponto de partida compartilhado entre o rodapé e a tela

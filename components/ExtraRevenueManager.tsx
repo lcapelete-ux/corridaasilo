@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExtraRevenue, Runner } from '../types';
+import { ExtraRevenue, Runner, Sponsor } from '../types';
 import { getRunnerPaidValue, SENIOR_AGE, EVENT_DATE, formatBrDate } from '../constants';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend, svgBars } from '../services/printReport';
 import { Plus, Trash2, TrendingUp, Calendar, DollarSign, UserCheck, Tag, Pencil, FileDown } from 'lucide-react';
@@ -12,6 +12,7 @@ interface ExtraRevenueManagerProps {
   onDelete: (id: string) => void;
   onUpdateRunner?: (runner: Runner) => void;
   raceGroupName?: string;
+  sponsors?: Sponsor[];
 }
 
 // Mesmo padrão visual do relatório de patrocínios
@@ -36,7 +37,7 @@ const REPORT_STYLE = `
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete, onUpdateRunner, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
+export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenues, runners, onSave, onDelete, onUpdateRunner, raceGroupName = '2ª CORRIDA NOTURNA LSC', sponsors = [] }) => {
   const [valueAdjustRunner, setValueAdjustRunner] = useState<Runner | null>(null);
   const [formData, setFormData] = useState({
     description: '',
@@ -430,6 +431,7 @@ export const ExtraRevenueManager: React.FC<ExtraRevenueManagerProps> = ({ revenu
 
       {valueAdjustRunner && onUpdateRunner && (
         <ValueAdjustModal
+          sponsors={sponsors}
           runner={valueAdjustRunner}
           onClose={() => setValueAdjustRunner(null)}
           onSave={onUpdateRunner}
