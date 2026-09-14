@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels } from './services/storageService';
 import { supabase } from './services/supabaseClient';
-import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount } from './constants';
+import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -63,6 +63,8 @@ const App: React.FC = () => {
   const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({ enabled: false, prizeName: '', imageUrl: '', imageHeight: 160, link: '', whatsappLink: '' });
   const [teamRankingEnabled, setTeamRankingEnabled] = useState(false);
   const [teamRanking, setTeamRanking] = useState<TeamRankingEntry[]>([]);
+  // Nomes que o organizador deu para cada cor de marcação
+  const [markerLabels, setMarkerLabels] = useState<Record<string, string>>({});
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -165,6 +167,12 @@ const App: React.FC = () => {
     })();
   }, []);
 
+  // Acesso exclusivo à Entrega de Kits: já abre nela, porque é a única tela
+  // que esse login tem. Vale no login e na sessão restaurada.
+  useEffect(() => {
+    if (isKitsOnly(userSession)) setCurrentView('kits');
+  }, [userSession]);
+
   // Sequência de abertura: prepara o áudio (destrava no 1º gesto) e pré-carrega
   // os logos da vinheta; depois some com o loader estático do index.html,
   // revelando a introdução por baixo (crossfade, sem tela preta no meio).
@@ -236,6 +244,7 @@ const App: React.FC = () => {
     refreshRaceGroupName();
     refreshPromoDeadline();
     refreshRegistrationDeadline();
+    refreshMarkerLabels();
     refreshSponsorLogos();
     refreshCouponsBlocked();
     refreshRaffleSettings();
@@ -678,6 +687,37 @@ const App: React.FC = () => {
     return runners;
   };
 
+  // Remessa para a organização: marca/desmarca e recarrega, para os selos e
+  // o contador do botão refletirem na hora.
+  const handleSendBatch = async (ids: string[], batch: number) => {
+    await markRunnersSent(ids, batch);
+    await refreshRunners();
+  };
+
+  const handleUndoBatch = async (ids: string[]) => {
+    await unmarkRunnersSent(ids);
+    await refreshRunners();
+  };
+
+  const handleMarkColor = async (ids: string[], marker: string | null) => {
+    await markRunnersColor(ids, marker);
+    await refreshRunners();
+  };
+
+  // Leitura resiliente: sem a coluna, ficam os nomes padrão das cores
+  const refreshMarkerLabels = async () => {
+    try {
+      setMarkerLabels(await getMarkerLabels());
+    } catch {
+      // Mantém os padrões
+    }
+  };
+
+  const handleRenameMarkers = async (labels: Record<string, string>) => {
+    await updateMarkerLabels(labels);
+    await refreshMarkerLabels();
+  };
+
   const getExistingTeams = () => {
     const teams = new Set(runners.map(r => r.teamName).filter(t => t && t !== 'Avulso'));
     return Array.from(teams);
@@ -867,9 +907,13 @@ const App: React.FC = () => {
             <NavItem target="dashboard" icon={LayoutDashboard} label="Dashboard" />
           )}
 
-          <NavItem target="runners" icon={Users} label="Corredores" />
-
-          <NavItem target="registration" icon={UserPlus} label="Novo Cadastro" />
+          {/* Acesso exclusivo à Entrega de Kits: nada de Corredores nem cadastro */}
+          {!isKitsOnly(userSession) && (
+            <>
+              <NavItem target="runners" icon={Users} label="Corredores" />
+              <NavItem target="registration" icon={UserPlus} label="Novo Cadastro" />
+            </>
+          )}
 
           {userSession?.role === 'admin' && (
             <NavItem target="bulk_registration" icon={Sparkles} label="Inscrição em Lote" />
@@ -984,6 +1028,11 @@ const App: React.FC = () => {
                 transferSettings={transferSettings}
                 onUpdateTransferSettings={handleUpdateTransferSettings}
                 promoDeadline={promoDeadline}
+                onSendBatch={handleSendBatch}
+                onUndoBatch={handleUndoBatch}
+                onMarkColor={handleMarkColor}
+                markerLabels={markerLabels}
+                onRenameMarkers={handleRenameMarkers}
               />
             )}
             

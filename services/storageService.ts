@@ -88,6 +88,9 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   payerName: (r as any).payer_name || undefined,
   paymentNotice: (r as any).payment_notice || undefined,
   valueAdjusted: (r as any).value_adjusted ?? undefined,
+  sentBatch: (r as any).sent_batch ?? undefined,
+  sentAt: (r as any).sent_at || undefined,
+  marker: (r as any).marker || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -127,6 +130,9 @@ const runnerToRow = (r: Runner) => {
   // Recado ao atleta: idem — mandar vazio é como o admin apaga o aviso
   if (r.paymentNotice !== undefined) row.payment_notice = r.paymentNotice.trim() ? r.paymentNotice.trim() : null;
   if (r.valueAdjusted !== undefined) row.value_adjusted = !!r.valueAdjusted;
+  if (r.sentBatch !== undefined) row.sent_batch = r.sentBatch ?? null;
+  if (r.sentAt !== undefined) row.sent_at = r.sentAt || null;
+  if (r.marker !== undefined) row.marker = r.marker || null;
   return row;
 };
 
@@ -137,6 +143,7 @@ const MIGRATION_COLUMNS = [
   'phone', 'modality', 'transferred_from', 'transferred_at',
   'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
   'senior_full_price', 'extra_donation', 'note', 'payer_name', 'payment_notice', 'value_adjusted',
+  'sent_batch', 'sent_at', 'marker',
 ];
 
 const isUnknownColumnError = (error: any): boolean =>
@@ -174,6 +181,69 @@ export const updateRunner = async (runner: Runner): Promise<void> => {
     ({ error } = await supabase.from('runners').update(stripMigrationColumns(row)).eq('id', id));
   }
   if (error) throw friendlyError(error, 'Erro ao atualizar inscrição');
+};
+
+// Marca uma remessa enviada à organização. Numa única requisição: com 400+
+// inscritos, gravar um por um demoraria e poderia parar no meio, deixando
+// parte marcada e parte não.
+export const markRunnersSent = async (ids: string[], batch: number): Promise<void> => {
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from('runners')
+    .update({ sent_batch: batch, sent_at: new Date().toISOString() })
+    .in('id', ids);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('A marcação de remessa precisa da atualização do banco. Rode o comando SQL que o organizador recebeu e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao marcar a remessa');
+  }
+};
+
+// Pinta (ou despinta, com marker null) vários inscritos de uma vez. Mesma
+// ideia da remessa: uma requisição só, para não parar no meio.
+export const markRunnersColor = async (ids: string[], marker: string | null): Promise<void> => {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('runners').update({ marker }).in('id', ids);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('A marcação colorida precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao marcar os inscritos');
+  }
+};
+
+// Nomes que o organizador deu para cada cor (ficam em app_settings)
+export const getMarkerLabels = async (): Promise<Record<string, string>> => {
+  const { data, error } = await supabase
+    .from('app_settings').select('marker_labels').limit(1).maybeSingle();
+  if (error) {
+    if (isUnknownColumnError(error)) return {};
+    throw friendlyError(error, 'Erro ao carregar os nomes das marcações');
+  }
+  const v = (data as { marker_labels: unknown } | null)?.marker_labels;
+  return v && typeof v === 'object' ? (v as Record<string, string>) : {};
+};
+
+export const updateMarkerLabels = async (labels: Record<string, string>): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings').update({ marker_labels: labels }).eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('Renomear as cores precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql.');
+    }
+    throw friendlyError(error, 'Erro ao salvar os nomes das marcações');
+  }
+};
+
+// Desfaz a marcação (remessa gerada por engano)
+export const unmarkRunnersSent = async (ids: string[]): Promise<void> => {
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from('runners')
+    .update({ sent_batch: null, sent_at: null })
+    .in('id', ids);
+  if (error) throw friendlyError(error, 'Erro ao desfazer a remessa');
 };
 
 export const deleteRunner = async (id: string): Promise<void> => {

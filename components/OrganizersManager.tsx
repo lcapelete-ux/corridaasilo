@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Organizer } from '../types';
-import { GRANTABLE_VIEWS } from '../constants';
-import { Shield, Plus, Trash2, User, Key, Flag, Phone, Pencil, Mail, CheckCircle, Copy, Check, X, Monitor } from 'lucide-react';
+import { GRANTABLE_VIEWS, KITS_ONLY } from '../constants';
+import { Shield, Plus, Trash2, User, Key, Flag, Phone, Pencil, Mail, CheckCircle, Copy, Check, X, Monitor, Package } from 'lucide-react';
 
 interface OrganizersManagerProps {
   organizers: Organizer[];
@@ -349,6 +349,32 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                     );
                   })}
                 </div>
+                {/* Login só para a retirada do kit: entra direto na tela de kits
+                    e não vê Corredores nem cadastro */}
+                {createForm.permissions.includes('kits') && (
+                  <label
+                    className={`flex items-start gap-3 p-3 mt-2 rounded-lg border cursor-pointer transition-all ${
+                      createForm.permissions.includes(KITS_ONLY)
+                        ? 'bg-teal-500/10 border-teal-500/40'
+                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={createForm.permissions.includes(KITS_ONLY)}
+                      onChange={() => toggleCreatePermission(KITS_ONLY)}
+                      className="w-4 h-4 mt-0.5 rounded border-slate-600 accent-teal-500"
+                    />
+                    <div>
+                      <span className={`text-sm font-bold block flex items-center gap-1.5 ${createForm.permissions.includes(KITS_ONLY) ? 'text-teal-300' : 'text-slate-300'}`}>
+                        <Package size={13} /> Somente Entrega de Kits
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Entra direto na tela de kits e não vê Corredores nem cadastro. Ideal para quem só vai dar baixa na retirada.
+                      </span>
+                    </div>
+                  </label>
+                )}
                 <p className="text-[11px] text-slate-500 mt-2">
                   O líder já vê "Corredores" e "Novo Cadastro" por padrão. Marque telas extras para liberar (ex.: Entrega de Kits). Pode ajustar depois editando o organizador.
                 </p>
@@ -436,6 +462,31 @@ export const OrganizersManager: React.FC<OrganizersManagerProps> = ({ organizers
                     );
                   })}
                 </div>
+                {/* Converte um organizador existente em login só de retirada de kit */}
+                {editForm.permissions.includes('kits') && (
+                  <label
+                    className={`flex items-start gap-3 p-3 mt-2 rounded-lg border cursor-pointer transition-all ${
+                      editForm.permissions.includes(KITS_ONLY)
+                        ? 'bg-teal-500/10 border-teal-500/40'
+                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editForm.permissions.includes(KITS_ONLY)}
+                      onChange={() => togglePermission(KITS_ONLY)}
+                      className="w-4 h-4 mt-0.5 rounded border-slate-600 accent-teal-500"
+                    />
+                    <div>
+                      <span className={`text-sm font-bold block flex items-center gap-1.5 ${editForm.permissions.includes(KITS_ONLY) ? 'text-teal-300' : 'text-slate-300'}`}>
+                        <Package size={13} /> Somente Entrega de Kits
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        Entra direto na tela de kits e não vê Corredores nem cadastro.
+                      </span>
+                    </div>
+                  </label>
+                )}
                 <p className="text-[11px] text-slate-500 mt-2">
                   O líder já vê "Corredores" e "Novo Cadastro". Marque telas extras para liberar (ex.: Entrega de Kits).
                 </p>

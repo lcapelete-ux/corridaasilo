@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
+import { MARKERS, getMarker, markerLabel, getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone, Send, Palette } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
+import { SendBatchModal } from './SendBatchModal';
+import { MarkerPicker } from './MarkerPicker';
 
 interface RunnerListProps {
   runners: Runner[];
@@ -14,6 +16,11 @@ interface RunnerListProps {
   transferSettings?: TransferSettings | null;
   onUpdateTransferSettings?: (settings: TransferSettings) => void;
   promoDeadline?: string; // Prazo do lote promocional — também vale como validade dos cupons
+  onSendBatch?: (ids: string[], batch: number) => Promise<void>;  // marca remessa enviada à organização
+  onUndoBatch?: (ids: string[]) => Promise<void>;
+  onMarkColor?: (ids: string[], marker: string | null) => Promise<void>;  // marcação colorida
+  markerLabels?: Record<string, string>;
+  onRenameMarkers?: (labels: Record<string, string>) => Promise<void>;
 }
 
 // Célula de observação editável (salva ao sair do campo). Uso do organizador:
@@ -50,7 +57,7 @@ const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded te
 // Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
 const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline, onSendBatch, onUndoBatch, onMarkColor, markerLabels = {}, onRenameMarkers }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes' | 'autorizacoes'>('lista');
@@ -101,6 +108,11 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     if (hoje <= promoDeadline) return false;
     return r.registrationDate.split('T')[0] <= promoDeadline;
   };
+  // Envio à organização: separa quem já foi de quem ainda vai
+  const [sendFilter, setSendFilter] = useState<'todos' | 'nao_enviados' | 'enviados'>('todos');
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [markerOpen, setMarkerOpen] = useState(false);
+  const [markerFilter, setMarkerFilter] = useState<string>('');   // '' = todas | 'sem' | chave da cor
   const [sortBy, setSortBy] = useState<'padrao' | 'data_desc' | 'data_asc' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
 
   // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
@@ -129,6 +141,14 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         r.teamName.toLowerCase().includes(q) ||
         r.cpf.includes(searchTerm) ||
         r.city.toLowerCase().includes(q);
+      const matchesSend =
+        sendFilter === 'nao_enviados' ? !r.sentBatch
+        : sendFilter === 'enviados' ? !!r.sentBatch
+        : true;
+      const matchesMarker =
+        !markerFilter ? true
+        : markerFilter === 'sem' ? !r.marker
+        : r.marker === markerFilter;
       const matchesTeam = !teamFilter || r.teamName === teamFilter;
       const matchesCategory = !categoryFilter || getRunnerCategory(r.birthDate, r.modality) === categoryFilter;
       const matchesModality = !modalityFilter || (r.modality || '5k') === modalityFilter;
@@ -140,7 +160,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         paymentFilter === 'pago' ? !!r.isPaid :
         paymentFilter === 'pendente' ? !r.isPaid :
         paymentFilter === 'promo_pendente' ? isPromoPending(r) : true;
-      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment;
+      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment && matchesSend && matchesMarker;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -158,7 +178,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       }
     });
 
-  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sortBy !== 'padrao');
+  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sendFilter !== 'todos' || markerFilter || sortBy !== 'padrao');
   const clearFilters = () => {
     setTeamFilter('');
     setCategoryFilter('');
@@ -657,6 +677,21 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 <Database size={14} /> Backup XML
               </button>
             )}
+            {userSession?.role === 'admin' && onSendBatch && (() => {
+              const aEnviar = runners.filter(r => r.isPaid && !r.sentBatch).length;
+              return (
+                <button
+                  onClick={() => setBatchOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-teal-500/10 text-teal-400 rounded-lg text-xs font-bold hover:bg-teal-500/20 transition-colors"
+                  title="Gerar o arquivo para a organização e marcar quem já foi enviado"
+                >
+                  <Send size={14} /> Remessa
+                  {aEnviar > 0 && (
+                    <span className="bg-teal-500 text-white px-1.5 rounded-full text-[10px]">{aEnviar}</span>
+                  )}
+                </button>
+              );
+            })()}
             {userSession?.role === 'admin' && (
               <button
                 onClick={() => showTransferSettings ? setShowTransferSettings(false) : openTransferSettings()}
@@ -1048,7 +1083,27 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {/* Marcação colorida */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Marcação</label>
+            <select value={markerFilter} onChange={e => setMarkerFilter(e.target.value)} className={filterSelectCls}>
+              <option value="">Todas</option>
+              <option value="sem">Sem marcação</option>
+              {MARKERS.map(m => (
+                <option key={m.key} value={m.key}>{markerLabel(m.key, markerLabels)}</option>
+              ))}
+            </select>
+          </div>
+          {/* Envio à organização */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Envio</label>
+            <select value={sendFilter} onChange={e => setSendFilter(e.target.value as typeof sendFilter)} className={filterSelectCls}>
+              <option value="todos">Todos</option>
+              <option value="nao_enviados">Não enviados</option>
+              <option value="enviados">Já enviados</option>
+            </select>
+          </div>
           {/* Academia */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Academia</label>
@@ -1117,6 +1172,14 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             >
               Limpar seleção
             </button>
+            {onMarkColor && (
+              <button
+                onClick={() => setMarkerOpen(true)}
+                className="bg-indigo-800/60 text-white border border-indigo-400/40 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-indigo-800 transition-colors"
+              >
+                <Palette size={16} /> Marcar com cor
+              </button>
+            )}
             <button
               onClick={openBulk}
               className="bg-white text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-indigo-50 transition-colors"
@@ -1146,6 +1209,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     />
                   </th>
                 )}
+                <th className="p-0 w-1.5" aria-label="Marcação" />
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Atleta</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Local/CPF</th>
                 <th className="p-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Idade/Gênero</th>
@@ -1162,6 +1226,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
               {filteredRunners.length > 0 ? (
                 filteredRunners.map((runner) => (
                   <tr key={runner.id} className={`transition-colors ${selectedIds.has(runner.id) ? 'bg-indigo-500/10' : 'hover:bg-slate-800/30'}`}>
+                    {/* Faixa da cor: a célula inteira é pintada, para acompanhar
+                        a altura da linha e dar para achar o grupo de relance */}
+                    <td className={`p-0 w-1.5 ${getMarker(runner.marker)?.dot || ''}`} />
                     {canEditFinancials && onUpdate && (
                       <td className="pl-4 pr-1 align-top pt-5">
                         <input
@@ -1176,6 +1243,35 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4">
                       <div className="font-medium text-white">{runner.fullName}</div>
                       <div className="text-xs text-slate-500">{runner.email}</div>
+                      {/* Marcação colorida do organizador */}
+                      {(() => {
+                        const mk = getMarker(runner.marker);
+                        return mk ? (
+                          <span
+                            className={`inline-flex items-center gap-1 mt-1 mr-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${mk.chip}`}
+                            title={`Marcado como: ${markerLabel(mk.key, markerLabels)}`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${mk.dot}`} />
+                            {markerLabel(mk.key, markerLabels)}
+                          </span>
+                        ) : null;
+                      })()}
+                      {/* Remessa: mostra se este atleta já foi enviado à organização */}
+                      {runner.sentBatch ? (
+                        <span
+                          className="inline-flex items-center gap-1 mt-1 mr-1 bg-teal-500/15 text-teal-300 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          title={`Enviado à organização na remessa ${runner.sentBatch}${runner.sentAt ? ` em ${new Date(runner.sentAt).toLocaleDateString('pt-BR')}` : ''}`}
+                        >
+                          <Send size={10} /> Remessa {runner.sentBatch}
+                        </span>
+                      ) : runner.isPaid ? (
+                        <span
+                          className="inline-flex items-center gap-1 mt-1 mr-1 bg-slate-700/60 text-slate-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          title="Pago e ainda não enviado — entra na próxima remessa"
+                        >
+                          A enviar
+                        </span>
+                      ) : null}
                       {runner.transferredFrom && (
                         <span
                           className="inline-flex items-center gap-1 mt-1 bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
@@ -1388,7 +1484,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                 ))
               ) : (
                 <tr>
-                  <td colSpan={canEditFinancials && onUpdate ? 9 : 8} className="p-8 text-center text-slate-600">
+                  <td colSpan={canEditFinancials && onUpdate ? 10 : 9} className="p-8 text-center text-slate-600">
                     Nenhum corredor encontrado.
                   </td>
                 </tr>
@@ -1630,6 +1726,28 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           </div>
         );
       })()}
+
+      {batchOpen && onSendBatch && onUndoBatch && (
+        <SendBatchModal
+          runners={runners}
+          onClose={() => setBatchOpen(false)}
+          onSend={onSendBatch}
+          onUndo={onUndoBatch}
+        />
+      )}
+
+      {markerOpen && onMarkColor && (
+        <MarkerPicker
+          quantos={selectedIds.size}
+          labels={markerLabels}
+          onClose={() => setMarkerOpen(false)}
+          onApply={async (marker) => {
+            await onMarkColor(Array.from(selectedIds), marker);
+            setSelectedIds(new Set());
+          }}
+          onRenameLabels={onRenameMarkers}
+        />
+      )}
 
       {/* MODAL DE CORREÇÃO DE NOME/CPF */}
       {editRunner && (

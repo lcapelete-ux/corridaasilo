@@ -1106,6 +1106,29 @@ alter table public.sponsors add column if not exists installments jsonb not null
 comment on column public.sponsors.installments is
   'Pagamentos recebidos do patrocinador: [{id, amount, date, note}]. Vazio = pagamento à vista, controlado por is_paid';
 
+-- 27. Remessa para a organização da prova. O organizador exporta os inscritos
+--     pagos e manda para quem cronometra; depois chegam mais inscrições e ele
+--     precisa saber quem já foi. Cada envio recebe um número e a data, então a
+--     remessa seguinte pega só quem entrou (ou pagou) depois. Quem não pagou
+--     nunca entra: fica para a próxima, se pagar.
+--     (Também disponível avulso em supabase/atualizacao_rapida.sql)
+alter table public.runners add column if not exists sent_batch smallint;
+alter table public.runners add column if not exists sent_at timestamptz;
+comment on column public.runners.sent_batch is
+  'Número da remessa enviada à organização (vazio = ainda não enviado)';
+comment on column public.runners.sent_at is
+  'Quando o atleta entrou na remessa enviada à organização';
+
+-- 28. Marcação colorida dos inscritos: o organizador seleciona na lista e pinta
+--     com uma cor para se organizar (pagamento novo, inscrição nova, conferir).
+--     O sentido de cada cor é escolhido por ele, não fixado pelo sistema.
+alter table public.runners add column if not exists marker text;
+alter table public.app_settings add column if not exists marker_labels jsonb not null default '{}'::jsonb;
+comment on column public.runners.marker is
+  'Marcação colorida do organizador (verde, azul, amarelo, laranja, vermelho, roxo)';
+comment on column public.app_settings.marker_labels is
+  'Nome que o organizador deu para cada cor de marcação';
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================
