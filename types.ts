@@ -51,6 +51,11 @@ export interface Runner {
   sentBatch?: number;
   sentAt?: string;           // Quando o atleta entrou na remessa (ISO)
   marker?: string;           // Marcação colorida do organizador (chave de MARKERS)
+  // Inscrição zerada: por que não pagou. 'patrocinio' vem com sponsorId
+  // preenchido (a vaga entrou no acordo com aquele patrocinador);
+  // 'cortesia' é cortesia da organização. Vazio = inscrição normal.
+  freeReason?: 'patrocinio' | 'cortesia';
+  sponsorId?: string;
   valueAdjusted?: boolean;   // Valor definido à mão pelo organizador: vale como está e não vence junto com o lote promocional
 }
 

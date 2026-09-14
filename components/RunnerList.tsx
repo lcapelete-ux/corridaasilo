@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Runner, UserSession, Gender, ShirtSize, TransferSettings } from '../types';
-import { MARKERS, getMarker, markerLabel, getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
+import { Runner, UserSession, Gender, ShirtSize, TransferSettings, Sponsor } from '../types';
+import { MARKERS, getMarker, markerLabel, FREE_REASONS, freeReasonLabel, getRegistrationFee, getRunnerPaidValue, getRunnerDueValue, canTransferNow, getRunnerCategory, modalityLabel, SENIOR_AGE, formatBrDate, isMinorAtEvent } from '../constants';
 import { prepareProofFile, isPdfProof } from '../services/imageUtils';
-import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone, Send, Palette } from 'lucide-react';
+import { Search, Trash2, Users, MapPin, Eye, X, Printer, Calendar, CreditCard, User, Flag, Award, Download, Upload, CheckCircle, Clock, ArrowRightLeft, Save, AlertCircle, FileImage, FileText, List, Lock, Settings, Ban, Filter, RefreshCw, StickyNote, Pencil, Tag, ShieldCheck, ShieldAlert, Database, UserCog, MessageSquare, Megaphone, Send, Palette, Gift, Briefcase } from 'lucide-react';
 import { ValueAdjustModal } from './ValueAdjustModal';
 import { SendBatchModal } from './SendBatchModal';
 import { MarkerPicker } from './MarkerPicker';
@@ -21,6 +21,7 @@ interface RunnerListProps {
   onMarkColor?: (ids: string[], marker: string | null) => Promise<void>;  // marcação colorida
   markerLabels?: Record<string, string>;
   onRenameMarkers?: (labels: Record<string, string>) => Promise<void>;
+  sponsors?: Sponsor[];   // para vincular inscrição zerada a um patrocinador
 }
 
 // Célula de observação editável (salva ao sair do campo). Uso do organizador:
@@ -57,7 +58,7 @@ const transferInputCls = "w-full p-2 bg-white border border-slate-300 rounded te
 // Selects da barra de filtros (fundo escuro; color-scheme dark p/ as opções não sumirem no mobile)
 const filterSelectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all [color-scheme:dark]";
 
-export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline, onSendBatch, onUndoBatch, onMarkColor, markerLabels = {}, onRenameMarkers }) => {
+export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpdate, onRefresh, userSession, transferSettings, onUpdateTransferSettings, promoDeadline, onSendBatch, onUndoBatch, onMarkColor, markerLabels = {}, onRenameMarkers, sponsors = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunner, setSelectedRunner] = useState<Runner | null>(null);
   const [activeTab, setActiveTab] = useState<'lista' | 'comprovantes' | 'autorizacoes'>('lista');
@@ -113,6 +114,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [batchOpen, setBatchOpen] = useState(false);
   const [markerOpen, setMarkerOpen] = useState(false);
   const [markerFilter, setMarkerFilter] = useState<string>('');   // '' = todas | 'sem' | chave da cor
+  const [freeFilter, setFreeFilter] = useState<string>('');       // '' = todos | 'patrocinio' | 'cortesia'
   const [sortBy, setSortBy] = useState<'padrao' | 'data_desc' | 'data_asc' | 'idade_asc' | 'idade_desc' | 'nome' | 'categoria' | 'equipe'>('padrao');
 
   // Atleta 60+ que efetivamente paga meia (não optou por apoiador)
@@ -149,6 +151,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         !markerFilter ? true
         : markerFilter === 'sem' ? !r.marker
         : r.marker === markerFilter;
+      const matchesFree = !freeFilter || r.freeReason === freeFilter;
       const matchesTeam = !teamFilter || r.teamName === teamFilter;
       const matchesCategory = !categoryFilter || getRunnerCategory(r.birthDate, r.modality) === categoryFilter;
       const matchesModality = !modalityFilter || (r.modality || '5k') === modalityFilter;
@@ -160,7 +163,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         paymentFilter === 'pago' ? !!r.isPaid :
         paymentFilter === 'pendente' ? !r.isPaid :
         paymentFilter === 'promo_pendente' ? isPromoPending(r) : true;
-      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment && matchesSend && matchesMarker;
+      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment && matchesSend && matchesMarker && matchesFree;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -178,7 +181,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       }
     });
 
-  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sendFilter !== 'todos' || markerFilter || sortBy !== 'padrao');
+  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sendFilter !== 'todos' || markerFilter || freeFilter || sortBy !== 'padrao');
   const clearFilters = () => {
     setTeamFilter('');
     setCategoryFilter('');
@@ -423,6 +426,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkValue, setBulkValue] = useState('');
   const [bulkNotice, setBulkNotice] = useState('');
+  const [bulkFreeReason, setBulkFreeReason] = useState<'' | 'patrocinio' | 'cortesia'>('');
+  const [bulkSponsorId, setBulkSponsorId] = useState('');
   const [bulkError, setBulkError] = useState('');
   const [bulkProgress, setBulkProgress] = useState<{ feitos: number; total: number } | null>(null);
 
@@ -444,6 +449,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const openBulk = () => {
     setBulkValue('');
     setBulkNotice(AVISO_SUGERIDO);
+    setBulkFreeReason('');
+    setBulkSponsorId('');
     setBulkError('');
     setBulkProgress(null);
     setBulkOpen(true);
@@ -461,6 +468,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       return;
     }
 
+    if (alvo <= 0 && !bulkFreeReason) {
+      setBulkError('Valor zerado: escolha se é patrocínio ou cortesia.');
+      return;
+    }
+    if (alvo <= 0 && bulkFreeReason === 'patrocinio' && !bulkSponsorId) {
+      setBulkError('Escolha qual patrocinador cobre estas vagas.');
+      return;
+    }
+
     const alvos = filteredRunners.filter(r => selectedIds.has(r.id));
     setBulkError('');
     setBulkProgress({ feitos: 0, total: alvos.length });
@@ -475,6 +491,10 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         // Marca o valor como definido à mão: assim ele vale como está e não é
         // recalculado quando o prazo do lote promocional vence.
         valueAdjusted: true,
+        // Zerou todo mundo: registra por que (patrocínio de um patrocinador,
+        // ou cortesia). Valor acima de zero limpa qualquer motivo antigo.
+        freeReason: alvo <= 0 ? (bulkFreeReason as 'patrocinio' | 'cortesia') : undefined,
+        sponsorId: alvo <= 0 && bulkFreeReason === 'patrocinio' ? bulkSponsorId : undefined,
         // Recado que o atleta vê ao consultar o CPF. Em branco apaga o aviso
         // anterior — mudar o valor de novo sem explicar seria pior.
         paymentNotice: bulkNotice.trim(),
@@ -1084,6 +1104,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {/* Inscrições zeradas */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Isenção</label>
+            <select value={freeFilter} onChange={e => setFreeFilter(e.target.value)} className={filterSelectCls}>
+              <option value="">Todos</option>
+              {FREE_REASONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
+          </div>
+
           {/* Marcação colorida */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Marcação</label>
@@ -1243,6 +1272,24 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4">
                       <div className="font-medium text-white">{runner.fullName}</div>
                       <div className="text-xs text-slate-500">{runner.email}</div>
+                      {/* Inscrição isenta: patrocínio (com o nome) ou cortesia */}
+                      {runner.freeReason && (() => {
+                        const def = FREE_REASONS.find(f => f.key === runner.freeReason);
+                        const patro = sponsors.find(sp => sp.id === runner.sponsorId);
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1 mt-1 mr-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${def?.chip || ''}`}
+                            title={runner.freeReason === 'patrocinio'
+                              ? `Vaga coberta pelo patrocinador: ${patro?.name || 'não encontrado'}`
+                              : 'Cortesia da organização'}
+                          >
+                            {runner.freeReason === 'patrocinio' ? <Briefcase size={10} /> : <Gift size={10} />}
+                            {freeReasonLabel(runner.freeReason)}
+                            {patro ? ` · ${patro.name}` : ''}
+                          </span>
+                        );
+                      })()}
+
                       {/* Marcação colorida do organizador */}
                       {(() => {
                         const mk = getMarker(runner.marker);
@@ -1585,6 +1632,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       {/* MODAL DE AJUSTE MANUAL DE VALOR */}
       {valueAdjustRunner && onUpdate && (
         <ValueAdjustModal
+          sponsors={sponsors}
           runner={valueAdjustRunner}
           onClose={() => setValueAdjustRunner(null)}
           onSave={onUpdate}
@@ -1647,6 +1695,46 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                   <p className="text-sm text-slate-600">
                     Cada selecionado passará a dever <strong className="text-indigo-600 font-mono">R$ {fmt(alvoNum)}</strong>.
                   </p>
+                )}
+
+                {/* Zerou o lote: registra o motivo */}
+                {alvoNum <= 0 && bulkValue.trim() && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <p className="text-sm font-bold text-slate-700">Por que estas inscrições estão zeradas?</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {FREE_REASONS.map(r => {
+                        const on = bulkFreeReason === r.key;
+                        const Icone = r.key === 'patrocinio' ? Briefcase : Gift;
+                        return (
+                          <button
+                            key={r.key}
+                            type="button"
+                            onClick={() => { setBulkFreeReason(r.key); setBulkError(''); }}
+                            disabled={!!bulkProgress}
+                            className={`p-3 rounded-lg border-2 text-left transition-all disabled:opacity-50 ${
+                              on ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <Icone size={16} className={on ? 'text-indigo-600' : 'text-slate-400'} />
+                            <span className={`block text-sm font-bold mt-1 ${on ? 'text-slate-900' : 'text-slate-600'}`}>
+                              {r.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {bulkFreeReason === 'patrocinio' && (
+                      <select
+                        value={bulkSponsorId}
+                        onChange={e => { setBulkSponsorId(e.target.value); setBulkError(''); }}
+                        disabled={!!bulkProgress}
+                        className={`${transferInputCls} mt-1`}
+                      >
+                        <option value="">Selecione o patrocinador...</option>
+                        {sponsors.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+                      </select>
+                    )}
+                  </div>
                 )}
 
                 {/* Recado que aparece pro atleta quando ele consulta o CPF.

@@ -1047,6 +1047,7 @@ const App: React.FC = () => {
                 promoDeadline={promoDeadline}
                 onSendBatch={handleSendBatch}
                 onUndoBatch={handleUndoBatch}
+                sponsors={sponsors}
                 onMarkColor={handleMarkColor}
                 markerLabels={markerLabels}
                 onRenameMarkers={handleRenameMarkers}
@@ -1089,6 +1090,7 @@ const App: React.FC = () => {
                 onSave={handleSaveExtraRevenue}
                 onDelete={handleDeleteExtraRevenue}
                 onUpdateRunner={handleUpdateRunner}
+                sponsors={sponsors}
                 raceGroupName={raceGroupName}
               />
             )}

@@ -1135,6 +1135,24 @@ alter table public.app_settings add column if not exists max_athletes int not nu
 comment on column public.app_settings.max_athletes is
   'Limite de vagas exibido no painel (alvo do organizador, não bloqueia inscrição)';
 
+-- 30. Inscrição zerada com motivo: às vezes a vaga entra no acordo de um
+--     patrocinador, às vezes é cortesia da organização. Sem isso, um valor
+--     zerado vira um buraco sem explicação na contabilidade.
+
+-- Inscrição zerada: por que não houve pagamento. 'patrocinio' vem com
+-- sponsor_id preenchido (a vaga entrou no acordo com aquele patrocinador);
+-- 'cortesia' é cortesia da organização. Vazio = inscrição normal.
+alter table public.runners add column if not exists free_reason text;
+alter table public.runners add column if not exists sponsor_id uuid references public.sponsors(id) on delete set null;
+alter table public.runners drop constraint if exists runners_free_reason_check;
+alter table public.runners add constraint runners_free_reason_check
+  check (free_reason is null or free_reason in ('patrocinio', 'cortesia'));
+comment on column public.runners.free_reason is
+  'Motivo da inscrição zerada: patrocinio (com sponsor_id) ou cortesia';
+comment on column public.runners.sponsor_id is
+  'Patrocinador que cobre esta vaga, quando free_reason = patrocinio';
+
+
 -- ============================================================================
 -- Resumo final
 -- ============================================================================

@@ -91,6 +91,8 @@ const runnerFromRow = (r: RunnerRow): Runner => ({
   sentBatch: (r as any).sent_batch ?? undefined,
   sentAt: (r as any).sent_at || undefined,
   marker: (r as any).marker || undefined,
+  freeReason: (r as any).free_reason || undefined,
+  sponsorId: (r as any).sponsor_id || undefined,
 });
 
 const runnerToRow = (r: Runner) => {
@@ -133,6 +135,9 @@ const runnerToRow = (r: Runner) => {
   if (r.sentBatch !== undefined) row.sent_batch = r.sentBatch ?? null;
   if (r.sentAt !== undefined) row.sent_at = r.sentAt || null;
   if (r.marker !== undefined) row.marker = r.marker || null;
+  // Motivo da isenção: enviados mesmo vazios, para permitir desfazer
+  if (r.freeReason !== undefined) row.free_reason = r.freeReason || null;
+  if (r.sponsorId !== undefined) row.sponsor_id = r.sponsorId || null;
   return row;
 };
 
@@ -143,7 +148,7 @@ const MIGRATION_COLUMNS = [
   'phone', 'modality', 'transferred_from', 'transferred_at',
   'coupon_code', 'coupon_discount', 'guardian_name', 'authorization_doc',
   'senior_full_price', 'extra_donation', 'note', 'payer_name', 'payment_notice', 'value_adjusted',
-  'sent_batch', 'sent_at', 'marker',
+  'sent_batch', 'sent_at', 'marker', 'free_reason', 'sponsor_id',
 ];
 
 const isUnknownColumnError = (error: any): boolean =>
