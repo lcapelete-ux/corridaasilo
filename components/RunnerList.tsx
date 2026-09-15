@@ -128,6 +128,20 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     return m ? parseInt(m[1], 10) : 99998;
   };
 
+  // Quantos há em cada situação de isenção — vai no rótulo do seletor, para o
+  // organizador ver os números sem precisar filtrar um por um.
+  const contagemIsencao = (() => {
+    let zerados = 0, patrocinio = 0, cortesia = 0, semMotivo = 0;
+    for (const r of runners) {
+      if (getRunnerPaidValue(r) > 0) continue;
+      zerados++;
+      if (r.freeReason === 'patrocinio') patrocinio++;
+      else if (r.freeReason === 'cortesia') cortesia++;
+      else semMotivo++;
+    }
+    return { zerados, patrocinio, cortesia, semMotivo };
+  })();
+
   // Listas para os menus de filtro (só o que realmente existe entre os inscritos)
   const teamsPresent = Array.from(new Set(runners.map(r => r.teamName).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -151,7 +165,15 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         !markerFilter ? true
         : markerFilter === 'sem' ? !r.marker
         : r.marker === markerFilter;
-      const matchesFree = !freeFilter || r.freeReason === freeFilter;
+      // Zerado é calculado do valor, não só da marcação: quem já estava em
+      // R$ 0,00 antes desta função existir não tem motivo gravado e ficaria
+      // invisível — e é justamente quem precisa ser classificado.
+      const zerado = getRunnerPaidValue(r) <= 0;
+      const matchesFree =
+        !freeFilter ? true
+        : freeFilter === 'zerados' ? zerado
+        : freeFilter === 'sem_motivo' ? (zerado && !r.freeReason)
+        : r.freeReason === freeFilter;
       const matchesTeam = !teamFilter || r.teamName === teamFilter;
       const matchesCategory = !categoryFilter || getRunnerCategory(r.birthDate, r.modality) === categoryFilter;
       const matchesModality = !modalityFilter || (r.modality || '5k') === modalityFilter;
@@ -1109,7 +1131,10 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Isenção</label>
             <select value={freeFilter} onChange={e => setFreeFilter(e.target.value)} className={filterSelectCls}>
               <option value="">Todos</option>
-              {FREE_REASONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+              <option value="zerados">Zerados ({contagemIsencao.zerados})</option>
+              <option value="patrocinio">Patrocínio ({contagemIsencao.patrocinio})</option>
+              <option value="cortesia">Cortesia ({contagemIsencao.cortesia})</option>
+              <option value="sem_motivo">Zerados sem motivo ({contagemIsencao.semMotivo})</option>
             </select>
           </div>
 
@@ -1272,6 +1297,17 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                     <td className="p-4">
                       <div className="font-medium text-white">{runner.fullName}</div>
                       <div className="text-xs text-slate-500">{runner.email}</div>
+                      {/* Zerado e ainda sem classificar: precisa de ação, então
+                          fica visível na lista em vez de só no filtro */}
+                      {!runner.freeReason && getRunnerPaidValue(runner) <= 0 && (
+                        <span
+                          className="inline-flex items-center gap-1 mt-1 mr-1 bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          title="Inscrição zerada sem motivo registrado — classifique em Ajustar valor"
+                        >
+                          <AlertCircle size={10} /> Zerado sem motivo
+                        </span>
+                      )}
+
                       {/* Inscrição isenta: patrocínio (com o nome) ou cortesia */}
                       {runner.freeReason && (() => {
                         const def = FREE_REASONS.find(f => f.key === runner.freeReason);
