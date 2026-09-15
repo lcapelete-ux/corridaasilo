@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Sponsor, SponsorType } from '../types';
+import { Sponsor, SponsorType, Runner } from '../types';
 import { prepareProofFile, migrateBase64ToCloudinary } from '../services/imageUtils';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend } from '../services/printReport';
 import { EVENT_DATE, formatBrDate, getSponsorPaidAmount, getSponsorBalance, isSponsorSettled } from '../constants';
@@ -13,6 +13,7 @@ interface SponsorsManagerProps {
   onUpdate: (sponsor: Sponsor) => Promise<void> | void;
   onDelete: (id: string) => void;
   raceGroupName?: string;
+  runners?: Runner[];   // para listar quem entrou pela cota de cada patrocinador
 }
 
 // CSS extra do relatório de patrocínios (mesmo padrão visual do relatório do Dashboard)
@@ -33,13 +34,17 @@ const REPORT_STYLE = `
   .status-pendente { color: #b45309; font-weight: 700; }
   tfoot td { font-weight: 800; background: #f1f5f9; }
   .pending-card { background: #fffbeb; border-color: #fcd34d; }
+  .sem-inscritos { background: #fef2f2; border-color: #fecaca; }
+  .atletas { font-size: 11px; color: #334155; line-height: 1.6; }
+  .aviso-vazio { color: #b91c1c; font-weight: 700; font-size: 11px; }
+  .contagem { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 999px; padding: 1px 8px; font-size: 10px; font-weight: 800; margin-left: 6px; }
 `;
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm";
 const selectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm [color-scheme:dark]";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
-export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSave, onUpdate, onDelete, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
+export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSave, onUpdate, onDelete, raceGroupName = '2ª CORRIDA NOTURNA LSC', runners = [] }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -140,6 +145,47 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
       return n > 0 ? `◐ PARCIAL (${n}x)` : '✗ PENDENTE';
     };
 
+    // Atletas que entraram pela cota de cada patrocinador. Patrocinador sem
+    // ninguém vinculado é informação, não ausência de dado: ou a cota não foi
+    // usada ainda, ou alguém esqueceu de vincular.
+    const porPatrocinador = sponsors.map(sp => ({
+      sponsor: sp,
+      atletas: runners
+        .filter(r => r.sponsorId === sp.id)
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR')),
+    }));
+    const comAtletas = porPatrocinador.filter(x => x.atletas.length > 0);
+    const semAtletas = porPatrocinador.filter(x => x.atletas.length === 0);
+    const totalVinculados = comAtletas.reduce((acc, x) => acc + x.atletas.length, 0);
+
+    const blocosAtletas = comAtletas.map(({ sponsor: sp, atletas }) => `
+      <div class="section-card">
+        <div class="section-title">
+          ${esc(sp.name)}<span class="contagem">${atletas.length} ${atletas.length === 1 ? 'inscrito' : 'inscritos'}</span>
+        </div>
+        <table>
+          <thead><tr><th class="num">Nº</th><th>Atleta</th><th>Equipe</th><th class="size">Modalidade</th><th class="size">Camiseta</th></tr></thead>
+          <tbody>
+            ${atletas.map((r, i) => `
+              <tr>
+                <td class="num">${i + 1}</td>
+                <td>${esc(r.fullName)}</td>
+                <td>${esc(r.teamName || 'Avulso')}</td>
+                <td class="size">${r.modality === '3k' ? '3 km' : '5 km'}</td>
+                <td class="size">${esc(r.shirtSize)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('');
+
+    const linhasSemAtletas = semAtletas.map(({ sponsor: sp }) => `
+      <tr>
+        <td>${esc(sp.name)}</td>
+        <td>${esc(sp.type)}</td>
+        <td class="total-col">${esc(fmtMoney(sp.amount))}</td>
+        <td class="size ${isSponsorSettled(sp) ? 'status-pago' : 'status-pendente'}">${statusLabel(sp)}</td>
+      </tr>`).join('');
+
     // Ordena: pendentes primeiro (é o que precisa de ação), depois por valor
     const ordered = [...sponsors].sort((a, b) => {
       const pa = isSponsorSettled(a), pb = isSponsorSettled(b);
@@ -228,6 +274,25 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
           <tbody>${partialRows}</tbody>
         </table>
       </div>` : ''}
+
+      ${semAtletas.length > 0 ? `
+      <div class="section-card sem-inscritos">
+        <div class="section-title">⚠️ Patrocinadores sem nenhum inscrito vinculado (${semAtletas.length})</div>
+        <p class="aviso-vazio">
+          Estas empresas ainda não têm nenhum atleta ligado à sua cota. Ou a cota não foi usada,
+          ou a inscrição foi feita sem vincular ao patrocinador.
+        </p>
+        <table style="margin-top:10px;">
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Valor</th><th class="size">Pagamento</th></tr></thead>
+          <tbody>${linhasSemAtletas}</tbody>
+        </table>
+      </div>` : ''}
+
+      ${blocosAtletas ? `
+      <div class="section-card">
+        <div class="section-title">👥 Inscritos por patrocinador — ${totalVinculados} no total, em ${comAtletas.length} ${comAtletas.length === 1 ? 'empresa' : 'empresas'}</div>
+      </div>
+      ${blocosAtletas}` : ''}
 
       <div class="section-card">
         <div class="section-title">📋 Todos os Patrocinadores (${sponsors.length})</div>
