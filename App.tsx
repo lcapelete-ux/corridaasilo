@@ -1076,6 +1076,7 @@ const App: React.FC = () => {
             {currentView === 'sponsors' && (
               <SponsorsManager
                 sponsors={sponsors}
+                runners={runners}
                 onSave={handleSaveSponsor}
                 onUpdate={handleUpdateSponsor}
                 onDelete={handleDeleteSponsor}
