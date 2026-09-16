@@ -4,11 +4,12 @@ import { nightMusic } from '../services/nightMusic';
 import sicrediLogo from '../assets/sicredi-logo.jpg';
 import rondontexLogo from '../assets/rondontex-logo.png';
 import { RaceIntro, shouldPlayRaceIntro } from './RaceIntro';
+import { KitFlyerOverlay, shouldShowKitFlyer, markKitFlyerShown } from './KitFlyerOverlay';
 import { SoundToggle } from './SoundToggle';
 import { RafflePromo } from './RafflePromo';
 import { formatBrDate, FOOTER_CHIP_HEIGHT, FOOTER_LOGO_BASE_HEIGHT } from '../constants';
 import { cloudinaryLogoUrl } from '../services/imageUtils';
-import { SponsorLogo, RaffleSettings, TeamRankingEntry } from '../types';
+import { SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings } from '../types';
 
 interface LandingPageProps {
   onStartRegistration: () => void;
@@ -24,13 +25,41 @@ interface LandingPageProps {
   // A vinheta só começa quando o loader inicial libera (crossfade sem gap).
   // Default true para funcionar caso a landing seja usada fora do fluxo de boot.
   startIntro?: boolean;
+  // Flyer em tela cheia mostrado antes de tudo (antes até da vinheta).
+  // kitFlyerReady: já sabemos se há flyer configurado (ou o teto do App.tsx
+  // estourou) — sem isso a vinheta poderia começar antes do flyer chegar.
+  kitFlyerSettings?: KitFlyerSettings;
+  kitFlyerReady?: boolean;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [], raffleSettings, teamRankingEnabled, teamRanking = [], startIntro = true }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, onAdminLogin, onOpenProofUpload, onOpenCourse, raceGroupName = '2ª CORRIDA NOTURNA LSC', promoDeadline, sponsorLogos = [], raffleSettings, teamRankingEnabled, teamRanking = [], startIntro = true, kitFlyerSettings, kitFlyerReady = false }) => {
   const [flashes, setFlashes] = useState<{id: number, top: number, left: number, delay: number}[]>([]);
-  // Vinheta de largada: o conteúdo aparece durante o fade do overlay (crossfade)
+
+  // Flyer inicial (opcional, antes de tudo) → vinheta de largada (opcional) →
+  // conteúdo. Cada etapa libera a seguinte; qualquer uma pode já vir "pronta"
+  // se não houver flyer configurado ou a vinheta já tiver tocado nesta carga.
+  const [flyerDone, setFlyerDone] = useState(() => !shouldShowKitFlyer());
   const [introDone, setIntroDone] = useState(() => !shouldPlayRaceIntro());
-  const [contentVisible, setContentVisible] = useState(introDone);
+  const [contentVisible, setContentVisible] = useState(() => flyerDone && introDone);
+
+  // Assim que soubermos se há flyer configurado (ou o teto do App.tsx
+  // estourar), decide: mostra, ou libera a vinheta direto.
+  useEffect(() => {
+    if (flyerDone || !kitFlyerReady) return;
+    const temFlyer = !!(kitFlyerSettings?.enabled && kitFlyerSettings.imageUrl);
+    if (!temFlyer) {
+      markKitFlyerShown(); // não deixa reaparecer se a config chegar atrasada
+      setFlyerDone(true);
+    }
+    // Se temFlyer, o próprio <KitFlyerOverlay> below cuida de exibir e marcar.
+  }, [flyerDone, kitFlyerReady, kitFlyerSettings]);
+
+  const handleFlyerDismiss = () => {
+    setFlyerDone(true);
+    // Sem vinheta pela frente (já tocou, ou reduced-motion): revela o
+    // conteúdo direto, já que não haverá RaceIntro para chamar onReveal.
+    if (introDone) setContentVisible(true);
+  };
 
   // --- Trilha sonora (synthwave noturno gerado no navegador) ---
   // Com a vinheta, quem dispara a música é o "LARGADA!". Sem vinheta
@@ -84,10 +113,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartRegistration, o
         ))}
       </div>
 
+      {/* Flyer inicial: aviso do momento (ex.: retirada de kit), configurado
+          pelo admin. Vem antes de tudo — só libera a vinheta depois de fechado. */}
+      {!flyerDone && kitFlyerReady && kitFlyerSettings?.enabled && kitFlyerSettings.imageUrl && (
+        <KitFlyerOverlay imageUrl={kitFlyerSettings.imageUrl} onDismiss={handleFlyerDismiss} />
+      )}
+
       {/* Vinheta de Largada (Sicredi → RondonTex → Apresentam → Largada).
-          Só monta quando o loader inicial libera (startIntro), para emendar
-          com o fim do carregamento num crossfade — sem tela preta no meio. */}
-      {!introDone && startIntro && (
+          Só monta quando o loader inicial libera (startIntro) E o flyer (se
+          houver) já foi fechado, para emendar num crossfade — sem tela preta
+          no meio e sem competir com o flyer pela tela. */}
+      {flyerDone && !introDone && startIntro && (
         <RaceIntro
           onReveal={() => setContentVisible(true)}
           onFinish={() => {

@@ -1152,6 +1152,17 @@ comment on column public.runners.free_reason is
 comment on column public.runners.sponsor_id is
   'Patrocinador que cobre esta vaga, quando free_reason = patrocinio';
 
+-- 31. Flyer inicial: tela cheia mostrada antes da vinheta de largada, ao abrir
+--     o site — antes de qualquer outra coisa. Serve para avisos do momento
+--     (ex.: data e local da retirada de kit). O conteúdo vem todo na imagem;
+--     o banco só guarda se está ligado e qual imagem usar.
+alter table public.app_settings add column if not exists kit_flyer_enabled boolean not null default false;
+alter table public.app_settings add column if not exists kit_flyer_image_url text;
+comment on column public.app_settings.kit_flyer_enabled is
+  'Liga/desliga o flyer em tela cheia mostrado antes da vinheta de largada';
+comment on column public.app_settings.kit_flyer_image_url is
+  'Imagem do flyer inicial (URL no Cloudinary)';
+
 
 -- ============================================================================
 -- Resumo final

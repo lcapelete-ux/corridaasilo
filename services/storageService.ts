@@ -1,4 +1,4 @@
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings, TeamRankingEntry } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings } from '../types';
 import { supabase } from './supabaseClient';
 
 // Todos os dados agora vivem no Supabase (banco central), não mais no
@@ -239,6 +239,44 @@ export const updateMaxAthletes = async (limite: number): Promise<void> => {
       throw new Error('Mudar o limite precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
     }
     throw friendlyError(error, 'Erro ao salvar o limite de inscrições');
+  }
+};
+
+// Flyer em tela cheia mostrado antes da vinheta de largada (ex.: aviso da
+// retirada de kit). Leitura pública — precisa aparecer para quem nunca logou.
+interface KitFlyerSettingsRow {
+  kit_flyer_enabled: boolean | null;
+  kit_flyer_image_url: string | null;
+}
+
+export const getKitFlyerSettings = async (): Promise<KitFlyerSettings> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('kit_flyer_enabled, kit_flyer_image_url')
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isUnknownColumnError(error)) return { enabled: false, imageUrl: '' };
+    throw friendlyError(error, 'Erro ao carregar o flyer inicial');
+  }
+  const row = data as KitFlyerSettingsRow | null;
+  return {
+    enabled: row?.kit_flyer_enabled ?? false,
+    imageUrl: row?.kit_flyer_image_url || '',
+  };
+};
+
+export const updateKitFlyerSettings = async (settings: Partial<KitFlyerSettings>): Promise<void> => {
+  const payload: Record<string, unknown> = {};
+  if (settings.enabled !== undefined) payload.kit_flyer_enabled = settings.enabled;
+  if (settings.imageUrl !== undefined) payload.kit_flyer_image_url = settings.imageUrl || null;
+
+  const { error } = await supabase.from('app_settings').update(payload).eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('O flyer inicial precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao salvar o flyer inicial');
   }
 };
 
