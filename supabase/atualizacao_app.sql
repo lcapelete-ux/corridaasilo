@@ -1163,6 +1163,17 @@ comment on column public.app_settings.kit_flyer_enabled is
 comment on column public.app_settings.kit_flyer_image_url is
   'Imagem do flyer inicial (URL no Cloudinary)';
 
+-- 32. Aviso manual mostrado no lugar do formulário quando as inscrições estão
+--     encerradas (prazo já passou). O WhatsApp é opcional: quando
+--     preenchido, a tela mostra um botão que já abre a conversa com esse
+--     número.
+alter table public.app_settings add column if not exists closed_notice_message text;
+alter table public.app_settings add column if not exists closed_notice_whatsapp text;
+comment on column public.app_settings.closed_notice_message is
+  'Aviso manual mostrado no lugar do formulário quando as inscrições estão encerradas (vazio = texto padrão)';
+comment on column public.app_settings.closed_notice_whatsapp is
+  'WhatsApp para contato mostrado junto do aviso de inscrições encerradas (vazio = sem botão)';
+
 
 -- ============================================================================
 -- Resumo final

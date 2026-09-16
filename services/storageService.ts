@@ -1,4 +1,4 @@
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings } from '../types';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, Gender, ShirtSize, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings, ClosedNoticeSettings } from '../types';
 import { supabase } from './supabaseClient';
 
 // Todos os dados agora vivem no Supabase (banco central), não mais no
@@ -277,6 +277,45 @@ export const updateKitFlyerSettings = async (settings: Partial<KitFlyerSettings>
       throw new Error('O flyer inicial precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
     }
     throw friendlyError(error, 'Erro ao salvar o flyer inicial');
+  }
+};
+
+// Aviso manual mostrado quando as inscrições estão encerradas. O WhatsApp é
+// opcional — quando preenchido, a tela mostra um botão que já abre a conversa.
+// Leitura pública — precisa aparecer para quem nunca logou.
+interface ClosedNoticeSettingsRow {
+  closed_notice_message: string | null;
+  closed_notice_whatsapp: string | null;
+}
+
+export const getClosedNoticeSettings = async (): Promise<ClosedNoticeSettings> => {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('closed_notice_message, closed_notice_whatsapp')
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isUnknownColumnError(error)) return { message: '', whatsapp: '' };
+    throw friendlyError(error, 'Erro ao carregar o aviso de inscrições encerradas');
+  }
+  const row = data as ClosedNoticeSettingsRow | null;
+  return {
+    message: row?.closed_notice_message || '',
+    whatsapp: row?.closed_notice_whatsapp || '',
+  };
+};
+
+export const updateClosedNoticeSettings = async (settings: Partial<ClosedNoticeSettings>): Promise<void> => {
+  const payload: Record<string, unknown> = {};
+  if (settings.message !== undefined) payload.closed_notice_message = settings.message || null;
+  if (settings.whatsapp !== undefined) payload.closed_notice_whatsapp = settings.whatsapp || null;
+
+  const { error } = await supabase.from('app_settings').update(payload).eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('O aviso de inscrições encerradas precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao salvar o aviso de inscrições encerradas');
   }
 };
 

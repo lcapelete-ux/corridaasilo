@@ -1,6 +1,6 @@
 -- ============================================================================
--- ATUALIZAÇÃO RÁPIDA — remessa, marcação colorida, limite de vagas, isenção
--- e flyer inicial
+-- ATUALIZAÇÃO RÁPIDA — remessa, marcação colorida, limite de vagas, isenção,
+-- flyer inicial e aviso de inscrições encerradas
 -- ============================================================================
 -- Rode este arquivo INTEIRO no SQL Editor do Supabase. Ele é curto de
 -- propósito: só cria as colunas que essas telas precisam.
@@ -42,6 +42,12 @@ alter table public.runners add constraint runners_free_reason_check
 alter table public.app_settings add column if not exists kit_flyer_enabled boolean not null default false;
 alter table public.app_settings add column if not exists kit_flyer_image_url text;
 
+-- Aviso manual mostrado no lugar do formulário quando as inscrições estão
+-- encerradas (prazo já passou). O WhatsApp é opcional: quando preenchido, a
+-- tela mostra um botão que já abre a conversa com esse número.
+alter table public.app_settings add column if not exists closed_notice_message text;
+alter table public.app_settings add column if not exists closed_notice_whatsapp text;
+
 
 comment on column public.runners.sent_batch is
   'Número da remessa enviada à organização (vazio = ainda não enviado)';
@@ -61,6 +67,10 @@ comment on column public.app_settings.kit_flyer_enabled is
   'Liga/desliga o flyer em tela cheia mostrado antes da vinheta de largada';
 comment on column public.app_settings.kit_flyer_image_url is
   'Imagem do flyer inicial (URL no Cloudinary)';
+comment on column public.app_settings.closed_notice_message is
+  'Aviso manual mostrado no lugar do formulário quando as inscrições estão encerradas (vazio = texto padrão)';
+comment on column public.app_settings.closed_notice_whatsapp is
+  'WhatsApp para contato mostrado junto do aviso de inscrições encerradas (vazio = sem botão)';
 
 
 -- Confirmação: mostra como está a fila de envio agora
@@ -73,5 +83,7 @@ select
   count(*) filter (where marker is not null)                  as com_marcacao,
   count(*) filter (where free_reason = 'patrocinio')          as vagas_patrocinio,
   count(*) filter (where free_reason = 'cortesia')            as cortesias,
-  (select kit_flyer_enabled from public.app_settings limit 1) as flyer_inicial_ligado
+  (select kit_flyer_enabled from public.app_settings limit 1) as flyer_inicial_ligado,
+  (select closed_notice_message is not null or closed_notice_whatsapp is not null
+     from public.app_settings limit 1)                        as aviso_encerramento_configurado
 from public.runners;
