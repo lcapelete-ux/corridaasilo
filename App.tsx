@@ -16,6 +16,7 @@ import { OrganizersManager } from './components/OrganizersManager';
 import { CouponsManager } from './components/CouponsManager';
 import { SettingsManager } from './components/SettingsManager';
 import { KitDelivery } from './components/KitDelivery';
+import { ShirtsManager } from './components/ShirtsManager';
 import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { RaffleManager } from './components/RaffleManager';
 import { BulkRegistration } from './components/BulkRegistration';
@@ -25,7 +26,7 @@ import { nightMusic } from './services/nightMusic';
 import sicrediLogo from './assets/sicredi-logo.jpg';
 import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -936,6 +937,10 @@ const App: React.FC = () => {
             <NavItem target="bulk_registration" icon={Sparkles} label="Inscrição em Lote" />
           )}
 
+          {userSession?.role === 'admin' && (
+            <NavItem target="shirts" icon={Shirt} label="Camisetas" />
+          )}
+
           {/* Entrega de Kits: admin sempre; organizador só se o admin liberou */}
           {(userSession?.role === 'admin' || userSession?.permissions?.includes('kits')) && (
             <NavItem target="kits" icon={Package} label="Entrega de Kits" />
@@ -1028,6 +1033,14 @@ const App: React.FC = () => {
                 cities={officialCities}
                 onSaveRunner={handleSaveRunnerBulk}
                 onFinish={refreshRunners}
+              />
+            )}
+
+            {currentView === 'shirts' && userSession?.role === 'admin' && (
+              <ShirtsManager
+                runners={runners}
+                onUpdate={handleUpdateRunner}
+                raceGroupName={raceGroupName}
               />
             )}
 
