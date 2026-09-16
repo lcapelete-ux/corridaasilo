@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy } from 'lucide-react';
-import { TransferSettings } from '../types';
-import { formatBrDate, MAX_ATHLETES } from '../constants';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy, MessageCircle, ExternalLink } from 'lucide-react';
+import { TransferSettings, ClosedNoticeSettings } from '../types';
+import { formatBrDate, MAX_ATHLETES, whatsappLink } from '../constants';
 
 interface SettingsManagerProps {
   raceGroupName: string;
@@ -19,9 +19,12 @@ interface SettingsManagerProps {
   onUpdateTeamRankingEnabled?: (enabled: boolean) => Promise<void>;
   maxAthletes?: number;                                     // limite de vagas definido pelo admin
   onUpdateMaxAthletes?: (limite: number) => Promise<void>;
+  closedNoticeMessage?: string;                             // aviso manual quando as inscrições estão encerradas
+  closedNoticeWhatsapp?: string;                            // WhatsApp opcional exibido junto do aviso
+  onUpdateClosedNotice?: (settings: ClosedNoticeSettings) => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled, maxAthletes = MAX_ATHLETES, onUpdateMaxAthletes }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled, maxAthletes = MAX_ATHLETES, onUpdateMaxAthletes, closedNoticeMessage = '', closedNoticeWhatsapp = '', onUpdateClosedNotice }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -60,6 +63,36 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
   // O limite vem do banco depois da montagem: sem isto o campo ficaria
   // mostrando o padrão enquanto o valor real já era outro.
   useEffect(() => { setLimiteDraft(String(maxAthletes)); }, [maxAthletes]);
+
+  // Aviso manual mostrado quando as inscrições estão encerradas
+  const [closedMsgDraft, setClosedMsgDraft] = useState(closedNoticeMessage);
+  const [closedWhatsDraft, setClosedWhatsDraft] = useState(closedNoticeWhatsapp);
+  const [savingClosedNotice, setSavingClosedNotice] = useState(false);
+  const [closedNoticeError, setClosedNoticeError] = useState('');
+  const [closedNoticeSuccess, setClosedNoticeSuccess] = useState(false);
+
+  useEffect(() => {
+    setClosedMsgDraft(closedNoticeMessage);
+    setClosedWhatsDraft(closedNoticeWhatsapp);
+  }, [closedNoticeMessage, closedNoticeWhatsapp]);
+
+  const salvarAvisoEncerramento = async () => {
+    setSavingClosedNotice(true);
+    setClosedNoticeError('');
+    setClosedNoticeSuccess(false);
+    try {
+      await onUpdateClosedNotice?.({ message: closedMsgDraft.trim(), whatsapp: closedWhatsDraft.trim() });
+      setClosedNoticeSuccess(true);
+      setTimeout(() => setClosedNoticeSuccess(false), 3000);
+    } catch (e: any) {
+      setClosedNoticeError(e?.message || 'Não foi possível salvar o aviso.');
+    } finally {
+      setSavingClosedNotice(false);
+    }
+  };
+
+  const closedNoticeTestLink = whatsappLink(closedWhatsDraft);
+  const closedNoticeUnchanged = closedMsgDraft === closedNoticeMessage && closedWhatsDraft === closedNoticeWhatsapp;
 
   const salvarLimite = async () => {
     const n = parseInt(limiteDraft, 10);
@@ -434,6 +467,77 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
             <Save size={18} /> {savingReg ? 'Salvando...' : 'Salvar Prazo'}
           </button>
         </form>
+
+        {/* Aviso manual mostrado no lugar do formulário quando as inscrições encerram */}
+        <div className="mt-8 pt-8 border-t border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageCircle size={18} className="text-slate-500" />
+            <h3 className="text-base font-bold text-slate-800">Aviso de inscrições encerradas</h3>
+          </div>
+          <p className="text-sm text-slate-600 mb-4">
+            Recado exibido no lugar do formulário depois do prazo acima (ex.: quando reabrem, para onde ligar).
+            Deixe vazio para usar o texto padrão. Informando um WhatsApp, um botão para chamar aparece junto do aviso.
+          </p>
+
+          <div className="space-y-4 max-w-xl">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Mensagem do aviso</label>
+              <textarea
+                value={closedMsgDraft}
+                onChange={(e) => { setClosedMsgDraft(e.target.value); setClosedNoticeError(''); setClosedNoticeSuccess(false); }}
+                placeholder={`O prazo de inscrição para a ${raceGroupName} foi encerrado. Para mais informações, procure a organização do evento.`}
+                rows={3}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm [color-scheme:light]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">WhatsApp para contato (opcional)</label>
+              <input
+                type="text"
+                value={closedWhatsDraft}
+                onChange={(e) => { setClosedWhatsDraft(e.target.value); setClosedNoticeError(''); setClosedNoticeSuccess(false); }}
+                placeholder="(15) 99133-4809"
+                className="w-full max-w-xs px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all [color-scheme:light]"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Deixe vazio para não mostrar botão de WhatsApp no aviso.
+              </p>
+              {closedNoticeTestLink && (
+                <a
+                  href={closedNoticeTestLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 hover:text-emerald-700 mt-2"
+                >
+                  <ExternalLink size={14} /> Testar link do WhatsApp
+                </a>
+              )}
+            </div>
+
+            {closedNoticeError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+                <p className="text-red-700 font-medium text-sm">{closedNoticeError}</p>
+              </div>
+            )}
+
+            {closedNoticeSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                <p className="text-emerald-700 font-medium text-sm">✓ Aviso salvo com sucesso!</p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={salvarAvisoEncerramento}
+              disabled={savingClosedNotice || !onUpdateClosedNotice || closedNoticeUnchanged}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+            >
+              <Save size={18} /> {savingClosedNotice ? 'Salvando...' : 'Salvar Aviso'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Cupons de Desconto — bloqueio geral */}

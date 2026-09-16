@@ -158,6 +158,13 @@ export interface RaffleSettings {
 
 export type ViewState = 'dashboard' | 'registration' | 'bulk_registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'shirts' | 'sponsor_logos' | 'raffle' | 'kit_flyer';
 
+// Aviso manual exibido quando as inscrições estão encerradas. O WhatsApp é
+// opcional: quando preenchido, mostra um botão que já abre a conversa.
+export interface ClosedNoticeSettings {
+  message: string;
+  whatsapp: string;
+}
+
 // Flyer em tela cheia mostrado antes da vinheta de largada, ao abrir o site —
 // antes de qualquer outra coisa. Serve para avisos do momento (ex.: data e
 // local da retirada de kit). O conteúdo vem todo na imagem; aqui só controla

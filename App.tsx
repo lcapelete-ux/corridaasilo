@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes, getKitFlyerSettings, updateKitFlyerSettings } from './services/storageService';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings, ClosedNoticeSettings } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes, getKitFlyerSettings, updateKitFlyerSettings, getClosedNoticeSettings, updateClosedNoticeSettings } from './services/storageService';
 import { supabase } from './services/supabaseClient';
-import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly, MAX_ATHLETES } from './constants';
+import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly, MAX_ATHLETES, whatsappLink } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
 import { RegistrationSuccess } from './components/RegistrationSuccess';
 import { RunnerList } from './components/RunnerList';
@@ -27,7 +27,7 @@ import { nightMusic } from './services/nightMusic';
 import sicrediLogo from './assets/sicredi-logo.jpg';
 import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt, Megaphone } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt, Megaphone, MessageCircle } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -75,6 +75,8 @@ const App: React.FC = () => {
   // dessa resposta chegar.
   const [kitFlyerSettings, setKitFlyerSettings] = useState<KitFlyerSettings>({ enabled: false, imageUrl: '' });
   const [kitFlyerReady, setKitFlyerReady] = useState(false);
+  // Aviso manual mostrado no lugar do formulário quando as inscrições encerram
+  const [closedNoticeSettings, setClosedNoticeSettings] = useState<ClosedNoticeSettings>({ message: '', whatsapp: '' });
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -260,6 +262,7 @@ const App: React.FC = () => {
     refreshCouponsBlocked();
     refreshRaffleSettings();
     refreshKitFlyerSettings();
+    refreshClosedNoticeSettings();
     refreshTeamRankingEnabled();
     refreshTeamRanking();
   }, []);
@@ -324,6 +327,22 @@ const App: React.FC = () => {
   const handleUpdateKitFlyerSettings = async (settings: Partial<KitFlyerSettings>) => {
     await updateKitFlyerSettings(settings); // erro propaga para o manager avisar
     await refreshKitFlyerSettings();
+  };
+
+  // Aviso manual de inscrições encerradas: leitura pública (aparece para quem
+  // nunca logou, no lugar do formulário). Se a migração ainda não rodou,
+  // engole o erro e o texto padrão continua sendo usado.
+  const refreshClosedNoticeSettings = async () => {
+    try {
+      setClosedNoticeSettings(await getClosedNoticeSettings());
+    } catch {
+      // Mantém o texto padrão
+    }
+  };
+
+  const handleUpdateClosedNoticeSettings = async (settings: ClosedNoticeSettings) => {
+    await updateClosedNoticeSettings(settings); // erro propaga para o SettingsManager avisar
+    await refreshClosedNoticeSettings();
   };
 
   // Logos do rodapé: leitura pública. Se a migração ainda não rodou, engole o
@@ -884,15 +903,27 @@ const App: React.FC = () => {
                  <Timer size={30} className="text-red-400" />
                </div>
                <h2 className="text-2xl font-black italic text-white mb-2">Inscrições Encerradas</h2>
-               <p className="text-slate-400 text-sm">
-                 O prazo de inscrição para a {raceGroupName} foi encerrado. Para mais informações, procure a organização do evento.
+               <p className="text-slate-400 text-sm whitespace-pre-line">
+                 {closedNoticeSettings.message.trim() || `O prazo de inscrição para a ${raceGroupName} foi encerrado. Para mais informações, procure a organização do evento.`}
                </p>
-               <button
-                 onClick={() => setMode('landing')}
-                 className="mt-6 bg-slate-800 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-700 transition-colors"
-               >
-                 Voltar ao Início
-               </button>
+               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                 {whatsappLink(closedNoticeSettings.whatsapp) && (
+                   <a
+                     href={whatsappLink(closedNoticeSettings.whatsapp)}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-500 transition-colors flex items-center gap-2"
+                   >
+                     <MessageCircle size={18} /> Falar no WhatsApp
+                   </a>
+                 )}
+                 <button
+                   onClick={() => setMode('landing')}
+                   className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                 >
+                   Voltar ao Início
+                 </button>
+               </div>
              </div>
            ) : (
              <RegistrationForm
@@ -1191,6 +1222,9 @@ const App: React.FC = () => {
                 onUpdateCouponsBlocked={handleUpdateCouponsBlocked}
                 teamRankingEnabled={teamRankingEnabled}
                 onUpdateTeamRankingEnabled={handleUpdateTeamRankingEnabled}
+                closedNoticeMessage={closedNoticeSettings.message}
+                closedNoticeWhatsapp={closedNoticeSettings.whatsapp}
+                onUpdateClosedNotice={handleUpdateClosedNoticeSettings}
               />
             )}
 

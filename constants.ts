@@ -61,6 +61,17 @@ export const FREE_REASONS: { key: 'patrocinio' | 'cortesia'; label: string; chip
 export const freeReasonLabel = (key?: string): string =>
   FREE_REASONS.find(r => r.key === key)?.label || '';
 
+// Monta o link do WhatsApp a partir de um número digitado livremente (com ou
+// sem DDI, com ou sem formatação). Números de até 11 dígitos são tratados
+// como locais (DDD + número) e ganham o 55 na frente; retorna '' quando não
+// há número.
+export const whatsappLink = (raw?: string): string => {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
+  return `https://wa.me/${withCountry}`;
+};
+
 // Logos de patrocinadores no rodapé: altura do "chip" branco e altura base do
 // logo dentro dele (100% do ajuste). Cada logo pode ter um scale próprio, então
 // esses números são o ponto de partida compartilhado entre o rodapé e a tela
