@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes } from './services/storageService';
+import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings } from './types';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes, getKitFlyerSettings, updateKitFlyerSettings } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly, MAX_ATHLETES } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -19,6 +19,7 @@ import { KitDelivery } from './components/KitDelivery';
 import { ShirtsManager } from './components/ShirtsManager';
 import { SponsorLogosManager } from './components/SponsorLogosManager';
 import { RaffleManager } from './components/RaffleManager';
+import { KitFlyerManager } from './components/KitFlyerManager';
 import { BulkRegistration } from './components/BulkRegistration';
 import { LoginScreen } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
@@ -26,7 +27,7 @@ import { nightMusic } from './services/nightMusic';
 import sicrediLogo from './assets/sicredi-logo.jpg';
 import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt, Megaphone } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -68,6 +69,12 @@ const App: React.FC = () => {
   const [markerLabels, setMarkerLabels] = useState<Record<string, string>>({});
   // Limite de vagas: o do banco quando o admin já definiu um, senão o padrão
   const [maxAthletes, setMaxAthletes] = useState<number>(MAX_ATHLETES);
+  // Flyer em tela cheia antes da vinheta (ex.: aviso da retirada de kit).
+  // kitFlyerReady: já sabemos se há flyer configurado (ou o teto abaixo
+  // estourou) — a landing usa isso para não deixar a vinheta começar antes
+  // dessa resposta chegar.
+  const [kitFlyerSettings, setKitFlyerSettings] = useState<KitFlyerSettings>({ enabled: false, imageUrl: '' });
+  const [kitFlyerReady, setKitFlyerReady] = useState(false);
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -252,6 +259,7 @@ const App: React.FC = () => {
     refreshSponsorLogos();
     refreshCouponsBlocked();
     refreshRaffleSettings();
+    refreshKitFlyerSettings();
     refreshTeamRankingEnabled();
     refreshTeamRanking();
   }, []);
@@ -292,6 +300,30 @@ const App: React.FC = () => {
   const handleUpdateRaffleSettings = async (settings: Partial<RaffleSettings>) => {
     await updateRaffleSettings(settings); // erro propaga para o manager avisar
     await refreshRaffleSettings();
+  };
+
+  // Flyer inicial: leitura pública, com um teto de tempo. A vinheta de
+  // largada começa ~1,6s depois do boot — sem um limite aqui, uma rede lenta
+  // (ou o Supabase "acordando") poderia prender a vinheta esperando essa
+  // consulta indefinidamente. Vencido o teto, segue como se não houvesse
+  // flyer: a vinheta toca normalmente nesta carga (fail-open).
+  const refreshKitFlyerSettings = async () => {
+    try {
+      const resultado = await Promise.race([
+        getKitFlyerSettings(),
+        new Promise<null>((res) => setTimeout(() => res(null), 2500)),
+      ]);
+      if (resultado) setKitFlyerSettings(resultado);
+    } catch {
+      // Mantém oculto por padrão
+    } finally {
+      setKitFlyerReady(true);
+    }
+  };
+
+  const handleUpdateKitFlyerSettings = async (settings: Partial<KitFlyerSettings>) => {
+    await updateKitFlyerSettings(settings); // erro propaga para o manager avisar
+    await refreshKitFlyerSettings();
   };
 
   // Logos do rodapé: leitura pública. Se a migração ainda não rodou, engole o
@@ -793,6 +825,8 @@ const App: React.FC = () => {
           teamRankingEnabled={teamRankingEnabled}
           teamRanking={teamRanking}
           startIntro={revealIntro}
+          kitFlyerSettings={kitFlyerSettings}
+          kitFlyerReady={kitFlyerReady}
         />
         {showCourse && (
           <Suspense fallback={<div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center text-slate-400 font-bold animate-pulse">Carregando percurso...</div>}>
@@ -968,6 +1002,7 @@ const App: React.FC = () => {
               </div>
               <NavItem target="sponsor_logos" icon={ImageIcon} label="Logos do Site" />
               <NavItem target="raffle" icon={Gift} label="Rifa Solidária" />
+              <NavItem target="kit_flyer" icon={Megaphone} label="Flyer Inicial" />
               <NavItem target="settings" icon={Settings} label="Configurações" />
             </>
           )}
@@ -1172,6 +1207,13 @@ const App: React.FC = () => {
               <RaffleManager
                 settings={raffleSettings}
                 onUpdate={handleUpdateRaffleSettings}
+              />
+            )}
+
+            {currentView === 'kit_flyer' && (
+              <KitFlyerManager
+                settings={kitFlyerSettings}
+                onUpdate={handleUpdateKitFlyerSettings}
               />
             )}
           </div>

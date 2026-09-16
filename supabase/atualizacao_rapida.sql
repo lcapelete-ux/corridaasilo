@@ -1,8 +1,9 @@
 -- ============================================================================
--- ATUALIZAÇÃO RÁPIDA — remessa para a organização + marcação colorida
+-- ATUALIZAÇÃO RÁPIDA — remessa, marcação colorida, limite de vagas, isenção
+-- e flyer inicial
 -- ============================================================================
 -- Rode este arquivo INTEIRO no SQL Editor do Supabase. Ele é curto de
--- propósito: só cria as colunas destas duas funções.
+-- propósito: só cria as colunas que essas telas precisam.
 --
 -- Não apaga nada, não mexe em inscrição nenhuma e pode ser rodado de novo sem
 -- problema (usa "if not exists").
@@ -35,6 +36,12 @@ alter table public.runners drop constraint if exists runners_free_reason_check;
 alter table public.runners add constraint runners_free_reason_check
   check (free_reason is null or free_reason in ('patrocinio', 'cortesia'));
 
+-- Flyer em tela cheia mostrado antes da vinheta de largada, ao abrir o site
+-- — antes de qualquer outra coisa. Serve para avisos do momento (ex.: data e
+-- local da retirada de kit). O conteúdo vem todo na imagem.
+alter table public.app_settings add column if not exists kit_flyer_enabled boolean not null default false;
+alter table public.app_settings add column if not exists kit_flyer_image_url text;
+
 
 comment on column public.runners.sent_batch is
   'Número da remessa enviada à organização (vazio = ainda não enviado)';
@@ -50,6 +57,10 @@ comment on column public.runners.free_reason is
   'Motivo da inscrição zerada: patrocinio (com sponsor_id) ou cortesia';
 comment on column public.runners.sponsor_id is
   'Patrocinador que cobre esta vaga, quando free_reason = patrocinio';
+comment on column public.app_settings.kit_flyer_enabled is
+  'Liga/desliga o flyer em tela cheia mostrado antes da vinheta de largada';
+comment on column public.app_settings.kit_flyer_image_url is
+  'Imagem do flyer inicial (URL no Cloudinary)';
 
 
 -- Confirmação: mostra como está a fila de envio agora
@@ -61,5 +72,6 @@ select
   coalesce(max(sent_batch), 0)                                as ultima_remessa,
   count(*) filter (where marker is not null)                  as com_marcacao,
   count(*) filter (where free_reason = 'patrocinio')          as vagas_patrocinio,
-  count(*) filter (where free_reason = 'cortesia')            as cortesias
+  count(*) filter (where free_reason = 'cortesia')            as cortesias,
+  (select kit_flyer_enabled from public.app_settings limit 1) as flyer_inicial_ligado
 from public.runners;

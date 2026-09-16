@@ -156,7 +156,16 @@ export interface RaffleSettings {
   whatsappLink: string;  // Link do grupo de WhatsApp da rifa (dúvidas e resultados)
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'bulk_registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'shirts' | 'sponsor_logos' | 'raffle';
+export type ViewState = 'dashboard' | 'registration' | 'bulk_registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'shirts' | 'sponsor_logos' | 'raffle' | 'kit_flyer';
+
+// Flyer em tela cheia mostrado antes da vinheta de largada, ao abrir o site —
+// antes de qualquer outra coisa. Serve para avisos do momento (ex.: data e
+// local da retirada de kit). O conteúdo vem todo na imagem; aqui só controla
+// se aparece e qual imagem usar.
+export interface KitFlyerSettings {
+  enabled: boolean;
+  imageUrl: string;
+}
 
 // Uma linha do ranking público de equipes (só nome + quantidade — nunca dados de corredores)
 export interface TeamRankingEntry {
