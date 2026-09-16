@@ -156,7 +156,7 @@ export interface RaffleSettings {
   whatsappLink: string;  // Link do grupo de WhatsApp da rifa (dúvidas e resultados)
 }
 
-export type ViewState = 'dashboard' | 'registration' | 'bulk_registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'sponsor_logos' | 'raffle';
+export type ViewState = 'dashboard' | 'registration' | 'bulk_registration' | 'runners' | 'teams' | 'cities' | 'sponsors' | 'expenses' | 'organizers' | 'extra_revenue' | 'coupons' | 'settings' | 'kits' | 'shirts' | 'sponsor_logos' | 'raffle';
 
 // Uma linha do ranking público de equipes (só nome + quantidade — nunca dados de corredores)
 export interface TeamRankingEntry {
