@@ -548,6 +548,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   const [editRunner, setEditRunner] = useState<Runner | null>(null);
   const [editName, setEditName] = useState('');
   const [editCpf, setEditCpf] = useState('');
+  const [editTeam, setEditTeam] = useState('');
   const [editError, setEditError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -555,6 +556,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     setEditRunner(runner);
     setEditName(runner.fullName);
     setEditCpf(runner.cpf);
+    setEditTeam(runner.teamName);
     setEditError('');
   };
 
@@ -574,10 +576,12 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
     const nome = editName.trim();
     const cpf = editCpf.trim();
+    const equipe = editTeam.trim();
     if (!nome) { setEditError('O nome não pode ficar vazio.'); return; }
     if (cpf.replace(/\D/g, '').length !== 11) { setEditError('CPF incompleto.'); return; }
+    if (!equipe) { setEditError('A equipe não pode ficar vazia. Use "Avulso" se não tiver equipe.'); return; }
 
-    if (nome === editRunner.fullName && cpf === editRunner.cpf) {
+    if (nome === editRunner.fullName && cpf === editRunner.cpf && equipe === editRunner.teamName) {
       setEditRunner(null);
       return;
     }
@@ -585,9 +589,9 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
     setSavingEdit(true);
     setEditError('');
     try {
-      // Só nome e CPF. Nada de transferredFrom/transferredAt: é correção,
-      // não troca de titular.
-      await onUpdate({ ...editRunner, fullName: nome, cpf });
+      // Nome, CPF e equipe. Nada de transferredFrom/transferredAt: é
+      // correção, não troca de titular.
+      await onUpdate({ ...editRunner, fullName: nome, cpf, teamName: equipe });
       setEditRunner(null);
     } catch (err: any) {
       // O banco tem CPF único — digitar um CPF já usado cai aqui
@@ -1509,7 +1513,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                           <button
                             onClick={() => openEditModal(runner)}
                             className="p-2 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
-                            title="Corrigir nome/CPF (não é transferência)"
+                            title="Corrigir nome/CPF/equipe (não é transferência)"
                           >
                             <UserCog size={18} />
                           </button>
@@ -1914,6 +1918,20 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
                   placeholder="000.000.000-00"
                   className={`${transferInputCls} font-mono`}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Equipe</label>
+                <input
+                  value={editTeam}
+                  onChange={(e) => { setEditTeam(e.target.value); setEditError(''); }}
+                  list="corrigir-equipes-existentes"
+                  placeholder="Avulso"
+                  className={transferInputCls}
+                />
+                <datalist id="corrigir-equipes-existentes">
+                  {teamsPresent.map(team => <option key={team} value={team} />)}
+                </datalist>
               </div>
 
               {editError && (
