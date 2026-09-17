@@ -93,6 +93,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
 
   // --- Filtros e ordenação da Lista ---
   const [teamFilter, setTeamFilter] = useState('');       // '' = todas as academias
+  const [cityFilter, setCityFilter] = useState('');       // '' = todas as cidades
   const [categoryFilter, setCategoryFilter] = useState(''); // '' = todas as categorias
   const [modalityFilter, setModalityFilter] = useState<'' | '5k' | '3k'>('');
   const [paymentFilter, setPaymentFilter] = useState<'todos' | 'meia' | 'inteira' | 'apoiador' | 'pago' | 'pendente' | 'promo_pendente'>('todos');
@@ -145,6 +146,8 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
   // Listas para os menus de filtro (só o que realmente existe entre os inscritos)
   const teamsPresent = Array.from(new Set(runners.map(r => r.teamName).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const citiesPresent = Array.from(new Set(runners.map(r => r.city).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const categoriesPresent = Array.from(new Set(
     runners.map(r => getRunnerCategory(r.birthDate, r.modality)).filter(Boolean)
   )).sort((a, b) => categoryOrder(a) - categoryOrder(b));
@@ -175,6 +178,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         : freeFilter === 'sem_motivo' ? (zerado && !r.freeReason)
         : r.freeReason === freeFilter;
       const matchesTeam = !teamFilter || r.teamName === teamFilter;
+      const matchesCity = !cityFilter || r.city === cityFilter;
       const matchesCategory = !categoryFilter || getRunnerCategory(r.birthDate, r.modality) === categoryFilter;
       const matchesModality = !modalityFilter || (r.modality || '5k') === modalityFilter;
       const matchesPayment =
@@ -185,7 +189,7 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
         paymentFilter === 'pago' ? !!r.isPaid :
         paymentFilter === 'pendente' ? !r.isPaid :
         paymentFilter === 'promo_pendente' ? isPromoPending(r) : true;
-      return matchesSearch && matchesTeam && matchesCategory && matchesModality && matchesPayment && matchesSend && matchesMarker && matchesFree;
+      return matchesSearch && matchesTeam && matchesCity && matchesCategory && matchesModality && matchesPayment && matchesSend && matchesMarker && matchesFree;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -203,9 +207,10 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
       }
     });
 
-  const hasActiveFilters = !!(teamFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sendFilter !== 'todos' || markerFilter || freeFilter || sortBy !== 'padrao');
+  const hasActiveFilters = !!(teamFilter || cityFilter || categoryFilter || modalityFilter || paymentFilter !== 'todos' || sendFilter !== 'todos' || markerFilter || freeFilter || sortBy !== 'padrao');
   const clearFilters = () => {
     setTeamFilter('');
+    setCityFilter('');
     setCategoryFilter('');
     setModalityFilter('');
     setPaymentFilter('todos');
@@ -1168,6 +1173,14 @@ export const RunnerList: React.FC<RunnerListProps> = ({ runners, onDelete, onUpd
             <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className={filterSelectCls}>
               <option value="">Todas</option>
               {teamsPresent.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          {/* Cidade */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Cidade</label>
+            <select value={cityFilter} onChange={e => setCityFilter(e.target.value)} className={filterSelectCls}>
+              <option value="">Todas</option>
+              {citiesPresent.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           {/* Categoria */}
