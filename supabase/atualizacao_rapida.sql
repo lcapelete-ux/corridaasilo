@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ATUALIZAÇÃO RÁPIDA — remessa, marcação colorida, limite de vagas, isenção,
--- flyer inicial e aviso de inscrições encerradas
+-- flyer inicial, aviso de inscrições encerradas e link VIP
 -- ============================================================================
 -- Rode este arquivo INTEIRO no SQL Editor do Supabase. Ele é curto de
 -- propósito: só cria as colunas que essas telas precisam.
@@ -48,6 +48,12 @@ alter table public.app_settings add column if not exists kit_flyer_image_url tex
 alter table public.app_settings add column if not exists closed_notice_message text;
 alter table public.app_settings add column if not exists closed_notice_whatsapp text;
 
+-- Link VIP: um código que, colado na URL como "?vip=CODIGO", libera o
+-- formulário de inscrição mesmo com o prazo encerrado. Serve para o admin
+-- mandar para quem quiser abrir exceção (convidados, patrocinadores...).
+-- Vazio = nenhum link ativo. Trocar o código invalida o link anterior.
+alter table public.app_settings add column if not exists vip_registration_token text;
+
 
 comment on column public.runners.sent_batch is
   'Número da remessa enviada à organização (vazio = ainda não enviado)';
@@ -71,6 +77,8 @@ comment on column public.app_settings.closed_notice_message is
   'Aviso manual mostrado no lugar do formulário quando as inscrições estão encerradas (vazio = texto padrão)';
 comment on column public.app_settings.closed_notice_whatsapp is
   'WhatsApp para contato mostrado junto do aviso de inscrições encerradas (vazio = sem botão)';
+comment on column public.app_settings.vip_registration_token is
+  'Código do link VIP (?vip=CODIGO) que libera inscrição mesmo com o prazo encerrado; vazio = sem link ativo';
 
 
 -- Confirmação: mostra como está a fila de envio agora
@@ -85,5 +93,7 @@ select
   count(*) filter (where free_reason = 'cortesia')            as cortesias,
   (select kit_flyer_enabled from public.app_settings limit 1) as flyer_inicial_ligado,
   (select closed_notice_message is not null or closed_notice_whatsapp is not null
-     from public.app_settings limit 1)                        as aviso_encerramento_configurado
+     from public.app_settings limit 1)                        as aviso_encerramento_configurado,
+  (select vip_registration_token is not null and vip_registration_token <> ''
+     from public.app_settings limit 1)                        as link_vip_ativo
 from public.runners;
