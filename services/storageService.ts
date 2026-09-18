@@ -319,6 +319,30 @@ export const updateClosedNoticeSettings = async (settings: Partial<ClosedNoticeS
   }
 };
 
+// Link VIP: um código que, colado na URL como "?vip=CODIGO", libera o
+// formulário de inscrição mesmo com o prazo encerrado. Leitura pública —
+// o próprio formulário precisa comparar o código sem o visitante estar logado.
+export const getVipRegistrationToken = async (): Promise<string> => {
+  const { data, error } = await supabase
+    .from('app_settings').select('vip_registration_token').limit(1).maybeSingle();
+  if (error) {
+    if (isUnknownColumnError(error)) return '';
+    throw friendlyError(error, 'Erro ao carregar o link VIP');
+  }
+  return (data as { vip_registration_token: string | null } | null)?.vip_registration_token || '';
+};
+
+export const updateVipRegistrationToken = async (token: string): Promise<void> => {
+  const { error } = await supabase
+    .from('app_settings').update({ vip_registration_token: token || null }).eq('id', true);
+  if (error) {
+    if (isUnknownColumnError(error)) {
+      throw new Error('O link VIP precisa da atualização do banco. Rode supabase/atualizacao_rapida.sql e tente de novo.');
+    }
+    throw friendlyError(error, 'Erro ao salvar o link VIP');
+  }
+};
+
 // Nomes que o organizador deu para cada cor (ficam em app_settings)
 export const getMarkerLabels = async (): Promise<Record<string, string>> => {
   const { data, error } = await supabase

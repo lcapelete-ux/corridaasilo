@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy, MessageCircle, ExternalLink } from 'lucide-react';
+import { Settings, Save, AlertCircle, Clock, Ban, Tag, CalendarClock, Users, Ticket, Trophy, MessageCircle, ExternalLink, Key, RefreshCw, Copy, Check } from 'lucide-react';
 import { TransferSettings, ClosedNoticeSettings } from '../types';
 import { formatBrDate, MAX_ATHLETES, whatsappLink } from '../constants';
 
@@ -22,9 +22,11 @@ interface SettingsManagerProps {
   closedNoticeMessage?: string;                             // aviso manual quando as inscrições estão encerradas
   closedNoticeWhatsapp?: string;                            // WhatsApp opcional exibido junto do aviso
   onUpdateClosedNotice?: (settings: ClosedNoticeSettings) => Promise<void>;
+  vipToken?: string;                                        // código do link VIP (?vip=CODIGO), vazio = sem link ativo
+  onUpdateVipToken?: (token: string) => Promise<void>;
 }
 
-export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled, maxAthletes = MAX_ATHLETES, onUpdateMaxAthletes, closedNoticeMessage = '', closedNoticeWhatsapp = '', onUpdateClosedNotice }) => {
+export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName, onUpdateRaceGroupName, transferSettings, onUpdateTransferSettings, promoDeadline, onUpdatePromoDeadline, registrationDeadline, onUpdateRegistrationDeadline, totalRunners = 0, couponsBlocked = false, onUpdateCouponsBlocked, teamRankingEnabled = false, onUpdateTeamRankingEnabled, maxAthletes = MAX_ATHLETES, onUpdateMaxAthletes, closedNoticeMessage = '', closedNoticeWhatsapp = '', onUpdateClosedNotice, vipToken = '', onUpdateVipToken }) => {
   const [name, setName] = useState(raceGroupName);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -93,6 +95,49 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
 
   const closedNoticeTestLink = whatsappLink(closedWhatsDraft);
   const closedNoticeUnchanged = closedMsgDraft === closedNoticeMessage && closedWhatsDraft === closedNoticeWhatsapp;
+
+  // Link VIP: libera o formulário mesmo com as inscrições encerradas
+  const [vipDraft, setVipDraft] = useState(vipToken);
+  const [savingVip, setSavingVip] = useState(false);
+  const [vipError, setVipError] = useState('');
+  const [vipSuccess, setVipSuccess] = useState(false);
+  const [vipCopied, setVipCopied] = useState(false);
+
+  useEffect(() => { setVipDraft(vipToken); }, [vipToken]);
+
+  const gerarTokenVip = () => {
+    const codigo = Math.random().toString(36).slice(2, 10).toUpperCase();
+    setVipDraft(codigo);
+    setVipError('');
+    setVipSuccess(false);
+  };
+
+  const salvarVip = async () => {
+    setSavingVip(true);
+    setVipError('');
+    setVipSuccess(false);
+    try {
+      await onUpdateVipToken?.(vipDraft.trim());
+      setVipSuccess(true);
+      setTimeout(() => setVipSuccess(false), 3000);
+    } catch (e: any) {
+      setVipError(e?.message || 'Não foi possível salvar o link VIP.');
+    } finally {
+      setSavingVip(false);
+    }
+  };
+
+  // Só mostra o link para copiar quando o rascunho bate com o que está
+  // salvo — copiar antes de salvar daria um link que ainda não funciona.
+  const vipLink = vipToken ? `${window.location.origin}${window.location.pathname}?vip=${encodeURIComponent(vipToken)}` : '';
+  const vipLinkReady = vipLink && vipDraft.trim() === vipToken;
+
+  const copiarVipLink = () => {
+    if (!vipLink) return;
+    navigator.clipboard.writeText(vipLink);
+    setVipCopied(true);
+    setTimeout(() => setVipCopied(false), 2000);
+  };
 
   const salvarLimite = async () => {
     const n = parseInt(limiteDraft, 10);
@@ -537,6 +582,92 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ raceGroupName,
               <Save size={18} /> {savingClosedNotice ? 'Salvando...' : 'Salvar Aviso'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Link VIP — libera inscrição mesmo com o prazo encerrado */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className={`p-3 rounded-lg ${vipToken ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+            <Key size={24} className={vipToken ? 'text-emerald-600' : 'text-slate-500'} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-800">Link VIP</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Status: <span className={`font-bold ${vipToken ? 'text-emerald-600' : 'text-slate-500'}`}>
+                {vipToken ? '✓ Link ativo' : '✗ Nenhum link gerado'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-slate-600 text-sm mb-6">
+          Gera um link especial que ignora o prazo de inscrição — quem abrir esse link consegue se inscrever
+          normalmente mesmo com as inscrições encerradas para o público. Envie só para quem você quiser abrir
+          exceção (convidados, patrocinadores, atletas de última hora). <strong>Qualquer pessoa com o link
+          consegue usá-lo</strong> — para revogar o acesso, gere um novo código: o link anterior para de funcionar.
+        </p>
+
+        <div className="max-w-xl space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Código do link</label>
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                value={vipDraft}
+                onChange={(e) => { setVipDraft(e.target.value); setVipError(''); setVipSuccess(false); }}
+                placeholder="Ex: AMIGOS2026"
+                className="flex-1 min-w-[180px] px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono [color-scheme:light]"
+              />
+              <button
+                type="button"
+                onClick={gerarTokenVip}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-200 transition-all flex items-center gap-2"
+              >
+                <RefreshCw size={15} /> Gerar novo
+              </button>
+            </div>
+          </div>
+
+          {vipError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-red-700 font-medium text-sm">{vipError}</p>
+            </div>
+          )}
+
+          {vipSuccess && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <p className="text-emerald-700 font-medium text-sm">✓ Link VIP salvo com sucesso!</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={salvarVip}
+            disabled={savingVip || !onUpdateVipToken || vipDraft.trim() === vipToken}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          >
+            <Save size={18} /> {savingVip ? 'Salvando...' : 'Salvar'}
+          </button>
+
+          {vipLinkReady ? (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Link para enviar aos VIPs</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="flex-1 min-w-[200px] text-xs text-slate-700 break-all">{vipLink}</code>
+                <button
+                  type="button"
+                  onClick={copiarVipLink}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${vipCopied ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'}`}
+                >
+                  {vipCopied ? <Check size={13} /> : <Copy size={13} />} {vipCopied ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
+            </div>
+          ) : vipToken ? (
+            <p className="text-xs text-amber-600 font-bold">Salve a alteração para atualizar o link.</p>
+          ) : null}
         </div>
       </div>
 

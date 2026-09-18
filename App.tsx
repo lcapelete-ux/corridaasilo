@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Runner, Sponsor, Expense, Organizer, ExtraRevenue, TeamCoupon, TransferSettings, ViewState, UserSession, SponsorLogo, RaffleSettings, TeamRankingEntry, KitFlyerSettings, ClosedNoticeSettings } from './types';
-import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes, getKitFlyerSettings, updateKitFlyerSettings, getClosedNoticeSettings, updateClosedNoticeSettings } from './services/storageService';
+import { getRunners, saveRunner, deleteRunner, getSponsors, saveSponsor, updateSponsor, deleteSponsor, updateRunner, getExpenses, saveExpense, deleteExpense, getOrganizers, updateOrganizer, deleteOrganizer, createOrganizerLogin, getExtraRevenues, saveExtraRevenue, deleteExtraRevenue, getCoupons, saveCoupon, updateCoupon, deleteCoupon, setCouponBlocked, getTransferSettings, updateTransferSettings, getTeams, createTeam, deleteTeam, renameTeam, getCities, createCity, deleteCity, getRaceGroupName, updateRaceGroupName, getPromoDeadline, updatePromoDeadline, getRegistrationDeadline, updateRegistrationDeadline, getSponsorLogos, addSponsorLogo, updateSponsorLogo, deleteSponsorLogo, getCouponsBlocked, setCouponsBlocked, getRaffleSettings, updateRaffleSettings, getTeamRankingEnabled, updateTeamRankingEnabled, getTeamRanking, markRunnersSent, unmarkRunnersSent, markRunnersColor, getMarkerLabels, updateMarkerLabels, getMaxAthletes, updateMaxAthletes, getKitFlyerSettings, updateKitFlyerSettings, getClosedNoticeSettings, updateClosedNoticeSettings, getVipRegistrationToken, updateVipRegistrationToken } from './services/storageService';
 import { supabase } from './services/supabaseClient';
 import { getRunnerPaidValue, PREDEFINED_TEAMS, PREDEFINED_CITIES, isMinorAtEvent, getSponsorPaidAmount, isKitsOnly, MAX_ATHLETES, whatsappLink } from './constants';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -27,7 +27,7 @@ import { nightMusic } from './services/nightMusic';
 import sicrediLogo from './assets/sicredi-logo.jpg';
 import rondontexLogo from './assets/rondontex-logo.png';
 import { ProofUploadScreen } from './components/ProofUploadScreen';
-import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt, Megaphone, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Users, Flag, Menu, Timer, LogIn, Briefcase, LogOut, TrendingDown, Shield, CircleDollarSign, ArrowLeft, Ticket, Settings, Package, Image as ImageIcon, MapPin, Gift, Sparkles, Shirt, Megaphone, MessageCircle, Key } from 'lucide-react';
 
 // Carregado sob demanda: o dashboard (com a lib de gráficos) só é baixado
 // por quem entra na área restrita, deixando a página pública mais leve
@@ -77,6 +77,9 @@ const App: React.FC = () => {
   const [kitFlyerReady, setKitFlyerReady] = useState(false);
   // Aviso manual mostrado no lugar do formulário quando as inscrições encerram
   const [closedNoticeSettings, setClosedNoticeSettings] = useState<ClosedNoticeSettings>({ message: '', whatsapp: '' });
+  // Link VIP: código que, em "?vip=CODIGO" na URL, libera o formulário
+  // mesmo com as inscrições encerradas
+  const [vipToken, setVipToken] = useState('');
 
   // Alterado: O modo inicial agora é 'landing'
   const [mode, setMode] = useState<AppMode>('landing');
@@ -263,6 +266,7 @@ const App: React.FC = () => {
     refreshRaffleSettings();
     refreshKitFlyerSettings();
     refreshClosedNoticeSettings();
+    refreshVipToken();
     refreshTeamRankingEnabled();
     refreshTeamRanking();
   }, []);
@@ -343,6 +347,22 @@ const App: React.FC = () => {
   const handleUpdateClosedNoticeSettings = async (settings: ClosedNoticeSettings) => {
     await updateClosedNoticeSettings(settings); // erro propaga para o SettingsManager avisar
     await refreshClosedNoticeSettings();
+  };
+
+  // Link VIP: leitura pública — o formulário precisa comparar o código do
+  // "?vip=" sem o visitante estar logado. Se a migração ainda não rodou,
+  // engole o erro e o link simplesmente não funciona ainda.
+  const refreshVipToken = async () => {
+    try {
+      setVipToken(await getVipRegistrationToken());
+    } catch {
+      // Mantém vazio (nenhum link ativo)
+    }
+  };
+
+  const handleUpdateVipToken = async (token: string) => {
+    await updateVipRegistrationToken(token); // erro propaga para o SettingsManager avisar
+    await refreshVipToken();
   };
 
   // Logos do rodapé: leitura pública. Se a migração ainda não rodou, engole o
@@ -811,6 +831,12 @@ const App: React.FC = () => {
   })();
   const registrationsClosed = !!registrationDeadline && todayIso > registrationDeadline;
 
+  // Link VIP: "?vip=CODIGO" na URL libera o formulário mesmo com as
+  // inscrições encerradas. A URL não muda de outro jeito nesta página (sem
+  // roteador), então basta ler uma vez — fica válido durante toda a visita.
+  const vipParam = new URLSearchParams(window.location.search).get('vip') || '';
+  const vipUnlocked = !!vipToken && !!vipParam && vipParam.trim().toLowerCase() === vipToken.trim().toLowerCase();
+
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState; icon: any; label: string }) => (
     <button
       onClick={() => {
@@ -897,7 +923,7 @@ const App: React.FC = () => {
         </nav>
 
         <main className="flex-1 p-4 md:p-8 relative z-10">
-           {registrationsClosed ? (
+           {registrationsClosed && !vipUnlocked ? (
              <div className="max-w-xl mx-auto my-12 bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-8 text-center">
                <div className="w-16 h-16 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-5">
                  <Timer size={30} className="text-red-400" />
@@ -926,14 +952,22 @@ const App: React.FC = () => {
                </div>
              </div>
            ) : (
-             <RegistrationForm
-               onSave={handleSaveRunner}
-               existingTeams={getExistingTeams()}
-               officialTeams={officialTeams}
-               officialCities={officialCities}
-               isPublicView={true}
-               couponsBlocked={couponsBlocked}
-             />
+             <>
+               {registrationsClosed && vipUnlocked && (
+                 <div className="max-w-xl mx-auto mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3 text-emerald-300 text-sm font-bold">
+                   <Key size={18} className="shrink-0" />
+                   Inscrição liberada por link especial, mesmo com o prazo encerrado.
+                 </div>
+               )}
+               <RegistrationForm
+                 onSave={handleSaveRunner}
+                 existingTeams={getExistingTeams()}
+                 officialTeams={officialTeams}
+                 officialCities={officialCities}
+                 isPublicView={true}
+                 couponsBlocked={couponsBlocked}
+               />
+             </>
            )}
 
            <div className="max-w-3xl mx-auto mt-4 mb-8 text-center text-slate-500 text-sm">
@@ -1225,6 +1259,8 @@ const App: React.FC = () => {
                 closedNoticeMessage={closedNoticeSettings.message}
                 closedNoticeWhatsapp={closedNoticeSettings.whatsapp}
                 onUpdateClosedNotice={handleUpdateClosedNoticeSettings}
+                vipToken={vipToken}
+                onUpdateVipToken={handleUpdateVipToken}
               />
             )}
 

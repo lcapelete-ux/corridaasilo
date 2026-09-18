@@ -1174,6 +1174,16 @@ comment on column public.app_settings.closed_notice_message is
 comment on column public.app_settings.closed_notice_whatsapp is
   'WhatsApp para contato mostrado junto do aviso de inscrições encerradas (vazio = sem botão)';
 
+-- 33. Link VIP: um código que, colado na URL como "?vip=CODIGO", libera o
+--     formulário de inscrição mesmo com o prazo encerrado. Serve para o
+--     admin mandar para quem quiser abrir exceção (convidados,
+--     patrocinadores, atletas de última hora...). Vazio = nenhum link
+--     ativo. Trocar o código invalida o link anterior — não precisa de
+--     tabela de convites nem de data de expiração.
+alter table public.app_settings add column if not exists vip_registration_token text;
+comment on column public.app_settings.vip_registration_token is
+  'Código do link VIP (?vip=CODIGO) que libera inscrição mesmo com o prazo encerrado; vazio = sem link ativo';
+
 
 -- ============================================================================
 -- Resumo final
