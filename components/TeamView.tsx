@@ -1,7 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { Runner } from '../types';
-import { Flag, Users, Award, Plus, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Flag, Users, Award, Plus, Trash2, Pencil, Check, X, FileDown } from 'lucide-react';
 import { TeamDetailView } from './TeamDetailView';
+import { escapeHtml as esc, printHtml } from '../services/printReport';
+
+const REPORT_STYLE = `
+  .header-band { background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 24px 28px; border-radius: 14px; margin-bottom: 18px; }
+  .header-band .badge { display: inline-block; color: #38bdf8; font-size: 10px; font-weight: 800; letter-spacing: .15em; border: 1px solid rgba(56,189,248,.5); padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+  .header-band h1 { color: #fff; margin: 0 0 4px; }
+  .header-band .sub { color: #cbd5e1; margin: 0; }
+  tfoot td { font-weight: 800; background: #f1f5f9; }
+`;
 
 interface TeamViewProps {
   runners: Runner[];
@@ -9,9 +18,10 @@ interface TeamViewProps {
   onCreateTeam: (name: string) => void;
   onDeleteTeam: (name: string) => void;
   onRenameTeam?: (oldName: string, newName: string) => Promise<void>;
+  raceGroupName?: string;
 }
 
-export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCreateTeam, onDeleteTeam, onRenameTeam }) => {
+export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCreateTeam, onDeleteTeam, onRenameTeam, raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -45,6 +55,42 @@ export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCr
       }))
       .sort((a, b) => b.members.length - a.members.length);
   }, [runners, officialTeams]);
+
+  // Só as que já têm alguém inscrito — "Avulso" fica de fora do relatório
+  // porque não é uma equipe de verdade, é a ausência de uma
+  const teamsComInscricao = useMemo(
+    () => teams.filter(t => t.name !== 'Avulso' && t.members.length > 0),
+    [teams]
+  );
+  const totalInscritosComEquipe = teamsComInscricao.reduce((acc, t) => acc + t.members.length, 0);
+
+  const gerarPdf = () => {
+    const dataStr = new Date().toLocaleString('pt-BR');
+    const linhas = teamsComInscricao.map(t => `
+      <tr>
+        <td>${esc(t.name)}</td>
+        <td class="total-col">${t.members.length}</td>
+      </tr>`).join('');
+
+    const html = `
+      <div class="header-band">
+        <span class="badge">EQUIPES COM INSCRIÇÃO</span>
+        <h1>${esc(raceGroupName)}</h1>
+        <p class="sub">${teamsComInscricao.length} ${teamsComInscricao.length === 1 ? 'equipe' : 'equipes'} · ${totalInscritosComEquipe} ${totalInscritosComEquipe === 1 ? 'inscrito' : 'inscritos'} no total · Gerado em ${esc(dataStr)}</p>
+      </div>
+
+      <table>
+        <thead><tr><th>Equipe</th><th class="size">Inscritos</th></tr></thead>
+        <tbody>${linhas || `<tr><td colspan="2">Nenhuma equipe com inscrição ainda.</td></tr>`}</tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL</td>
+            <td class="total-col">${totalInscritosComEquipe}</td>
+          </tr>
+        </tfoot>
+      </table>`;
+    printHtml(html, `Equipes com inscrição - ${raceGroupName}`, REPORT_STYLE);
+  };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,6 +195,26 @@ export const TeamView: React.FC<TeamViewProps> = ({ runners, officialTeams, onCr
         <p className="text-xs text-slate-400 mt-2">
           A equipe passa a aparecer na hora para escolher em Inscrições, Cupons e Novo Login.
         </p>
+      </div>
+
+      {/* Relatório: equipes que têm inscrição */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <Flag size={16} className="text-indigo-500" /> Equipes com inscrição
+          </h3>
+          <p className="text-xs text-slate-400 mt-1">
+            {teamsComInscricao.length} {teamsComInscricao.length === 1 ? 'equipe' : 'equipes'} · {totalInscritosComEquipe} {totalInscritosComEquipe === 1 ? 'inscrito' : 'inscritos'} no total
+          </p>
+        </div>
+        <button
+          onClick={gerarPdf}
+          disabled={teamsComInscricao.length === 0}
+          className="flex items-center gap-2 bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Gerar PDF com as equipes que têm inscrição e a quantidade de cada uma"
+        >
+          <FileDown size={16} /> Gerar PDF
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
