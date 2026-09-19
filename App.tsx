@@ -1174,6 +1174,7 @@ const App: React.FC = () => {
                 onCreateTeam={handleCreateTeam}
                 onDeleteTeam={handleDeleteTeam}
                 onRenameTeam={handleRenameTeam}
+                raceGroupName={raceGroupName}
               />
             )}
 
