@@ -89,6 +89,7 @@ export interface Sponsor {
   isPaid: boolean;   // Derivado das parcelas quando há parcelas lançadas
   receiptImage?: string; // URL do arquivo no Cloudinary
   installments?: SponsorPayment[]; // Pagamentos parcelados, na ordem em que entraram
+  paidAt?: string;   // Data do pagamento à vista (yyyy-mm-dd), quando não há parcelas
 }
 
 // Logo de patrocinador exibido no rodapé do site (só imagem, leitura pública)

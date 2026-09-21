@@ -1,6 +1,7 @@
 -- ============================================================================
 -- ATUALIZAÇÃO RÁPIDA — remessa, marcação colorida, limite de vagas, isenção,
--- flyer inicial, aviso de inscrições encerradas e link VIP
+-- flyer inicial, aviso de inscrições encerradas, link VIP e data de
+-- pagamento dos patrocinadores
 -- ============================================================================
 -- Rode este arquivo INTEIRO no SQL Editor do Supabase. Ele é curto de
 -- propósito: só cria as colunas que essas telas precisam.
@@ -54,6 +55,11 @@ alter table public.app_settings add column if not exists closed_notice_whatsapp 
 -- Vazio = nenhum link ativo. Trocar o código invalida o link anterior.
 alter table public.app_settings add column if not exists vip_registration_token text;
 
+-- Data do pagamento à vista do patrocinador (sem parcelas). Quem paga
+-- parcelado já tem a data de cada parcela em sponsors.installments; esta
+-- coluna cobre o caso simples (marcar como pago de uma vez).
+alter table public.sponsors add column if not exists paid_at date;
+
 
 comment on column public.runners.sent_batch is
   'Número da remessa enviada à organização (vazio = ainda não enviado)';
@@ -79,6 +85,8 @@ comment on column public.app_settings.closed_notice_whatsapp is
   'WhatsApp para contato mostrado junto do aviso de inscrições encerradas (vazio = sem botão)';
 comment on column public.app_settings.vip_registration_token is
   'Código do link VIP (?vip=CODIGO) que libera inscrição mesmo com o prazo encerrado; vazio = sem link ativo';
+comment on column public.sponsors.paid_at is
+  'Data do pagamento à vista do patrocinador (vazio quando pago em parcelas ou ainda pendente)';
 
 
 -- Confirmação: mostra como está a fila de envio agora
@@ -95,5 +103,7 @@ select
   (select closed_notice_message is not null or closed_notice_whatsapp is not null
      from public.app_settings limit 1)                        as aviso_encerramento_configurado,
   (select vip_registration_token is not null and vip_registration_token <> ''
-     from public.app_settings limit 1)                        as link_vip_ativo
+     from public.app_settings limit 1)                        as link_vip_ativo,
+  (select count(*) filter (where paid_at is not null or jsonb_array_length(installments) > 0)
+     from public.sponsors)                                    as patrocinadores_com_data_de_pagamento
 from public.runners;
