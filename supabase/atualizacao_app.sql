@@ -1184,6 +1184,14 @@ alter table public.app_settings add column if not exists vip_registration_token 
 comment on column public.app_settings.vip_registration_token is
   'Código do link VIP (?vip=CODIGO) que libera inscrição mesmo com o prazo encerrado; vazio = sem link ativo';
 
+-- 34. Data do pagamento à vista do patrocinador (sem parcelas). Quem paga
+--     parcelado já tem a data de cada parcela em sponsors.installments; esta
+--     coluna cobre o caso simples (marcar como pago de uma vez), para o
+--     relatório de datas de pagamento não ficar sem essa informação.
+alter table public.sponsors add column if not exists paid_at date;
+comment on column public.sponsors.paid_at is
+  'Data do pagamento à vista do patrocinador (vazio quando pago em parcelas ou ainda pendente)';
+
 
 -- ============================================================================
 -- Resumo final

@@ -1,4 +1,4 @@
-import { Runner, TeamCoupon, TransferSettings, RaceModality, Sponsor } from './types';
+import { Runner, TeamCoupon, TransferSettings, RaceModality, Sponsor, SponsorPayment } from './types';
 
 // Modalidades da prova (seleção no topo da inscrição)
 export const MODALITIES: { value: RaceModality; label: string; distance: string; emoji: string }[] = [
@@ -247,6 +247,22 @@ export const getSponsorBalance = (s: Pick<Sponsor, 'amount' | 'isPaid' | 'instal
 // 3x de 33,33 para 100,00) deixe o patrocínio eternamente "quase pago".
 export const isSponsorSettled = (s: Pick<Sponsor, 'amount' | 'isPaid' | 'installments'>): boolean =>
   s.installments?.length ? getSponsorPaidAmount(s) >= s.amount - 0.01 : s.isPaid;
+
+// Datas em que o patrocinador efetivamente pagou. Parcelado: uma por parcela
+// lançada (já vem com data). À vista: uma única, guardada em paidAt — só
+// existe quando isPaid é true (marcar como pendente apaga a data). Sem
+// nenhum pagamento registrado ainda: lista vazia.
+export const getSponsorPaymentDates = (
+  s: Pick<Sponsor, 'amount' | 'isPaid' | 'installments' | 'paidAt'>
+): SponsorPayment[] => {
+  if (s.installments?.length) {
+    return [...s.installments].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  if (s.isPaid && s.paidAt) {
+    return [{ id: 'avista', amount: s.amount, date: s.paidAt }];
+  }
+  return [];
+};
 
 // Se, agora, um líder de equipe pode transferir inscrições (admin sempre pode,
 // independente destas configurações — a regra só limita o líder)

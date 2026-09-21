@@ -3,8 +3,8 @@ import React, { useState, useRef } from 'react';
 import { Sponsor, SponsorType, Runner } from '../types';
 import { prepareProofFile, migrateBase64ToCloudinary } from '../services/imageUtils';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend } from '../services/printReport';
-import { EVENT_DATE, formatBrDate, getSponsorPaidAmount, getSponsorBalance, isSponsorSettled } from '../constants';
-import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase, FileDown, Wallet } from 'lucide-react';
+import { EVENT_DATE, formatBrDate, getSponsorPaidAmount, getSponsorBalance, isSponsorSettled, getSponsorPaymentDates } from '../constants';
+import { Plus, Trash2, CheckCircle, XCircle, Upload, DollarSign, Briefcase, FileDown, Wallet, CalendarClock } from 'lucide-react';
 import { SponsorPaymentsModal } from './SponsorPaymentsModal';
 
 interface SponsorsManagerProps {
@@ -44,6 +44,8 @@ const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 t
 const selectCls = "w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-yellow-400/40 focus:border-yellow-400 outline-none transition-all text-sm [color-scheme:dark]";
 const labelCls = "block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide";
 
+const todayIso = () => new Date().toISOString().split('T')[0];
+
 export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSave, onUpdate, onDelete, raceGroupName = '2ª CORRIDA NOTURNA LSC', runners = [] }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +55,7 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
     type: 'Camiseta' as SponsorType,
     position: '',
     isPaid: false,
+    paidAt: todayIso(),
     receiptImage: ''
   });
 
@@ -103,11 +106,12 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
       type: formData.type,
       position: formData.type === 'Camiseta' ? formData.position : 'N/A',
       isPaid: formData.isPaid,
+      paidAt: formData.isPaid ? (formData.paidAt || todayIso()) : undefined,
       receiptImage: formData.receiptImage
     };
 
     onSave(newSponsor);
-    setFormData({ name: '', amount: '', type: 'Camiseta', position: '', isPaid: false, receiptImage: '' });
+    setFormData({ name: '', amount: '', type: 'Camiseta', position: '', isPaid: false, paidAt: todayIso(), receiptImage: '' });
     setIsFormVisible(false);
   };
 
@@ -120,8 +124,21 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
       setPaymentsSponsor(sponsor);
       return;
     }
-    Promise.resolve(onUpdate({ ...sponsor, isPaid: !sponsor.isPaid }))
-      .catch((e: any) => alert(e?.message || 'Erro ao atualizar patrocinador.'));
+    const willBePaid = !sponsor.isPaid;
+    Promise.resolve(onUpdate({
+      ...sponsor,
+      isPaid: willBePaid,
+      // Marcar como pago carimba hoje (ajustável depois); voltar para
+      // pendente limpa a data — não faz sentido um pendente ter data de pagamento.
+      paidAt: willBePaid ? (sponsor.paidAt || todayIso()) : undefined,
+    })).catch((e: any) => alert(e?.message || 'Erro ao atualizar patrocinador.'));
+  };
+
+  // Corrige a data de um pagamento à vista já marcado (ex.: lançado hoje,
+  // mas o pagamento caiu há alguns dias)
+  const handleChangePaidAt = (sponsor: Sponsor, date: string) => {
+    Promise.resolve(onUpdate({ ...sponsor, paidAt: date || todayIso() }))
+      .catch((e: any) => alert(e?.message || 'Erro ao atualizar a data de pagamento.'));
   };
 
   // Receita = o que efetivamente entrou (parcelas lançadas, ou o valor cheio
@@ -312,6 +329,60 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
     printHtml(html, `Patrocínios - ${raceGroupName}`, REPORT_STYLE);
   };
 
+  // Relatório dedicado: só as datas de pagamento, um por patrocinador. Quem
+  // paga parcelado entra com uma data por parcela; quem paga à vista, com a
+  // data única (paidAt). Serve para conferência financeira sem o resto do
+  // relatório completo (inscritos vinculados, comprovantes, etc.).
+  const generatePaymentDatesPdf = () => {
+    const fmtMoney = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    const dataStr = new Date().toLocaleString('pt-BR');
+
+    const comPagamento = sponsors
+      .map(s => ({ sponsor: s, pagamentos: getSponsorPaymentDates(s) }))
+      .filter(x => x.pagamentos.length > 0)
+      .sort((a, b) => a.pagamentos[0].date.localeCompare(b.pagamentos[0].date));
+    const semPagamento = sponsors.filter(s => getSponsorPaymentDates(s).length === 0);
+    const totalRecebido = comPagamento.reduce((acc, x) => acc + x.pagamentos.reduce((a, p) => a + p.amount, 0), 0);
+
+    const linhas = comPagamento.map(({ sponsor: s, pagamentos }) => `
+      <tr>
+        <td>${esc(s.name)}</td>
+        <td>${esc(s.type)}</td>
+        <td>${pagamentos.map(p => `${esc(formatBrDate(p.date, true))}${p.note ? ` — ${esc(p.note)}` : ''}`).join('<br>')}</td>
+        <td class="total-col">${pagamentos.map(p => esc(fmtMoney(p.amount))).join('<br>')}</td>
+      </tr>`).join('');
+
+    const linhasSemPagamento = semPagamento.map(s => `
+      <tr><td>${esc(s.name)}</td><td>${esc(s.type)}</td><td class="total-col">${esc(fmtMoney(s.amount))}</td></tr>`).join('');
+
+    const html = `
+      <div class="header-band">
+        <span class="badge">DATAS DE PAGAMENTO</span>
+        <h1>${esc(raceGroupName)}</h1>
+        <p class="sub">${comPagamento.length} ${comPagamento.length === 1 ? 'patrocinador' : 'patrocinadores'} com pagamento registrado · ${esc(fmtMoney(totalRecebido))} recebido · Gerado em ${esc(dataStr)}</p>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">📅 Pagamentos por data</div>
+        <table>
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th>Data(s) de pagamento</th><th class="size">Valor</th></tr></thead>
+          <tbody>${linhas || '<tr><td colspan="4">Nenhum pagamento registrado ainda.</td></tr>'}</tbody>
+          ${comPagamento.length > 0 ? `<tfoot><tr><td colspan="3">TOTAL RECEBIDO</td><td class="total-col">${esc(fmtMoney(totalRecebido))}</td></tr></tfoot>` : ''}
+        </table>
+      </div>
+
+      ${linhasSemPagamento ? `
+      <div class="section-card pending-card">
+        <div class="section-title">⚠️ Sem pagamento registrado (${semPagamento.length})</div>
+        <table>
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Combinado</th></tr></thead>
+          <tbody>${linhasSemPagamento}</tbody>
+        </table>
+      </div>` : ''}
+    `;
+    printHtml(html, `Datas de Pagamento - ${raceGroupName}`, REPORT_STYLE);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header Cards */}
@@ -343,6 +414,15 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
           Patrocinadores ({sponsors.length})
         </h2>
         <div className="flex items-center gap-2">
+          {sponsors.length > 0 && (
+            <button
+              onClick={generatePaymentDatesPdf}
+              className="bg-slate-800 text-slate-300 border border-slate-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-700 hover:text-white transition-all"
+              title="Gerar relatório só com as datas de pagamento"
+            >
+              <CalendarClock size={18} /> Datas de Pagamento (PDF)
+            </button>
+          )}
           {sponsors.length > 0 && (
             <button
               onClick={generatePdf}
@@ -451,16 +531,28 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
               </button>
             </div>
 
-            <div className="flex items-end">
+            <div className="flex flex-col justify-end gap-2">
               <label className="flex items-center gap-3 cursor-pointer bg-slate-800 p-2.5 rounded-lg w-full border border-slate-700">
                 <input
                   type="checkbox"
                   className="w-5 h-5 rounded border-slate-600 accent-yellow-400"
                   checked={formData.isPaid}
-                  onChange={e => setFormData({...formData, isPaid: e.target.checked})}
+                  onChange={e => setFormData({...formData, isPaid: e.target.checked, paidAt: formData.paidAt || todayIso()})}
                 />
                 <span className="text-sm font-bold text-slate-300">Pagamento Confirmado?</span>
               </label>
+              {formData.isPaid && (
+                <div className="flex items-center gap-2 bg-slate-800 p-2.5 rounded-lg border border-slate-700 animate-fade-in">
+                  <label className="text-xs font-bold text-slate-400 shrink-0">Data do pagamento</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.paidAt}
+                    onChange={e => setFormData({...formData, paidAt: e.target.value})}
+                    className="flex-1 bg-transparent text-white text-sm outline-none [color-scheme:dark]"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="col-span-1 md:col-span-2 lg:col-span-3 pt-3 border-t border-slate-800 flex justify-end gap-3">
@@ -550,6 +642,19 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
                       >
                         {quitado ? 'PAGO' : parcelas > 0 ? 'PARCIAL' : 'PENDENTE'}
                       </button>
+                      {/* Pagamento à vista: data editável (parcelado já tem data por parcela) */}
+                      {quitado && parcelas === 0 && (
+                        <div className="mt-1.5 flex items-center gap-1">
+                          <CalendarClock size={11} className="text-slate-500 shrink-0" />
+                          <input
+                            type="date"
+                            value={sponsor.paidAt || ''}
+                            onChange={e => handleChangePaidAt(sponsor, e.target.value)}
+                            title="Data em que o pagamento entrou"
+                            className="bg-transparent text-slate-400 text-[11px] outline-none focus:text-white cursor-pointer [color-scheme:dark]"
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="p-4 text-right whitespace-nowrap">
                       <button
