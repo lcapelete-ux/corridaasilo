@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Sponsor, SponsorType, Runner } from '../types';
+import { Sponsor, SponsorType, SponsorPayment, Runner } from '../types';
 import { prepareProofFile, migrateBase64ToCloudinary } from '../services/imageUtils';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend } from '../services/printReport';
 import { EVENT_DATE, formatBrDate, getSponsorPaidAmount, getSponsorBalance, isSponsorSettled, getSponsorPaymentDates } from '../constants';
@@ -106,7 +106,7 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
       type: formData.type,
       position: formData.type === 'Camiseta' ? formData.position : 'N/A',
       isPaid: formData.isPaid,
-      paidAt: formData.isPaid ? (formData.paidAt || todayIso()) : undefined,
+      paidAt: formData.isPaid ? (formData.paidAt || undefined) : undefined,
       receiptImage: formData.receiptImage
     };
 
@@ -134,10 +134,10 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
     })).catch((e: any) => alert(e?.message || 'Erro ao atualizar patrocinador.'));
   };
 
-  // Corrige a data de um pagamento à vista já marcado (ex.: lançado hoje,
-  // mas o pagamento caiu há alguns dias)
+  // Corrige (ou apaga) a data de um pagamento à vista já marcado. Apagar é
+  // válido: o pagamento continua confirmado, só a data fica sem informar.
   const handleChangePaidAt = (sponsor: Sponsor, date: string) => {
-    Promise.resolve(onUpdate({ ...sponsor, paidAt: date || todayIso() }))
+    Promise.resolve(onUpdate({ ...sponsor, paidAt: date || undefined }))
       .catch((e: any) => alert(e?.message || 'Erro ao atualizar a data de pagamento.'));
   };
 
@@ -340,15 +340,29 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
     const comPagamento = sponsors
       .map(s => ({ sponsor: s, pagamentos: getSponsorPaymentDates(s) }))
       .filter(x => x.pagamentos.length > 0)
-      .sort((a, b) => a.pagamentos[0].date.localeCompare(b.pagamentos[0].date));
+      .sort((a, b) => {
+        // Pagamento sem data informada é permitido — entra no relatório, só
+        // vai para o fim da lista (não dá para ordenar cronologicamente o
+        // que não tem data).
+        const da = a.pagamentos[0].date, db = b.pagamentos[0].date;
+        if (!da && !db) return a.sponsor.name.localeCompare(b.sponsor.name, 'pt-BR');
+        if (!da) return 1;
+        if (!db) return -1;
+        return da.localeCompare(db);
+      });
     const semPagamento = sponsors.filter(s => getSponsorPaymentDates(s).length === 0);
     const totalRecebido = comPagamento.reduce((acc, x) => acc + x.pagamentos.reduce((a, p) => a + p.amount, 0), 0);
+
+    const fmtData = (p: SponsorPayment) =>
+      p.date
+        ? `${esc(formatBrDate(p.date, true))}${p.note ? ` — ${esc(p.note)}` : ''}`
+        : `<span style="font-style:italic;color:#94a3b8;">Data não informada</span>${p.note ? ` — ${esc(p.note)}` : ''}`;
 
     const linhas = comPagamento.map(({ sponsor: s, pagamentos }) => `
       <tr>
         <td>${esc(s.name)}</td>
         <td>${esc(s.type)}</td>
-        <td>${pagamentos.map(p => `${esc(formatBrDate(p.date, true))}${p.note ? ` — ${esc(p.note)}` : ''}`).join('<br>')}</td>
+        <td>${pagamentos.map(fmtData).join('<br>')}</td>
         <td class="total-col">${pagamentos.map(p => esc(fmtMoney(p.amount))).join('<br>')}</td>
       </tr>`).join('');
 
@@ -543,10 +557,9 @@ export const SponsorsManager: React.FC<SponsorsManagerProps> = ({ sponsors, onSa
               </label>
               {formData.isPaid && (
                 <div className="flex items-center gap-2 bg-slate-800 p-2.5 rounded-lg border border-slate-700 animate-fade-in">
-                  <label className="text-xs font-bold text-slate-400 shrink-0">Data do pagamento</label>
+                  <label className="text-xs font-bold text-slate-400 shrink-0">Data do pagamento (opcional)</label>
                   <input
                     type="date"
-                    required
                     value={formData.paidAt}
                     onChange={e => setFormData({...formData, paidAt: e.target.value})}
                     className="flex-1 bg-transparent text-white text-sm outline-none [color-scheme:dark]"
