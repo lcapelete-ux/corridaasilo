@@ -249,8 +249,10 @@ export const isSponsorSettled = (s: Pick<Sponsor, 'amount' | 'isPaid' | 'install
   s.installments?.length ? getSponsorPaidAmount(s) >= s.amount - 0.01 : s.isPaid;
 
 // Datas em que o patrocinador efetivamente pagou. Parcelado: uma por parcela
-// lançada (já vem com data). À vista: uma única, guardada em paidAt — só
-// existe quando isPaid é true (marcar como pendente apaga a data). Sem
+// lançada (já vem com data). À vista: uma única, guardada em paidAt — mas a
+// data é opcional (payment sem data é permitido), então isPaid=true sempre
+// conta como pagamento aqui, mesmo com date vazio (o relatório mostra "data
+// não informada" nesse caso, em vez de tratar como se não tivesse pago). Sem
 // nenhum pagamento registrado ainda: lista vazia.
 export const getSponsorPaymentDates = (
   s: Pick<Sponsor, 'amount' | 'isPaid' | 'installments' | 'paidAt'>
@@ -258,8 +260,8 @@ export const getSponsorPaymentDates = (
   if (s.installments?.length) {
     return [...s.installments].sort((a, b) => a.date.localeCompare(b.date));
   }
-  if (s.isPaid && s.paidAt) {
-    return [{ id: 'avista', amount: s.amount, date: s.paidAt }];
+  if (s.isPaid) {
+    return [{ id: 'avista', amount: s.amount, date: s.paidAt || '' }];
   }
   return [];
 };
