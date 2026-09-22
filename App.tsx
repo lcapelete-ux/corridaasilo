@@ -1108,6 +1108,7 @@ const App: React.FC = () => {
                   totalSponsorRevenue={totalSponsorRevenue}
                   totalExtraRevenue={totalExtraRevenue}
                   expenses={expenses}
+                  sponsors={sponsors}
                   raceGroupName={raceGroupName}
                 />
               </Suspense>

@@ -1,8 +1,8 @@
 
 import React, { useMemo } from 'react';
-import { Runner, ShirtSize, Expense } from '../types';
+import { Runner, ShirtSize, Expense, Sponsor } from '../types';
 import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar, FileDown } from 'lucide-react';
-import { SENIOR_AGE, EVENT_DATE, formatBrDate } from '../constants';
+import { SENIOR_AGE, EVENT_DATE, formatBrDate, getRunnerPaidValue, getRegistrationFee, getSponsorBalance, isSponsorSettled } from '../constants';
 import { StatsCard } from './StatsCard';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend, svgBars } from '../services/printReport';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -15,6 +15,7 @@ interface DashboardProps {
   totalSponsorRevenue?: number;
   totalExtraRevenue?: number;
   expenses?: Expense[];
+  sponsors?: Sponsor[];
   raceGroupName?: string;
 }
 
@@ -83,7 +84,7 @@ const DonutCard: React.FC<{ title: string; data: { name: string; value: number }
   </div>
 );
 
-export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0, totalRegistrationRevenue = 0, totalSponsorRevenue = 0, totalExtraRevenue = 0, expenses = [], raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0, totalRegistrationRevenue = 0, totalSponsorRevenue = 0, totalExtraRevenue = 0, expenses = [], sponsors = [], raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
 
   const stats = useMemo(() => {
     const totalRunners = runners.length;
@@ -107,6 +108,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
     let m3 = 0;
     let seniorCount = 0;
 
+    // Inscrições por valor: só quem já pagou entra aqui — a soma dos totais
+    // bate com a Receita de Inscrições, pra fechar as contas sem buraco.
+    // Isento (valor zerado) conta a quantidade, mas o "recebido" é R$ 0 —
+    // o valor de tabela que essas vagas representariam fica à parte.
+    let inteiraCount = 0, inteiraTotal = 0;
+    let meiaCount = 0, meiaTotal = 0;
+    let apoiadorCount = 0, apoiadorTotal = 0;
+    let cupomCount = 0, cupomTotal = 0;
+    let isentoPatrocinioCount = 0, isentoPatrocinioValor = 0;
+    let isentoCortesiaCount = 0, isentoCortesiaValor = 0;
+    let isentoSemMotivoCount = 0, isentoSemMotivoValor = 0;
+
     runners.forEach(r => {
       if (sizeCounts[r.shirtSize] !== undefined) sizeCounts[r.shirtSize]++;
 
@@ -121,7 +134,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       }
 
       sumAge += r.age || 0;
-      if (r.isPaid) paidCount++;
+      if (r.isPaid) {
+        paidCount++;
+        const valor = getRunnerPaidValue(r);
+        if (valor <= 0) {
+          const tabela = getRegistrationFee(r.age, r.seniorFullPrice);
+          if (r.freeReason === 'patrocinio') { isentoPatrocinioCount++; isentoPatrocinioValor += tabela; }
+          else if (r.freeReason === 'cortesia') { isentoCortesiaCount++; isentoCortesiaValor += tabela; }
+          else { isentoSemMotivoCount++; isentoSemMotivoValor += tabela; }
+        } else if (r.age >= SENIOR_AGE && r.seniorFullPrice) {
+          apoiadorCount++; apoiadorTotal += valor;
+        } else if (r.age >= SENIOR_AGE) {
+          meiaCount++; meiaTotal += valor;
+        } else if ((r.couponDiscount || 0) > 0) {
+          cupomCount++; cupomTotal += valor;
+        } else {
+          inteiraCount++; inteiraTotal += valor;
+        }
+      }
       if (r.paidNoProof && !r.isPaid) paidNoProofCount++;
       if (r.modality === '3k') m3++; else m5++;
       if (r.age >= SENIOR_AGE) seniorCount++;
@@ -168,13 +198,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       { name: 'Caminhada 3 km', value: m3 },
     ];
 
+    const valueBreakdown = [
+      { key: 'inteira', label: 'Inteira (valor cheio)', count: inteiraCount, total: inteiraTotal },
+      { key: 'meia', label: 'Meia-inscrição (60+)', count: meiaCount, total: meiaTotal },
+      { key: 'apoiador', label: 'Apoiador 60+ (optou pelo valor cheio)', count: apoiadorCount, total: apoiadorTotal },
+      { key: 'cupom', label: 'Com cupom de desconto', count: cupomCount, total: cupomTotal },
+      { key: 'isento_patrocinio', label: 'Isento — Patrocínio', count: isentoPatrocinioCount, total: 0 },
+      { key: 'isento_cortesia', label: 'Isento — Cortesia', count: isentoCortesiaCount, total: 0 },
+      { key: 'isento_sem_motivo', label: 'Isento — Sem motivo registrado', count: isentoSemMotivoCount, total: 0 },
+    ];
+    const valorRecebidoInscricoes = inteiraTotal + meiaTotal + apoiadorTotal + cupomTotal;
+    const isentosCount = isentoPatrocinioCount + isentoCortesiaCount + isentoSemMotivoCount;
+    const isentosValorTabela = isentoPatrocinioValor + isentoCortesiaValor + isentoSemMotivoValor;
+
     return {
       totalRunners, uniqueTeams, sizeCounts, genderData, ageData, sortedTeams,
       topCities, distinctCities, paidCount, pendingCount, pctPaid, avgAge,
       seniorCount, m5, m3, paidNoProofCount, paymentData, modalityData,
-      allTeamsSorted, allCitiesSorted,
+      allTeamsSorted, allCitiesSorted, valueBreakdown, valorRecebidoInscricoes,
+      isentosCount, isentosValorTabela, isentoPatrocinioCount, isentoCortesiaCount, isentoSemMotivoCount,
     };
   }, [runners]);
+
+  // Previsão: patrocínios que ainda vão entrar (parcial ou totalmente
+  // pendente). Não é dinheiro fechado — é o que falta receber, para o
+  // organizador enxergar o que ainda pode chegar até o fim das contas.
+  const sponsorForecast = useMemo(() => {
+    const pending = sponsors
+      .filter(s => !isSponsorSettled(s))
+      .map(s => ({
+        sponsor: s,
+        recebido: getSponsorBalance(s) < s.amount ? s.amount - getSponsorBalance(s) : 0,
+        saldo: getSponsorBalance(s),
+        parcelado: !!s.installments?.length,
+      }))
+      .sort((a, b) => b.saldo - a.saldo);
+    const totalAReceber = pending.reduce((acc, x) => acc + x.saldo, 0);
+    return { pending, totalAReceber, count: pending.length };
+  }, [sponsors]);
 
   const balance = totalRevenue - totalExpenses;
   const PAYMENT_COLORS = ['#10b981', '#f59e0b'];
@@ -205,6 +266,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
     const genderSegments = stats.genderData.map((g, i) => ({ label: g.name, value: g.value, color: [COLORS[0], COLORS[1]][i % 2] }));
 
     const balanceColor = balance >= 0 ? '#3b82f6, #2563eb' : '#ef4444, #dc2626';
+
+    const valueBreakdownRows = stats.valueBreakdown.map(v => `
+      <tr${v.key.startsWith('isento') ? ' style="background:#fffbeb;"' : ''}>
+        <td>${esc(v.label)}</td>
+        <td class="total-col">${v.count}</td>
+        <td class="total-col">${esc(fmtMoney(v.total))}</td>
+      </tr>`).join('');
+
+    const sponsorForecastRows = sponsorForecast.pending.map(({ sponsor: s, recebido, saldo, parcelado }) => `
+      <tr>
+        <td>${esc(s.name)}</td>
+        <td>${esc(s.type)}${parcelado ? ' · parcelado' : ''}</td>
+        <td class="total-col">${esc(fmtMoney(s.amount))}</td>
+        <td class="total-col">${esc(fmtMoney(recebido))}</td>
+        <td class="total-col">${esc(fmtMoney(saldo))}</td>
+      </tr>`).join('');
 
     const html = `
       <div class="header-band">
@@ -242,6 +319,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
           <tr><td>Despesas Totais</td><td class="total-col">${esc(fmtMoney(totalExpenses))}</td></tr>
           <tr class="highlight-row"><td><strong>Balanço Final</strong></td><td class="total-col"><strong>${esc(fmtMoney(balance))}</strong></td></tr>
         </tbody></table>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">🧾 Inscrições por Valor (conferência)</div>
+        <table>
+          <thead><tr><th>Categoria</th><th class="size">Qtd</th><th class="size">Recebido</th></tr></thead>
+          <tbody>${valueBreakdownRows}</tbody>
+          <tfoot><tr><td>TOTAL PAGO</td><td class="total-col">${stats.paidCount}</td><td class="total-col">${esc(fmtMoney(stats.valorRecebidoInscricoes))}</td></tr></tfoot>
+        </table>
+        ${stats.isentosCount > 0 ? `
+        <p style="font-size:11px;color:#92400e;margin-top:10px;">
+          ⚠️ ${stats.isentosCount} ${stats.isentosCount === 1 ? 'vaga isenta' : 'vagas isentas'}
+          (valor de tabela ${esc(fmtMoney(stats.isentosValorTabela))}) não entram na receita acima —
+          patrocínio cobre ${stats.isentoPatrocinioCount}, cortesia ${stats.isentoCortesiaCount}${stats.isentoSemMotivoCount > 0 ? `, e <strong>${stats.isentoSemMotivoCount} ainda sem motivo classificado</strong> (ajuste em Corredores)` : ''}.
+        </p>` : ''}
+        ${stats.pendingCount > 0 ? `<p style="font-size:11px;color:#64748b;margin-top:6px;">${stats.pendingCount} ${stats.pendingCount === 1 ? 'inscrito ainda não confirmou pagamento' : 'inscritos ainda não confirmaram pagamento'} — fora desta tabela.</p>` : ''}
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">🔮 Previsão — Patrocínios a Receber</div>
+        ${sponsorForecastRows ? `
+        <p style="font-size:12px;color:#475569;margin:0 0 10px;">
+          Ainda não é receita confirmada — é o que falta entrar dos patrocínios parciais ou pendentes.
+        </p>
+        <table>
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Combinado</th><th class="size">Já recebido</th><th class="size">Saldo previsto</th></tr></thead>
+          <tbody>${sponsorForecastRows}</tbody>
+          <tfoot><tr><td colspan="4">TOTAL PREVISTO A RECEBER</td><td class="total-col">${esc(fmtMoney(sponsorForecast.totalAReceber))}</td></tr></tfoot>
+        </table>
+        ` : `<p style="font-size:12px;color:#475569;">Nenhum patrocínio pendente — todos os cadastrados já estão quitados.</p>`}
       </div>
 
       ${expenseCategoryRows ? `
@@ -474,6 +581,92 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Inscrições por Valor — para fechar as contas */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 lg:col-span-2">
+          <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+            🧾 Inscrições por Valor
+          </h3>
+          <p className="text-slate-500 text-xs mb-4">
+            Só quem já pagou — a soma bate com a Receita de Inscrições do relatório em PDF.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-500 uppercase">
+                <tr className="bg-slate-800/50">
+                  <th className="px-4 py-3 rounded-l-lg">Categoria</th>
+                  <th className="px-4 py-3 text-right">Qtd</th>
+                  <th className="px-4 py-3 text-right rounded-r-lg">Recebido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.valueBreakdown.map(v => (
+                  <tr key={v.key} className={`border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors ${v.key.startsWith('isento') ? 'bg-amber-500/5' : ''}`}>
+                    <td className="px-4 py-3 font-medium text-slate-300">{v.label}</td>
+                    <td className="px-4 py-3 text-right text-slate-400">{v.count}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">R$ {v.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+                <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                  <td className="px-4 py-3 text-yellow-400">TOTAL PAGO</td>
+                  <td className="px-4 py-3 text-right text-yellow-400">{stats.paidCount}</td>
+                  <td className="px-4 py-3 text-right text-yellow-400">R$ {stats.valorRecebidoInscricoes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {stats.isentosCount > 0 && (
+            <p className="text-amber-400/90 text-xs mt-3">
+              {stats.isentosCount} {stats.isentosCount === 1 ? 'vaga isenta' : 'vagas isentas'} (valor de tabela R$ {stats.isentosValorTabela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) não contam como receita.
+              {stats.isentoSemMotivoCount > 0 && <> <strong>{stats.isentoSemMotivoCount} sem motivo classificado</strong> — ajuste em Corredores.</>}
+            </p>
+          )}
+          {stats.pendingCount > 0 && (
+            <p className="text-slate-500 text-xs mt-1">{stats.pendingCount} {stats.pendingCount === 1 ? 'inscrito ainda não pagou' : 'inscritos ainda não pagaram'} (fora desta tabela).</p>
+          )}
+        </div>
+
+        {/* Previsão: patrocínios ainda a receber */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 lg:col-span-2">
+          <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+            🔮 Previsão — Patrocínios a Receber
+          </h3>
+          <p className="text-slate-500 text-xs mb-4">
+            Ainda não é receita confirmada — é o que falta entrar dos patrocínios parciais ou pendentes.
+          </p>
+          {sponsorForecast.count > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 uppercase">
+                  <tr className="bg-slate-800/50">
+                    <th className="px-4 py-3 rounded-l-lg">Patrocinador</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3 text-right">Combinado</th>
+                    <th className="px-4 py-3 text-right">Já recebido</th>
+                    <th className="px-4 py-3 text-right rounded-r-lg">Saldo previsto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sponsorForecast.pending.map(({ sponsor: s, recebido, saldo, parcelado }) => (
+                    <tr key={s.id} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-300">{s.name}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">{s.type}{parcelado ? ' · parcelado' : ''}</td>
+                      <td className="px-4 py-3 text-right text-slate-400">R$ {s.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-right text-emerald-400">R$ {recebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-right font-bold text-amber-400">R$ {saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                    <td className="px-4 py-3 text-yellow-400" colSpan={4}>TOTAL PREVISTO A RECEBER</td>
+                    <td className="px-4 py-3 text-right text-yellow-400">R$ {sponsorForecast.totalAReceber.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-slate-600 text-sm italic">Nenhum patrocínio pendente — todos os cadastrados já estão quitados.</p>
+          )}
         </div>
 
         {/* Gênero */}
