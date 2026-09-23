@@ -1,8 +1,8 @@
 
 import React, { useMemo } from 'react';
-import { Runner, ShirtSize, Expense, Sponsor } from '../types';
-import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar, FileDown } from 'lucide-react';
-import { SENIOR_AGE, EVENT_DATE, formatBrDate, getRunnerPaidValue, getRegistrationFee, getSponsorBalance, isSponsorSettled } from '../constants';
+import { Runner, ShirtSize, Expense, Sponsor, ExtraRevenue } from '../types';
+import { Users, DollarSign, TrendingDown, Wallet, CheckCircle, Activity, Footprints, Calendar, FileDown, Package, Ticket, Briefcase } from 'lucide-react';
+import { SENIOR_AGE, EVENT_DATE, formatBrDate, getRunnerPaidValue, getRegistrationFee, getSponsorBalance, getSponsorPaidAmount, isSponsorSettled } from '../constants';
 import { StatsCard } from './StatsCard';
 import { escapeHtml as esc, printHtml, svgDonut, donutLegend, svgBars } from '../services/printReport';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -15,6 +15,7 @@ interface DashboardProps {
   totalSponsorRevenue?: number;
   totalExtraRevenue?: number;
   expenses?: Expense[];
+  extraRevenues?: ExtraRevenue[];
   sponsors?: Sponsor[];
   raceGroupName?: string;
 }
@@ -42,6 +43,8 @@ const REPORT_STYLE = `
   .chart-row { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   table.mt { margin-top: 14px; }
   .highlight-row td { background: #fef9c3 !important; }
+  .status-pago { color: #047857; font-weight: 700; }
+  .status-pendente { color: #b45309; font-weight: 700; }
 `;
 
 // Donut com total no centro e legenda com contagem/percentual ao lado
@@ -84,7 +87,7 @@ const DonutCard: React.FC<{ title: string; data: { name: string; value: number }
   </div>
 );
 
-export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0, totalRegistrationRevenue = 0, totalSponsorRevenue = 0, totalExtraRevenue = 0, expenses = [], sponsors = [], raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0, totalExpenses = 0, totalRegistrationRevenue = 0, totalSponsorRevenue = 0, totalExtraRevenue = 0, expenses = [], extraRevenues = [], sponsors = [], raceGroupName = '2ª CORRIDA NOTURNA LSC' }) => {
 
   const stats = useMemo(() => {
     const totalRunners = runners.length;
@@ -120,6 +123,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
     let isentoCortesiaCount = 0, isentoCortesiaValor = 0;
     let isentoSemMotivoCount = 0, isentoSemMotivoValor = 0;
 
+    // Cupons: só entre quem já pagou (valor histórico do desconto que de fato
+    // saiu, consistente com a Receita de Inscrições acima)
+    const couponCounts: Record<string, { count: number; total: number }> = {};
+    // Kits: só faz sentido para quem pagou — sem pagamento não tem kit a entregar
+    let kitDeliveredCount = 0;
+    let kitPendingCount = 0;
+
     runners.forEach(r => {
       if (sizeCounts[r.shirtSize] !== undefined) sizeCounts[r.shirtSize]++;
 
@@ -151,6 +161,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         } else {
           inteiraCount++; inteiraTotal += valor;
         }
+        if (r.couponCode && (r.couponDiscount || 0) > 0) {
+          const code = r.couponCode.toUpperCase();
+          if (!couponCounts[code]) couponCounts[code] = { count: 0, total: 0 };
+          couponCounts[code].count++;
+          couponCounts[code].total += r.couponDiscount || 0;
+        }
+        if (r.kitDelivered) kitDeliveredCount++; else kitPendingCount++;
       }
       if (r.paidNoProof && !r.isPaid) paidNoProofCount++;
       if (r.modality === '3k') m3++; else m5++;
@@ -211,12 +228,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
     const isentosCount = isentoPatrocinioCount + isentoCortesiaCount + isentoSemMotivoCount;
     const isentosValorTabela = isentoPatrocinioValor + isentoCortesiaValor + isentoSemMotivoValor;
 
+    const couponSummary = Object.entries(couponCounts)
+      .map(([code, v]) => ({ code, count: v.count, total: v.total }))
+      .sort((a, b) => b.total - a.total);
+    const couponTotalDiscount = couponSummary.reduce((acc, c) => acc + c.total, 0);
+
+    const kitTotal = kitDeliveredCount + kitPendingCount;
+    const kitPct = kitTotal ? Math.round((kitDeliveredCount / kitTotal) * 100) : 0;
+
     return {
       totalRunners, uniqueTeams, sizeCounts, genderData, ageData, sortedTeams,
       topCities, distinctCities, paidCount, pendingCount, pctPaid, avgAge,
       seniorCount, m5, m3, paidNoProofCount, paymentData, modalityData,
       allTeamsSorted, allCitiesSorted, valueBreakdown, valorRecebidoInscricoes,
       isentosCount, isentosValorTabela, isentoPatrocinioCount, isentoCortesiaCount, isentoSemMotivoCount,
+      couponSummary, couponTotalDiscount, kitDeliveredCount, kitPendingCount, kitTotal, kitPct,
     };
   }, [runners]);
 
@@ -236,6 +262,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
     const totalAReceber = pending.reduce((acc, x) => acc + x.saldo, 0);
     return { pending, totalAReceber, count: pending.length };
   }, [sponsors]);
+
+  // Visão geral de patrocínios: todos, quitados e pendentes — pendentes
+  // primeiro (é o que precisa de ação), depois por valor combinado. Mesma
+  // ordenação usada no relatório da tela de Patrocinadores.
+  const sponsorOverview = useMemo(() => {
+    const ordered = [...sponsors].sort((a, b) => {
+      const pa = isSponsorSettled(a), pb = isSponsorSettled(b);
+      return pa === pb ? b.amount - a.amount : (pa ? 1 : -1);
+    }).map(s => ({
+      sponsor: s,
+      recebido: getSponsorPaidAmount(s),
+      saldo: getSponsorBalance(s),
+      quitado: isSponsorSettled(s),
+    }));
+    const totalCombinado = sponsors.reduce((acc, s) => acc + s.amount, 0);
+    const totalRecebido = ordered.reduce((acc, x) => acc + x.recebido, 0);
+    return { ordered, totalCombinado, totalRecebido, count: sponsors.length };
+  }, [sponsors]);
+
+  // Despesas e receita extra, uma linha por lançamento — auditoria completa
+  // para além do resumo por categoria
+  const expenseItems = useMemo(
+    () => [...expenses].sort((a, b) => a.date.localeCompare(b.date)),
+    [expenses]
+  );
+  const extraRevenueItems = useMemo(
+    () => [...extraRevenues].sort((a, b) => a.date.localeCompare(b.date)),
+    [extraRevenues]
+  );
 
   const balance = totalRevenue - totalExpenses;
   const PAYMENT_COLORS = ['#10b981', '#f59e0b'];
@@ -281,6 +336,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         <td class="total-col">${esc(fmtMoney(s.amount))}</td>
         <td class="total-col">${esc(fmtMoney(recebido))}</td>
         <td class="total-col">${esc(fmtMoney(saldo))}</td>
+      </tr>`).join('');
+
+    const sponsorOverviewRows = sponsorOverview.ordered.map(({ sponsor: s, recebido, saldo, quitado }) => `
+      <tr>
+        <td>${esc(s.name)}</td>
+        <td>${esc(s.type)}</td>
+        <td class="total-col">${esc(fmtMoney(s.amount))}</td>
+        <td class="total-col">${esc(fmtMoney(recebido))}</td>
+        <td class="total-col">${saldo > 0 ? esc(fmtMoney(saldo)) : '—'}</td>
+        <td class="size ${quitado ? 'status-pago' : 'status-pendente'}">${quitado ? '✓ PAGO' : (recebido > 0 ? '◐ PARCIAL' : '✗ PENDENTE')}</td>
+      </tr>`).join('');
+
+    const couponRows = stats.couponSummary.map(c => `
+      <tr>
+        <td>${esc(c.code)}</td>
+        <td class="total-col">${c.count}</td>
+        <td class="total-col">${esc(fmtMoney(c.total))}</td>
+      </tr>`).join('');
+
+    const expenseItemRows = expenseItems.map(e => `
+      <tr>
+        <td>${esc(formatBrDate(e.date, true))}</td>
+        <td>${esc(e.description)}</td>
+        <td>${esc(e.category)}</td>
+        <td class="total-col">${esc(fmtMoney(e.amount))}</td>
+      </tr>`).join('');
+
+    const extraRevenueItemRows = extraRevenueItems.map(e => `
+      <tr>
+        <td>${esc(formatBrDate(e.date, true))}</td>
+        <td>${esc(e.description)}</td>
+        <td>${esc(e.category || '—')}</td>
+        <td class="total-col">${esc(fmtMoney(e.amount))}</td>
       </tr>`).join('');
 
     const html = `
@@ -337,6 +425,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         ${stats.pendingCount > 0 ? `<p style="font-size:11px;color:#64748b;margin-top:6px;">${stats.pendingCount} ${stats.pendingCount === 1 ? 'inscrito ainda não confirmou pagamento' : 'inscritos ainda não confirmaram pagamento'} — fora desta tabela.</p>` : ''}
       </div>
 
+      ${couponRows ? `
+      <div class="section-card">
+        <div class="section-title">🎟️ Cupons de Desconto — Resumo</div>
+        <table>
+          <thead><tr><th>Código</th><th class="size">Usos</th><th class="size">Desconto concedido</th></tr></thead>
+          <tbody>${couponRows}</tbody>
+          <tfoot><tr><td>TOTAL</td><td class="total-col">${stats.couponSummary.reduce((a, c) => a + c.count, 0)}</td><td class="total-col">${esc(fmtMoney(stats.couponTotalDiscount))}</td></tr></tfoot>
+        </table>
+      </div>` : ''}
+
+      <div class="section-card">
+        <div class="section-title">🤝 Patrocinadores — Visão Geral (${sponsorOverview.count})</div>
+        ${sponsorOverviewRows ? `
+        <table>
+          <thead><tr><th>Patrocinador</th><th>Tipo</th><th class="size">Combinado</th><th class="size">Recebido</th><th class="size">Saldo</th><th class="size">Status</th></tr></thead>
+          <tbody>${sponsorOverviewRows}</tbody>
+          <tfoot><tr><td colspan="2">TOTAL</td><td class="total-col">${esc(fmtMoney(sponsorOverview.totalCombinado))}</td><td class="total-col">${esc(fmtMoney(sponsorOverview.totalRecebido))}</td><td colspan="2"></td></tr></tfoot>
+        </table>
+        ` : `<p style="font-size:12px;color:#475569;">Nenhum patrocinador cadastrado.</p>`}
+      </div>
+
       <div class="section-card">
         <div class="section-title">🔮 Previsão — Patrocínios a Receber</div>
         ${sponsorForecastRows ? `
@@ -360,6 +469,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
         </div>
       </div>
       ` : ''}
+
+      ${expenseItemRows ? `
+      <div class="section-card">
+        <div class="section-title">📋 Despesas — Detalhamento (${expenseItems.length})</div>
+        <table>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="size">Valor</th></tr></thead>
+          <tbody>${expenseItemRows}</tbody>
+          <tfoot><tr><td colspan="3">TOTAL</td><td class="total-col">${esc(fmtMoney(totalExpenses))}</td></tr></tfoot>
+        </table>
+      </div>` : ''}
+
+      ${extraRevenueItemRows ? `
+      <div class="section-card">
+        <div class="section-title">💵 Receita Extra — Detalhamento (${extraRevenueItems.length})</div>
+        <table>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="size">Valor</th></tr></thead>
+          <tbody>${extraRevenueItemRows}</tbody>
+          <tfoot><tr><td colspan="3">TOTAL</td><td class="total-col">${esc(fmtMoney(totalExtraRevenue))}</td></tr></tfoot>
+        </table>
+      </div>` : ''}
 
       <div class="section-card">
         <div class="section-title">🏅 Participação</div>
@@ -393,6 +522,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
       <div class="section-card">
         <div class="section-title">👕 Camisetas por Tamanho</div>
         ${svgBars(Object.entries(stats.sizeCounts).map(([size, count]) => ({ label: size, value: count })), { color: '#f59e0b', labelWidth: 60 })}
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">📦 Entrega de Kits (só quem pagou)</div>
+        <table class="mt"><tbody>
+          <tr><td>Kits entregues</td><td class="total-col">${stats.kitDeliveredCount}</td></tr>
+          <tr><td>Kits ainda pendentes</td><td class="total-col">${stats.kitPendingCount}</td></tr>
+          <tr class="highlight-row"><td><strong>Total (pagos)</strong></td><td class="total-col"><strong>${stats.kitTotal} — ${stats.kitPct}% entregue</strong></td></tr>
+        </tbody></table>
       </div>
 
       <div class="section-card">
@@ -667,6 +805,113 @@ export const Dashboard: React.FC<DashboardProps> = ({ runners, totalRevenue = 0,
           ) : (
             <p className="text-slate-600 text-sm italic">Nenhum patrocínio pendente — todos os cadastrados já estão quitados.</p>
           )}
+        </div>
+
+        {/* Patrocinadores — visão geral (todos, quitados e pendentes) */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60 lg:col-span-2">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <Briefcase size={18} className="text-yellow-400" /> Patrocinadores — Visão Geral ({sponsorOverview.count})
+          </h3>
+          {sponsorOverview.count > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 uppercase">
+                  <tr className="bg-slate-800/50">
+                    <th className="px-4 py-3 rounded-l-lg">Patrocinador</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3 text-right">Combinado</th>
+                    <th className="px-4 py-3 text-right">Recebido</th>
+                    <th className="px-4 py-3 text-right">Saldo</th>
+                    <th className="px-4 py-3 text-right rounded-r-lg">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sponsorOverview.ordered.map(({ sponsor: s, recebido, saldo, quitado }) => (
+                    <tr key={s.id} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-300">{s.name}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">{s.type}</td>
+                      <td className="px-4 py-3 text-right text-slate-400">R$ {s.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-right text-emerald-400">R$ {recebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-right text-slate-400">{saldo > 0 ? `R$ ${saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
+                      <td className={`px-4 py-3 text-right text-xs font-bold ${quitado ? 'text-emerald-400' : recebido > 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                        {quitado ? '✓ PAGO' : recebido > 0 ? '◐ PARCIAL' : '✗ PENDENTE'}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                    <td className="px-4 py-3 text-yellow-400" colSpan={2}>TOTAL</td>
+                    <td className="px-4 py-3 text-right text-yellow-400">R$ {sponsorOverview.totalCombinado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-right text-yellow-400">R$ {sponsorOverview.totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-slate-600 text-sm italic">Nenhum patrocinador cadastrado.</p>
+          )}
+        </div>
+
+        {/* Cupons de desconto */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <Ticket size={18} className="text-yellow-400" /> Cupons de Desconto
+          </h3>
+          {stats.couponSummary.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 uppercase">
+                  <tr className="bg-slate-800/50">
+                    <th className="px-4 py-3 rounded-l-lg">Código</th>
+                    <th className="px-4 py-3 text-right">Usos</th>
+                    <th className="px-4 py-3 text-right rounded-r-lg">Desconto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.couponSummary.map(c => (
+                    <tr key={c.code} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-slate-300">{c.code}</td>
+                      <td className="px-4 py-3 text-right text-slate-400">{c.count}</td>
+                      <td className="px-4 py-3 text-right font-bold text-white">R$ {c.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                    <td className="px-4 py-3 text-yellow-400">TOTAL</td>
+                    <td className="px-4 py-3 text-right text-yellow-400">{stats.couponSummary.reduce((a, c) => a + c.count, 0)}</td>
+                    <td className="px-4 py-3 text-right text-yellow-400">R$ {stats.couponTotalDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-slate-600 text-sm italic">Nenhum cupom usado por quem já pagou.</p>
+          )}
+        </div>
+
+        {/* Entrega de Kits */}
+        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800/60">
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <Package size={18} className="text-yellow-400" /> Entrega de Kits
+          </h3>
+          <p className="text-slate-500 text-xs mb-4">Contando só quem já pagou — {stats.kitPct}% entregue.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <tbody>
+                <tr className="border-b border-slate-800/40">
+                  <td className="px-4 py-3 font-medium text-slate-300">Entregues</td>
+                  <td className="px-4 py-3 text-right font-bold text-emerald-400">{stats.kitDeliveredCount}</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-medium text-slate-300">Pendentes</td>
+                  <td className="px-4 py-3 text-right font-bold text-amber-400">{stats.kitPendingCount}</td>
+                </tr>
+                <tr className="bg-yellow-400/10 font-bold border-t border-yellow-400/20">
+                  <td className="px-4 py-3 text-yellow-400">TOTAL (pagos)</td>
+                  <td className="px-4 py-3 text-right text-yellow-400">{stats.kitTotal}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Gênero */}
